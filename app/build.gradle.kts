@@ -85,4 +85,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     implementation(libs.datastore.preferences)
+    implementation(libs.google.fonts.compose)
 }
