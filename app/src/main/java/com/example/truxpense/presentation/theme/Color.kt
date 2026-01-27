@@ -1,4 +1,4 @@
-package com.example.truxpense.ui.theme
+package com.example.truxpense.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 
