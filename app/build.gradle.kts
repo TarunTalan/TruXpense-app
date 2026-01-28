@@ -47,6 +47,7 @@ android {
 }
 
 dependencies {
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -76,6 +77,9 @@ dependencies {
     // Secure storage for refresh tokens
     implementation(libs.androidx.security.crypto)
 
+    // Core splashscreen API - use version catalog
+    implementation(libs.core.splashscreen)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -86,4 +90,6 @@ dependencies {
 
     implementation(libs.datastore.preferences)
     implementation(libs.google.fonts.compose)
+    // Hilt Navigation Compose (for hiltViewModel in Compose)
+    implementation(libs.androidx.hilt.navigation.compose)
 }

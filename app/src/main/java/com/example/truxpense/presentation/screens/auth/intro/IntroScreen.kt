@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
 
@@ -68,6 +69,7 @@ fun IntroScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .clearFocusOnTap()
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
