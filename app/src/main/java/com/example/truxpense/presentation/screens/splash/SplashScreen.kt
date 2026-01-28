@@ -138,7 +138,7 @@ fun SplashScreen(
             Box(modifier = Modifier.offset { IntOffset(truOffset.value.roundToInt(), 0) }) {
                 Text(
                     text = "Tru",
-                    fontSize = 36.sp,
+                    fontSize = 40.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.graphicsLayer { alpha = truAlpha.value }
@@ -152,7 +152,7 @@ fun SplashScreen(
                 .graphicsLayer { alpha = xAlpha.value }) {
                 Text(
                     text = "X",
-                    fontSize = 94.sp,
+                    fontSize = 80.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -162,7 +162,7 @@ fun SplashScreen(
             Box(modifier = Modifier.offset { IntOffset(penseOffset.value.roundToInt(), 0) }) {
                 Text(
                     text = "pense",
-                    fontSize = 36.sp,
+                    fontSize = 40.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.graphicsLayer { alpha = penseAlpha.value }
@@ -177,7 +177,7 @@ fun SplashScreen(
                 Image(
                     painter = painterResource(id = R.drawable.splash_screen_icon),
                     contentDescription = "App icon",
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(40.dp)
                 )
             }
         }

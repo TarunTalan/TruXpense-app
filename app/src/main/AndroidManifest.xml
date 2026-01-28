@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required to read SMS messages for automatic expense parsing (requested at runtime) -->
+    <uses-permission android:name="android.permission.READ_SMS" />
 
     <application
         android:name=".TruXpenseApplication"
