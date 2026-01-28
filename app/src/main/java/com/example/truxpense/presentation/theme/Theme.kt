@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.theme
 
+import android.graphics.Color.rgb
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -8,31 +9,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(159, 214, 207, 1),
-    secondary = Color(193, 199, 205, 1),
-    tertiary = Color(247, 249, 250, 1),
-    background = Color.Black,
+    primary = Color(rgb(159, 214, 207)),
+    secondary = Color(rgb(193, 199, 205)),
+    tertiary = Color(rgb(247, 249, 250)),
+    background = Color(rgb(18, 20, 23)),
     surface = Color(0xFFFFFBFE),
     onPrimary = Color.White,
-    onSecondary = Color.White,
+    onSecondary = Color(rgb(58, 63, 69)),
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    error = Color(224, 122, 122, 1),
+    onBackground = Color(rgb(247, 249, 250)),
+    onSurface = Color(rgb(154, 163, 171)),
+    error = Color(rgb(224, 122, 122)),
+    outline = Color(rgb(110, 119, 129,)),
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(47, 164, 169, 1),
-    secondary = Color(110, 119, 129, 1),
-    tertiary = Color(58, 63, 69, 1),
+    primary = Color(rgb(47, 164, 169)),
+    secondary = Color(rgb(110, 119, 129)),
+    tertiary = Color(rgb(58, 63, 69)),
     background = Color.White,
-    surface = Color(0xFFFFFBFE),
+    surface = Color.White,
     onPrimary = Color.White,
-    onSecondary = Color.White,
+    onSecondary = Color(rgb(193, 199, 205)),
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
+    onBackground = Color(rgb(58, 63, 69)),
+    onSurface = Color(rgb(154, 163, 171)),
     error = Color(214, 69, 69, 1),
+    outline = Color(rgb(154, 163, 171)),
 )
 
 @Composable
