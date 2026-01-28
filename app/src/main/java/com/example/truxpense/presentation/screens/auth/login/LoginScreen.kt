@@ -134,13 +134,13 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     AuthTextField(
-                        value = email,
-                        onValueChange = { viewModel.onEmailChanged(it) },
-                        label = "Email Address",
-                        bottomLabel = "We'll send a verification code to this email",
-                        placeholder = "Example@xyz.com",
                         bgColor = MaterialTheme.colorScheme.background,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                        label = "Email Address",
+                        placeholder = "Example@xyz.com",
+                        bottomLabel = "We'll send a verification code to this email",
+                        value = email,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        onValueChange = { viewModel.onEmailChanged(it) },
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(

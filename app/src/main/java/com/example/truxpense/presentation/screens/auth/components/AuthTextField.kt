@@ -30,7 +30,8 @@ fun AuthTextField(
     bottomLabel: String? = null,
     value: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    contentPadding: Int = 0
 ) {
     var isFocused by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -62,7 +63,7 @@ fun AuthTextField(
             decorationBox = { innerTextField ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().padding(horizontal = contentPadding.dp)
                 ) {
                     if (keyboardOptions.keyboardType == KeyboardType.Email) {
                         Icon(
@@ -78,7 +79,8 @@ fun AuthTextField(
                                 text = placeholder,
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface
-                                )
+                                ),
+                                modifier = Modifier
                             )
                         }
                         innerTextField()
@@ -108,13 +110,12 @@ fun AuthTextField(
 @Composable
 fun AuthTextFieldPreview() {
     AuthTextField(
-        modifier = Modifier,
         bgColor = MaterialTheme.colorScheme.background,
         label = "Email Address",
         placeholder = "placeholder",
         error = "",
         bottomLabel = "bottomLabel",
         value = "",
-        onValueChange = {}
+        onValueChange = {},
     )
 }
