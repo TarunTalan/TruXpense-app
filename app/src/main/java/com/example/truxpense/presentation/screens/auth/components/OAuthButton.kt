@@ -1,6 +1,5 @@
 package com.example.truxpense.presentation.screens.auth.components
 
-import android.graphics.Color.rgb
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -42,7 +41,7 @@ fun OAuthButton(
 
             Icon(
                 painter = if (isGoogle) painterResource(id = R.drawable.google_icon) else painterResource(id = R.drawable.facebook_icon),
-                contentDescription = "Google icon",
+                contentDescription = "OAuth icon",
                 tint = Color.Unspecified,
                 modifier = Modifier.size(24.dp)
             )
