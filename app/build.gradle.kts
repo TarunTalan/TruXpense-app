@@ -19,6 +19,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Provide the Google Web OAuth client id as a string resource from a local property.
+        // Add `googleWebClientId=YOUR_CLIENT_ID` to your local.properties (this file is not checked in).
+        val webClientId: String? = (project.findProperty("googleWebClientId") as? String)
+        if (!webClientId.isNullOrBlank()) {
+            resValue("string", "default_web_client_id", webClientId)
+        } else {
+            // fallback to a visible placeholder so the project still builds until you set the property
+            resValue("string", "default_web_client_id", "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com")
+        }
     }
 
     buildTypes {

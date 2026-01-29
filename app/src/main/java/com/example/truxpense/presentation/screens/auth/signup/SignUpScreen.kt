@@ -27,16 +27,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 import com.example.truxpense.presentation.screens.auth.components.OAuthButton
 import com.example.truxpense.presentation.utils.clearFocusOnTap
+import com.example.truxpense.data.repository.GoogleSignInRepository
+import com.example.truxpense.data.remote.api.TokenResponse
 
 @Composable
 fun SignUpScreen(
     onBack: (() -> Unit)? = null,
-    onGoogleAuth: (() -> Unit)? = null,
     onSignUp: ((String) -> Unit)? = null,
     onLoginNavigate: (() -> Unit)? = null,
     onOtpNavigate: (() -> Unit)? = null,
@@ -46,6 +50,18 @@ fun SignUpScreen(
     val checked by viewModel.agreeTnc.collectAsState()
     var showTncDialog by remember { mutableStateOf(false) }
     val isEmailValid = remember(email) { Patterns.EMAIL_ADDRESS.matcher(email).matches() }
+
+    val context = LocalContext.current
+    val googleSignInRepository = remember { GoogleSignInRepository(context) }
+    val signInIntent = remember { googleSignInRepository.getSignInIntent() }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.handleGoogleSignInResult(result.data, onSuccess = { resp: TokenResponse -> resp.accessToken?.let { onSignUp?.invoke(it) } }, onError = { err -> println("Google sign-up error: $err") })
+        } else {
+            println("Google sign-up canceled")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -169,12 +185,14 @@ fun SignUpScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
+
                     OAuthButton(
                         modifier = Modifier,
                         text = "Continue with Google",
-                        onClick = { onGoogleAuth?.invoke() },
+                        onClick = { launcher.launch(signInIntent) },
                         isGoogle = true
                     )
+
                     Spacer(modifier = Modifier.height(16.dp))
                     OAuthButton(
                         modifier = Modifier,
@@ -243,35 +261,35 @@ fun SignUpScreen(
                             Text(
                                 text = "TruXpense reads only the data necessary to help you track your expenses automatically.\n",
                                 style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Start
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Start
                             )
 
                             Text(
                                 text = "What we access:",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                                textAlign = TextAlign.Start
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Start
                             )
-                            Text(text = "• Bank transaction SMS messages.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
-                            Text(text = "• App usage data for product improvements.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
+                            Text(text = "• Bank transaction SMS messages.", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                            Text(text = "• App usage data for product improvements.", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Start)
 
                             Text(
                                 text = "\nWhat we don’t access:",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                                textAlign = TextAlign.Start
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Start
                             )
-                            Text(text = "• Personal messages.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
-                            Text(text = "• OTPs from other apps.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
-                            Text(text = "• Contacts or call logs.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
-                            Text(text = "• Any other unrelated personal data.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
+                            Text(text = "• Personal messages.", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                            Text(text = "• OTPs from other apps.", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                            Text(text = "• Contacts or call logs.", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                            Text(text = "• Any other unrelated personal data.", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Start)
 
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
                                 text = "By continuing, you agree to allow TruXpense to access the data listed above for the purpose of automatically categorizing and tracking your expenses.",
                                 style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.Start,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Start,
                                 modifier = Modifier.padding(top = 8.dp)
                             )
                         }
