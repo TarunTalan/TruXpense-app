@@ -1,10 +1,9 @@
 package com.example.truxpense.presentation.screens.onboarding.username
 
+import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,6 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 import com.example.truxpense.presentation.utils.clearFocusOnTap
@@ -26,8 +26,11 @@ fun UsernameScreen(
     onComplete: (() -> Unit)? = null,
     viewModel: UsernameViewModel = hiltViewModel()
 ) {
-    val username by viewModel.username.collectAsState()
-    val enabled = username.isNotBlank()
+    // Read username from ViewModel
+    val username by viewModel.username.collectAsState(initial = "")
+    val usernameError by viewModel.error.collectAsState(initial = null)
+    val isSaving by viewModel.isSaving.collectAsState(initial = false)
+    val enabled = username.isNotBlank() && !isSaving
 
     Scaffold(
         topBar = {
@@ -38,7 +41,7 @@ fun UsernameScreen(
                 contentAlignment = Alignment.CenterStart
             ) {
                 IconButton(onClick = { onBack?.invoke() }) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(painter = painterResource(id = R.drawable.back_icon), contentDescription = "Back")
                 }
             }
         },
@@ -49,18 +52,32 @@ fun UsernameScreen(
                     .padding(vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AuthButton(onClick = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } }, text = "Continue", enabled = enabled)
+                AuthButton(
+                    onClick = { if (username.isNotBlank()) viewModel.saveAndComplete { onComplete?.invoke() } },
+                    text = "Continue",
+                    enabled = enabled,
+                    isLoading = isSaving
+                )
             }
         }
-    ) { _ ->
-        // Delegate UI to a previewable composable
-        UsernameContent(
-            username = username,
-            onUsernameChange = { viewModel.onUsernameChanged(it) },
-            onBack = { onBack?.invoke() },
-            onComplete = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } },
-            enabled = enabled
-        )
+    ) { innerPadding ->
+        // Main content
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .clearFocusOnTap()
+        ) {
+            UsernameContent(
+                username = username,
+                onUsernameChange = { viewModel.onUsernameChanged(it) },
+                onBack = { onBack?.invoke() },
+                onComplete = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } },
+                enabled = enabled,
+                showActions = false,
+                error = usernameError
+            )
+        }
     }
 }
 
@@ -71,7 +88,8 @@ fun UsernameContent(
     onBack: () -> Unit = {},
     onComplete: () -> Unit = {},
     enabled: Boolean = false,
-    showActions: Boolean = false
+    showActions: Boolean = false,
+    error: String? = null
 ) {
     Column(
         modifier = Modifier
@@ -88,7 +106,7 @@ fun UsernameContent(
                 contentAlignment = Alignment.CenterStart
             ) {
                 Icon(
-                    painter = painterResource(id = com.example.truxpense.R.drawable.back_icon),
+                    painter = painterResource(id = R.drawable.back_icon),
                     contentDescription = null,
                     tint = Color.Unspecified,
                     modifier = Modifier.clickable { onBack() }.padding(vertical = 20.dp)
@@ -122,7 +140,7 @@ fun UsernameContent(
             onValueChange = onUsernameChange,
             contentPadding = 16,
             modifier = Modifier.fillMaxWidth(),
-            error = "",
+            error = error,
             enabled = true,
         )
 
@@ -157,7 +175,7 @@ fun UsernameContentPreviewLight() {
     }
 }
 
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, name = "Username - Dark")
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Username - Dark")
 @Composable
 fun UsernameContentPreviewDark() {
     MaterialTheme {

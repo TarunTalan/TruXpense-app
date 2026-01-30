@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.auth.login
 
+import android.app.Activity
 import android.graphics.Color.rgb
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -31,18 +32,20 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 import com.example.truxpense.presentation.screens.auth.components.OAuthButton
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 import com.example.truxpense.data.repository.GoogleSignInRepository
+import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.navigation.AuthFlowViewModel
 import com.example.truxpense.util.findActivity
 
 @Composable
 fun LoginScreen(
     onBack: () -> Unit,
-    onNavigateToOtp: () -> Unit,
+    onNavigateToOtp: (String, AuthFlowType) -> Unit,
     onNavigateToHome: (String) -> Unit,
     onNavigateToSignup: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel(),
@@ -56,8 +59,8 @@ fun LoginScreen(
     // Handle navigation events
     LaunchedEffect(state.navigateToOtp) {
         if (state.navigateToOtp) {
-            authFlowViewModel.setLogin(state.email)
-            onNavigateToOtp()
+            // delegate navigation to the NavHost so it can persist flow/email
+            onNavigateToOtp(state.email, AuthFlowType.LOGIN)
             viewModel.onEvent(LoginEvent.OnNavigationHandled)
         }
     }
@@ -73,23 +76,9 @@ fun LoginScreen(
     val googleSignInLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
+        if (result.resultCode == Activity.RESULT_OK) {
             viewModel.handleGoogleSignInResult(result.data)
         }
-    }
-
-    // Show error dialog
-    state.error?.let { error ->
-        AlertDialog(
-            onDismissRequest = { viewModel.onEvent(LoginEvent.ClearError) },
-            title = { Text("Error") },
-            text = { Text(error) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onEvent(LoginEvent.ClearError) }) {
-                    Text("OK")
-                }
-            }
-        )
     }
 
     Scaffold(
@@ -100,10 +89,11 @@ fun LoginScreen(
             )
         },
         bottomBar = {
+            // Keep Verify enabled unless field is empty or an API call is running
             LoginBottomBar(
                 onLogin = { viewModel.onEvent(LoginEvent.LoginWithEmail) },
                 onNavigateToSignup = onNavigateToSignup,
-                enabled = state.canLogin && !state.isLoading,
+                enabled = state.email.isNotBlank() && !state.isLoading,
                 isLoading = state.isLoading
             )
         }
@@ -129,17 +119,17 @@ fun LoginScreen(
                         googleSignInLauncher.launch(intent)
                     } catch (e: Exception) {
                         Log.e("LoginScreen", "Failed to launch Google Sign-In", e)
+                        // Show inline error instead of dialog
+                        viewModel.onEvent(LoginEvent.ClearError)
+                        // Setting the error text is handled in ViewModel when appropriate
                     }
                 }
             )
 
-            // Loading overlay
-            if (state.isLoading) {
-                LoadingOverlay()
-            }
+            // Removed full screen LoadingOverlay; button-level loading is used instead
         }
 
-        // Terms and Conditions Dialog
+        // Terms and Conditions Dialog (keep)
         if (state.showTncDialog) {
             TncDialog(
                 onDismiss = { viewModel.onEvent(LoginEvent.ShowTncDialog(false)) }
@@ -160,7 +150,7 @@ private fun LoginTopBar(
         contentAlignment = Alignment.CenterStart
     ) {
         Icon(
-            painter = painterResource(id = com.example.truxpense.R.drawable.back_icon),
+            painter = painterResource(id = R.drawable.back_icon),
             contentDescription = null,
             tint = Color.Unspecified,
             modifier = Modifier.clickable { onBack() }.padding(vertical = 20.dp)
@@ -184,7 +174,8 @@ private fun LoginBottomBar(
         AuthButton(
             onClick = onLogin,
             text = "Verify Email",
-            enabled = enabled
+            enabled = enabled,
+            isLoading = isLoading
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -236,6 +227,7 @@ private fun LoginContent(
             label = "Email Address",
             placeholder = "Example@xyz.com",
             bottomLabel = "We'll send a verification code to this email",
+            error = state.error, // show inline error instead of dialog
             value = state.email,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             onValueChange = { onEvent(LoginEvent.EmailChanged(it)) },
@@ -250,8 +242,9 @@ private fun LoginContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // OAuth Buttons
+        // Keep OAuth button label constant; only disable while loading
         OAuthButton(
-            text = if (state.isLoading) "Signing in..." else "Continue with Google",
+            text = "Continue with Google",
             onClick = onGoogleSignIn,
             isGoogle = true,
             enabled = !state.isLoading
@@ -384,17 +377,6 @@ private fun TncCheckbox(
     }
 }
 
-@Composable
-private fun LoadingOverlay() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.3f)),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
-}
 
 @Composable
 private fun TncDialog(onDismiss: () -> Unit) {
@@ -447,8 +429,8 @@ private fun TncDialog(onDismiss: () -> Unit) {
 fun LoginScreenPreview() {
     LoginScreen(
         onBack = {},
-        onNavigateToOtp = {},
         onNavigateToHome = {},
-        onNavigateToSignup = {}
+        onNavigateToSignup = {},
+        onNavigateToOtp = TODO(),
     )
 }

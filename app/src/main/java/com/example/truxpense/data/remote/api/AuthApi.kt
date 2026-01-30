@@ -23,13 +23,13 @@ interface AuthApi {
     @POST("api/auth/signup/send-otp")
     suspend fun sendSignupOtp(@Body request: Map<String, String>): Response<SignupOtpResponse>
 
-    @POST("api/auth/signup/verify-otp")
+    @POST("api/auth/signup/verify")
     suspend fun verifySignupOtp(@Body request: VerifySignupRequest): Response<TokenResponse>
 
     @POST("api/auth/login/send-otp")
     suspend fun sendLoginOtp(@Body request: Map<String, String>): Response<LoginOtpResponse>
 
-    @POST("api/auth/login/verify-otp")
+    @POST("api/auth/login/verify")
     suspend fun verifyLoginOtp(@Body request: VerifyLoginOtpRequest): Response<TokenResponse>
 
     @POST("api/auth/signup/resend-otp")

@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.auth.otp
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -30,6 +32,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.navigation.AuthFlowViewModel
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
@@ -43,6 +46,8 @@ fun OtpScreen(
     onResend: (() -> Unit)? = null,
     otpLength: Int = 6,
     resendSeconds: Int = 30,
+    authEmailParam: String? = null,
+    flowParam: AuthFlowType? = null,
     viewModel: OtpViewModel = hiltViewModel()
 ) {
     val otpDigits by viewModel.digits.collectAsState()
@@ -50,10 +55,15 @@ fun OtpScreen(
     val resendRemaining by viewModel.resendSecondsRemaining.collectAsState()
 
     val authFlowVm: AuthFlowViewModel = hiltViewModel()
-    val currentFlow by authFlowVm.flow.collectAsState()
-    val authEmail by authFlowVm.email.collectAsState()
+    val currentFlowFromVm by authFlowVm.flow.collectAsState()
+    val authEmailFromVm by authFlowVm.email.collectAsState()
 
-    var localError by remember { mutableStateOf<String?>(null) }
+    // prefer explicit params passed from NavHost to avoid race conditions
+    val currentFlow: AuthFlowType? = flowParam ?: currentFlowFromVm
+    val authEmail: String = authEmailParam ?: authEmailFromVm
+
+    // Use the ViewModel's error StateFlow so API errors are displayed inline
+    val vmError by viewModel.error.collectAsState()
 
     // start initial resend countdown
     LaunchedEffect(Unit) {
@@ -68,30 +78,37 @@ fun OtpScreen(
         currentFlow = currentFlow,
         authEmail = authEmail,
         otpLength = otpLength,
+        resendSeconds = resendSeconds,
         onBack = onBack,
         onDigitChange = { index, value -> viewModel.updateDigit(index, value) },
         onBackspace = { index -> viewModel.updateDigit(index, "") },
         onVerify = { otp ->
-            val isSignup = currentFlow == AuthFlowType.SIGNUP
+            // Call verify with explicit flowType so the correct backend endpoint is used
             viewModel.verifyOtp(
                 email = authEmail,
                 otp = otp,
-                isSignup = isSignup,
+                flowType = currentFlow,
                 onSuccess = {
                     onVerified?.invoke()
                 },
-                onError = { errMsg ->
-                    // show friendly error via internal state
-                    localError = errMsg
-                }
+                onError = { /* handled via viewModel.error */ }
             )
         },
         onResend = {
-            onResend?.invoke()
-            viewModel.startResendTimer(resendSeconds)
+            // Use viewModel.resendOtp with explicit flow type to call the right endpoint
+            viewModel.resendOtp(
+                email = authEmail,
+                flowType = currentFlow,
+                onSuccess = {
+                    // restart timer and notify parent
+                    viewModel.startResendTimer(resendSeconds)
+                    onResend?.invoke()
+                },
+                onError = { /* handled via viewModel.error */ }
+            )
         },
-        errorMessage = localError,
-        onDismissError = { localError = null }
+        // show vm error (set by viewModel when API fails)
+        errorMessage = vmError
     )
 }
 
@@ -102,19 +119,22 @@ fun OtpContent(
     resendRemaining: Int,
     currentFlow: AuthFlowType?,
     authEmail: String,
+    resendSeconds: Int,
     otpLength: Int,
     onBack: (() -> Unit)? = null,
     onDigitChange: (Int, String) -> Unit = { _, _ -> },
     onBackspace: (Int) -> Unit = {},
     onVerify: (String) -> Unit = {},
     onResend: () -> Unit = {},
-    errorMessage: String? = null,
-    onDismissError: () -> Unit = {}
+    errorMessage: String? = null
 ) {
+    val vm: OtpViewModel = hiltViewModel()
+    val isLoading by vm.isLoading.collectAsState()
+
     val focusRequesters = remember { List(otpLength) { FocusRequester() } }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val enabledVerify = otpDigits.all { it.isNotEmpty() }
+    val enabledVerify = otpDigits.all { it.isNotEmpty() } && !isLoading
 
     Scaffold(
         topBar = {
@@ -125,13 +145,14 @@ fun OtpContent(
                 contentAlignment = Alignment.CenterStart
             ) {
                 Icon(
-                    painter = painterResource(id = com.example.truxpense.R.drawable.back_icon),
+                    painter = painterResource(id = R.drawable.back_icon),
                     contentDescription = null,
                     tint = Color.Unspecified,
                     modifier = Modifier.clickable { onBack?.invoke() }.padding(vertical = 20.dp)
                 )
             }
         },
+        // bottomBar with loading-aware button
         bottomBar = {
             Column(
                 modifier = Modifier
@@ -143,22 +164,31 @@ fun OtpContent(
                     onClick = {
                         // Build OTP string
                         val otp = otpDigits.joinToString(separator = "")
-                        val isSignup = currentFlow == AuthFlowType.SIGNUP
                         // Call ViewModel verify which will hit the backend and return parsed messages
                         onVerify(otp)
                     },
                     text = "Verify OTP",
-                    enabled = enabledVerify
+                    enabled = enabledVerify,
+                    isLoading = isLoading
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
                 ResendButton(
                     onClick = {
-                        // delegate resend action to the parent via onResend so the calling screen can send appropriate endpoint
-                        onResend()
+                        // Use ViewModel (vm) to resend and restart timer
+                        vm.resendOtp(
+                            email = authEmail,
+                            flowType = currentFlow,
+                            onSuccess = {
+                                // restart timer and notify parent
+                                vm.startResendTimer(resendSeconds)
+                                onResend()
+                            },
+                            onError = { /* handled via viewModel.error */ }
+                        )
                     },
                     text = if (canResend) "Resend OTP" else "Resend in ${resendRemaining}s",
-                    enabled = canResend,
+                    enabled = canResend && !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -168,6 +198,9 @@ fun OtpContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // ensure OTP screen has an opaque background so underlying screens/buttons
+                // cannot be interacted with while OTP is active
+                .background(MaterialTheme.colorScheme.background)
                 .clearFocusOnTap(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -194,6 +227,7 @@ fun OtpContent(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
+                val hasError = !errorMessage.isNullOrEmpty()
                 for (i in 0 until otpLength) {
                     val value = otpDigits[i]
                     val isFocused = remember { mutableStateOf(false) }
@@ -203,6 +237,7 @@ fun OtpContent(
                         index = i,
                         otpLength = otpLength,
                         isFocused = isFocused.value,
+                        hasError = hasError,
                         onValueChange = { newValue ->
                             when {
                                 // Handle paste (multiple characters)
@@ -259,17 +294,33 @@ fun OtpContent(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Inline error message instead of AlertDialog
+            if (!errorMessage.isNullOrEmpty()) {
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
 
-        // Error dialog shown when verification fails
-        errorMessage?.let { err ->
-            AlertDialog(
-                onDismissRequest = onDismissError,
-                title = { Text(text = "Verification failed") },
-                text = { Text(text = err) },
-                confirmButton = {
-                    TextButton(onClick = onDismissError) { Text(text = "OK") }
-                }
+        // While verifying OTP, block pointer events on the entire screen so underlying UI
+        // (or concurrent click events) can't activate OAuth buttons or other controls.
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+                    .pointerInput(Unit) {
+                        // Consume all pointer events while loading
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent()
+                            }
+                        }
+                    }
             )
         }
     }
@@ -281,6 +332,7 @@ fun OtpDigitBox(
     index: Int,
     otpLength: Int,
     isFocused: Boolean,
+    hasError: Boolean = false,
     onValueChange: (String) -> Unit,
     onBackspace: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
@@ -288,6 +340,7 @@ fun OtpDigitBox(
     modifier: Modifier = Modifier
 ) {
     val borderColor = when {
+        hasError -> MaterialTheme.colorScheme.error
         isFocused -> MaterialTheme.colorScheme.primary
         value.isNotEmpty() -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
@@ -466,18 +519,18 @@ fun OtpContentPreviewLight() {
         resendRemaining = 28,
         currentFlow = AuthFlowType.SIGNUP,
         authEmail = "demo@example.com",
+        resendSeconds = 30,
         otpLength = 6,
         onBack = {},
         onDigitChange = { _, _ -> },
         onBackspace = {},
         onVerify = { /* no-op */ },
         onResend = {},
-        errorMessage = null,
-        onDismissError = {}
+        errorMessage = null
     )
 }
 
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, name = "OTP - Dark")
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "OTP - Dark")
 @Composable
 fun OtpContentPreviewDark() {
     OtpContent(
@@ -486,13 +539,13 @@ fun OtpContentPreviewDark() {
         resendRemaining = 0,
         currentFlow = AuthFlowType.LOGIN,
         authEmail = "demo@example.com",
+        resendSeconds = 30,
         otpLength = 6,
         onBack = {},
         onDigitChange = { _, _ -> },
         onBackspace = {},
         onVerify = { /* no-op */ },
         onResend = {},
-        errorMessage = "Invalid code, please try again",
-        onDismissError = {}
+        errorMessage = "Invalid code, please try again"
     )
 }

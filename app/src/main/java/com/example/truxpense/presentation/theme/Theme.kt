@@ -34,7 +34,7 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = Color(rgb(247, 249, 250)),
     onBackground = Color(rgb(58, 63, 69)),
     onSurface = Color(rgb(154, 163, 171)),
-    error = Color(214, 69, 69, 1),
+    error = Color(rgb(214, 69, 69)),
     outline = Color(rgb(154, 163, 171)),
 )
 

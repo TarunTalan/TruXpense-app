@@ -36,19 +36,24 @@ class LoginViewModel @Inject constructor(
     fun onEvent(event: LoginEvent) {
         when (event) {
             is LoginEvent.EmailChanged -> {
-                val email = event.email
-                val isValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
+                // sanitize input: remove spaces, emoji and disallowed characters and cap length
+                val email = com.example.truxpense.presentation.utils.InputValidators.filterEmailInput(event.email)
+                val isValid = com.example.truxpense.presentation.utils.InputValidators.isValidEmail(email)
+                // Reset error when user edits the email
                 _state.value = _state.value.copy(
                     email = email,
                     isEmailValid = isValid,
-                    canLogin = isValid && _state.value.agreeTnc
+                    canLogin = isValid && _state.value.agreeTnc,
+                    error = null
                 )
             }
 
             is LoginEvent.AgreeTncChanged -> {
                 _state.value = _state.value.copy(
                     agreeTnc = event.agreed,
-                    canLogin = event.agreed && _state.value.isEmailValid
+                    canLogin = event.agreed && _state.value.isEmailValid,
+                    // clear TnC-related error when user accepts
+                    error = if (event.agreed) null else _state.value.error
                 )
             }
 
@@ -57,7 +62,25 @@ class LoginViewModel @Inject constructor(
             }
 
             LoginEvent.LoginWithEmail -> {
-                sendLoginOtp()
+                // Validate email before sending OTP. If invalid, show inline error
+                val isValidNow = com.example.truxpense.presentation.utils.InputValidators.isValidEmail(_state.value.email)
+                if (!isValidNow) {
+                    _state.value = _state.value.copy(
+                        isEmailValid = false,
+                        canLogin = false,
+                        error = "Please enter a valid email address"
+                    )
+                } else if (!_state.value.agreeTnc) {
+                    // Show a TnC acceptance error if user hasn't agreed
+                    _state.value = _state.value.copy(
+                        canLogin = false,
+                        error = "Please accept the Terms and Conditions to continue"
+                    )
+                } else {
+                    // clear any previous error and proceed
+                    _state.value = _state.value.copy(error = null)
+                    sendLoginOtp()
+                }
             }
 
             LoginEvent.LoginWithGoogle -> {

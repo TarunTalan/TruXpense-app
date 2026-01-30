@@ -2,6 +2,8 @@ package com.example.truxpense.data.repository
 
 import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
+import com.example.truxpense.data.remote.api.LoginRequest
+import com.example.truxpense.data.remote.api.RefreshRequest
 import com.example.truxpense.data.remote.api.TokenResponse
 import com.example.truxpense.data.remote.api.VerifySignupRequest
 import com.example.truxpense.data.remote.dto.request.VerifyLoginOtpRequest
@@ -19,7 +21,7 @@ class AuthRepository @Inject constructor(
     private val prefs: AuthPreferences
 ) {
     suspend fun login(username: String, password: String): Boolean {
-        val response = api.login(com.example.truxpense.data.remote.api.LoginRequest(username, password))
+        val response = api.login(LoginRequest(username, password))
         if (response.isSuccessful) {
             response.body()?.let {
                 prefs.saveTokens(it.accessToken ?: "", it.refreshToken ?: "", it.expiresIn ?: 0L)
@@ -31,7 +33,7 @@ class AuthRepository @Inject constructor(
 
     suspend fun refresh(): Boolean {
         val refreshToken = prefs.refreshToken.first() ?: return false
-        val response = api.refresh(com.example.truxpense.data.remote.api.RefreshRequest(refreshToken))
+        val response = api.refresh(RefreshRequest(refreshToken))
         if (response.isSuccessful) {
             response.body()?.let {
                 prefs.saveTokens(it.accessToken ?: "", it.refreshToken ?: "", it.expiresIn ?: 0L)

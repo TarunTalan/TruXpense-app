@@ -17,11 +17,17 @@ object ResponseHandler {
             is java.net.UnknownHostException -> "No internet connection. Please check your network."
             is java.io.IOException -> "Network error. Please check your connection."
             is HttpException -> {
-                try {
-                    val body = t.response()?.errorBody()?.string()
-                    if (!body.isNullOrEmpty()) extractMessage(body) else (t.localizedMessage ?: "Server error")
-                } catch (_: Exception) {
-                    t.localizedMessage ?: "Server error"
+                // Treat 5xx server errors as a generic server-unavailable message
+                val code = try { t.code() } catch (_: Exception) { -1 }
+                if (code in 500..599) {
+                    "Server error. Please try again later."
+                } else {
+                    try {
+                        val body = t.response()?.errorBody()?.string()
+                        if (!body.isNullOrEmpty()) extractMessage(body) else (t.localizedMessage ?: "Server error")
+                    } catch (_: Exception) {
+                        t.localizedMessage ?: "Server error"
+                    }
                 }
             }
             else -> {
