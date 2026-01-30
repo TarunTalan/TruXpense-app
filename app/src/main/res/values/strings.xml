@@ -1,5 +1,4 @@
 <resources>
     <string name="app_name">TruXpense</string>
-    <!-- backend base url placeholder: replace in local configuration or update Hilt module -->
-    <string name="backend_base_url">http://192.168.29.104:8082</string>
+    <!-- backend base url is injected from Gradle property `backendBaseUrl` via resValue at build time -->
 </resources>

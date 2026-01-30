@@ -1,0 +1,8 @@
+# Example gradle.properties (commit this file; keep real values local and untracked)
+# Copy this to gradle.properties in the project root and fill the real values.
+
+# Google web client id used for requestIdToken (debug/dev)
+# googleWebClientId=REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com
+
+# Backend base url (example: local dev server)
+# backendBaseUrl=http://192.168.29.104:8082
