@@ -1,4 +1,4 @@
-package com.example.truxpense.presentation.screens.auth.login
+package com.example.truxpense.presentation.screens.auth.signup
 
 import android.content.Intent
 import android.util.Log
@@ -9,8 +9,6 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.AuthRepository
 import com.google.android.gms.common.api.ApiException
@@ -18,61 +16,58 @@ import kotlinx.coroutines.launch
 import com.example.truxpense.presentation.utils.ResponseHandler
 
 @HiltViewModel
-class LoginViewModel @Inject constructor(
+class SignUpViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
     companion object {
-        private const val TAG = "LoginViewModel"
+        private const val TAG = "SignUpViewModel"
     }
 
-    private val _state = MutableStateFlow(LoginUiState())
-    val state: StateFlow<LoginUiState> = _state.asStateFlow()
+    private val _state = MutableStateFlow(SignUpUiState())
+    val state: StateFlow<SignUpUiState> = _state.asStateFlow()
 
-    // one-shot flow used by the NavHost/Activity to launch external sign-in intent
-    private val _signInRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val signInRequest = _signInRequest.asSharedFlow()
-
-    fun onEvent(event: LoginEvent) {
+    fun onEvent(event: SignupEvent) {
         when (event) {
-            is LoginEvent.EmailChanged -> {
+            is SignupEvent.EmailChanged -> {
                 val email = event.email
                 val isValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
                 _state.value = _state.value.copy(
                     email = email,
                     isEmailValid = isValid,
-                    canLogin = isValid && _state.value.agreeTnc
+                    canSignUp = isValid && _state.value.agreeTnc
                 )
             }
 
-            is LoginEvent.AgreeTncChanged -> {
+            is SignupEvent.AgreeTncChanged -> {
                 _state.value = _state.value.copy(
                     agreeTnc = event.agreed,
-                    canLogin = event.agreed && _state.value.isEmailValid
+                    canSignUp = event.agreed && _state.value.isEmailValid
                 )
             }
 
-            is LoginEvent.ShowTncDialog -> {
+            is SignupEvent.ShowTncDialog -> {
                 _state.value = _state.value.copy(showTncDialog = event.show)
             }
 
-            LoginEvent.LoginWithEmail -> {
-                sendLoginOtp()
+            SignupEvent.SignUpWithEmail -> {
+                sendSignupOtp()
             }
 
-            LoginEvent.LoginWithGoogle -> {
+            SignupEvent.SignUpWithGoogle -> {
                 // Google sign-in is handled separately via handleGoogleSignInResult
-                Log.d(TAG, "Google login initiated")
+                // This event is just for logging/tracking if needed
+                Log.d(TAG, "Google sign-up initiated")
             }
 
-            LoginEvent.ClearError -> {
+            SignupEvent.ClearError -> {
                 _state.value = _state.value.copy(error = null)
             }
 
-            LoginEvent.OnNavigationHandled -> {
+            SignupEvent.OnNavigationHandled -> {
                 _state.value = _state.value.copy(
                     navigateToOtp = false,
-                    navigateToHome = false
+                    navigateToUsername = false
                 )
             }
         }
@@ -111,7 +106,7 @@ class LoginViewModel @Inject constructor(
                 if (result.isSuccess) {
                     val tokenResponse = result.getOrNull()!!
                     _state.value = _state.value.copy(
-                        navigateToHome = true,
+                        navigateToUsername = true,
                         authToken = tokenResponse.accessToken
                     )
                 } else {
@@ -144,11 +139,11 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    private fun sendLoginOtp() {
+    private fun sendSignupOtp() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             val emailVal = _state.value.email
-            val result = authRepository.sendLoginOtp(emailVal)
+            val result = authRepository.sendSignupOtp(emailVal)
             _state.value = _state.value.copy(isLoading = false)
 
             if (result.isSuccess) {
@@ -160,17 +155,17 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    fun verifyLoginOtp(otp: String) {
+    fun verifySignupOtp(otp: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             val emailVal = _state.value.email
-            val result = authRepository.verifyLoginOtp(emailVal, otp)
+            val result = authRepository.verifySignupOtp(emailVal, otp)
             _state.value = _state.value.copy(isLoading = false)
 
             if (result.isSuccess) {
                 val tokenResp = result.getOrNull()!!
                 _state.value = _state.value.copy(
-                    navigateToHome = true,
+                    navigateToUsername = true,
                     authToken = tokenResp.accessToken
                 )
             } else {
@@ -178,15 +173,5 @@ class LoginViewModel @Inject constructor(
                 _state.value = _state.value.copy(error = msg)
             }
         }
-    }
-
-    // Clear transient navigation flags (NavHost should call this after handling navigation)
-    fun clearTransientFlags() {
-        _state.value = _state.value.copy(navigateToOtp = false, navigateToHome = false, authToken = null)
-    }
-
-    // Emit a sign-in request (UI calls this to request the NavHost to launch Google Sign-In)
-    fun requestGoogleSignIn() {
-        _signInRequest.tryEmit(Unit)
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,7 +32,8 @@ fun AuthTextField(
     value: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     onValueChange: (String) -> Unit,
-    contentPadding: Int = 0
+    contentPadding: Int = 0,
+    enabled: Boolean
 ) {
     var isFocused by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -42,6 +44,15 @@ fun AuthTextField(
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
+
+        // Choose border color: if there is an error, use outline (as requested), otherwise
+        // show primary when focused and a subtle outline when not focused.
+        val borderColor = when {
+            !error.isNullOrEmpty() -> MaterialTheme.colorScheme.error
+            isFocused -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.outline
+        }
+
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -53,13 +64,13 @@ fun AuthTextField(
                 .onFocusChanged { isFocused = it.isFocused }
                 .border(
                     width = if (isFocused) 2.dp else 1.dp,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = borderColor,
                     shape = MaterialTheme.shapes.medium
                 ),
             keyboardOptions = keyboardOptions,
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onBackground),
             singleLine = true,
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.onBackground),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
             decorationBox = { innerTextField ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -88,17 +99,13 @@ fun AuthTextField(
                 }
             }
         )
-        if (!error.isNullOrEmpty()) {
+
+        // Show either the error (preferentially) or the regular bottom label.
+        val bottomText = error ?: bottomLabel
+        if (!bottomText.isNullOrEmpty()) {
             Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        } else if (!bottomLabel.isNullOrEmpty()) {
-            Text(
-                text = bottomLabel,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = bottomText,
+                color = if (!error.isNullOrEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -117,5 +124,7 @@ fun AuthTextFieldPreview() {
         bottomLabel = "bottomLabel",
         value = "",
         onValueChange = {},
+        modifier = Modifier,
+        enabled = true,
     )
 }

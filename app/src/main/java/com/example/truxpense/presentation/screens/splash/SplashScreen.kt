@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -25,6 +26,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.tooling.preview.Preview
+import android.util.Log
 import kotlin.math.roundToInt
 
 @Composable
@@ -55,13 +57,33 @@ fun SplashScreen(
 
     val density = LocalDensity.current
 
-    // notify host ASAP when Composable is composed so system splash can go away quickly
+
     var enteredOnEnter by remember { mutableStateOf(false) }
-    SideEffect {
+    val localView = LocalView.current
+    Log.d("SplashScreen", "DisposableEffect registering pre-draw listener; enteredOnEnter=$enteredOnEnter")
+    DisposableEffect(localView) {
         if (!enteredOnEnter) {
+            Log.d("SplashScreen", "markReady() called on ViewModel")
             viewModel.markReady()
-            onEnter?.invoke()
-            enteredOnEnter = true
+            val listener = object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    // Remove listener and notify host once
+                    if (!enteredOnEnter) {
+                        enteredOnEnter = true
+                        Log.d("SplashScreen", "onPreDraw triggered - calling onEnter")
+                        localView.viewTreeObserver.removeOnPreDrawListener(this)
+                        onEnter?.invoke()
+                    }
+                    return true
+                }
+            }
+            localView.viewTreeObserver.addOnPreDrawListener(listener)
+            onDispose {
+                Log.d("SplashScreen", "DisposableEffect onDispose")
+                localView.viewTreeObserver.removeOnPreDrawListener(listener)
+            }
+        } else {
+            onDispose { }
         }
     }
 
@@ -122,6 +144,7 @@ fun SplashScreen(
 
         // keep visible a bit
         delay(700)
+        Log.d("SplashScreen", "animation finished - calling onFinished")
         onFinished?.invoke()
     }
 

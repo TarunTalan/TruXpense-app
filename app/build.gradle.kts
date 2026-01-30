@@ -1,15 +1,14 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.kapt)
 }
 
 android {
     namespace = "com.example.truxpense"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.truxpense"
@@ -20,13 +19,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Provide the Google Web OAuth client id as a string resource from a local property.
-        // Add `googleWebClientId=YOUR_CLIENT_ID` to your local.properties (this file is not checked in).
         val webClientId: String? = (project.findProperty("googleWebClientId") as? String)
         if (!webClientId.isNullOrBlank()) {
             resValue("string", "default_web_client_id", webClientId)
         } else {
-            // fallback to a visible placeholder so the project still builds until you set the property
             resValue("string", "default_web_client_id", "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com")
         }
     }
@@ -40,24 +36,25 @@ android {
             )
         }
     }
+
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17  // Updated for Kotlin 2.1.0
+        targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"  // Updated
     }
+
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.10"
-    }
 
+
+    // Remove composeOptions - handled by kotlin-compose plugin now
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -83,13 +80,26 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
+    // Direct coordinate fallback to ensure Tasks.await is available
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    // Secure storage for refresh tokens
+    // Secure storage
     implementation(libs.androidx.security.crypto)
 
-    // Core splashscreen API - use version catalog
+    // Splashscreen
     implementation(libs.core.splashscreen)
 
+    // DataStore
+    implementation(libs.datastore.preferences)
+
+    // Google Fonts
+    implementation(libs.google.fonts.compose)
+
+    // Hilt Navigation Compose
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -97,9 +107,4 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-
-    implementation(libs.datastore.preferences)
-    implementation(libs.google.fonts.compose)
-    // Hilt Navigation Compose (for hiltViewModel in Compose)
-    implementation(libs.androidx.hilt.navigation.compose)
 }

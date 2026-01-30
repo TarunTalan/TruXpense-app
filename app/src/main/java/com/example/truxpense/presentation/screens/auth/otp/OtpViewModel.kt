@@ -9,9 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.example.truxpense.data.repository.AuthRepository
+import com.example.truxpense.presentation.utils.ResponseHandler
+import com.example.truxpense.data.remote.api.TokenResponse
 
 @HiltViewModel
-class OtpViewModel @Inject constructor(): ViewModel() {
+class OtpViewModel @Inject constructor(
+    private val authRepository: AuthRepository
+) : ViewModel() {
     private val _digits = MutableStateFlow(List(6) { "" })
     val digits: StateFlow<List<String>> = _digits
 
@@ -44,6 +49,64 @@ class OtpViewModel @Inject constructor(): ViewModel() {
                 _resendSecondsRemaining.value = t
             }
             _canResend.value = true
+        }
+    }
+
+    // Verify OTP against server. isSignup toggles which endpoint to call.
+    fun verifyOtp(
+        email: String,
+        otp: String,
+        isSignup: Boolean,
+        onSuccess: (TokenResponse) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val result = if (isSignup) {
+                    authRepository.verifySignupOtp(email, otp)
+                } else {
+                    authRepository.verifyLoginOtp(email, otp)
+                }
+
+                if (result.isSuccess) {
+                    val token = result.getOrNull()!!
+                    onSuccess(token)
+                } else {
+                    val message = ResponseHandler.getMessageFromResult(result, "Failed to verify OTP")
+                    onError(message)
+                }
+            } catch (t: Throwable) {
+                val message = ResponseHandler.parseThrowable(t)
+                onError(message)
+            }
+        }
+    }
+
+    // Resend OTP via backend for signup or login
+    fun resendOtp(
+        email: String,
+        isSignup: Boolean,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val result = if (isSignup) {
+                    authRepository.sendSignupOtp(email)
+                } else {
+                    authRepository.sendLoginOtp(email)
+                }
+
+                if (result.isSuccess) {
+                    onSuccess()
+                } else {
+                    val message = ResponseHandler.getMessageFromResult(result, "Failed to resend OTP")
+                    onError(message)
+                }
+            } catch (t: Throwable) {
+                val message = ResponseHandler.parseThrowable(t)
+                onError(message)
+            }
         }
     }
 }

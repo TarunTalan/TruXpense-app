@@ -1,7 +1,7 @@
 package com.example.truxpense.presentation.screens.onboarding.username
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -21,7 +23,7 @@ import com.example.truxpense.presentation.utils.clearFocusOnTap
 @Composable
 fun UsernameScreen(
     onBack: (() -> Unit)? = null,
-    onNext: ((String) -> Unit)? = null,
+    onComplete: (() -> Unit)? = null,
     viewModel: UsernameViewModel = hiltViewModel()
 ) {
     val username by viewModel.username.collectAsState()
@@ -32,7 +34,7 @@ fun UsernameScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 30.dp, start = 5.dp),
+                    .padding(top = 20.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 IconButton(onClick = { onBack?.invoke() }) {
@@ -44,54 +46,132 @@ fun UsernameScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 28.dp),
+                    .padding(vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AuthButton(onClick = { if (enabled) onNext?.invoke(username) }, text = "Continue", enabled = enabled)
+                AuthButton(onClick = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } }, text = "Continue", enabled = enabled)
             }
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .clearFocusOnTap()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "What should we call you?",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.align(Alignment.Start)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "This help us personalized your experience",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.align(Alignment.Start)
-            )
+    ) { _ ->
+        // Delegate UI to a previewable composable
+        UsernameContent(
+            username = username,
+            onUsernameChange = { viewModel.onUsernameChanged(it) },
+            onBack = { onBack?.invoke() },
+            onComplete = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } },
+            enabled = enabled
+        )
+    }
+}
 
-            Spacer(modifier = Modifier.height(20.dp))
+@Composable
+fun UsernameContent(
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    onBack: () -> Unit = {},
+    onComplete: () -> Unit = {},
+    enabled: Boolean = false,
+    showActions: Boolean = false
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .clearFocusOnTap(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (showActions) {
+            // Small top back action for preview-only
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Icon(
+                    painter = painterResource(id = com.example.truxpense.R.drawable.back_icon),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.clickable { onBack() }.padding(vertical = 20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = "What should we call you?",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.align(Alignment.Start)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "This helps us personalize your experience",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.align(Alignment.Start)
+        )
 
-            AuthTextField(
-                value = username,
-                onValueChange = { viewModel.onUsernameChanged(it) },
-                label = "Username",
-                placeholder = "e.g. john_doe",
-                bottomLabel = "You can change this later",
-                bgColor = MaterialTheme.colorScheme.background,
-                keyboardOptions = KeyboardOptions.Default,
-                contentPadding = 16
+        Spacer(modifier = Modifier.height(20.dp))
+
+        AuthTextField(
+            bgColor = MaterialTheme.colorScheme.background,
+            label = "Username",
+            placeholder = "e.g. john_doe",
+            bottomLabel = "You can change this later",
+            value = username,
+            keyboardOptions = KeyboardOptions.Default,
+            onValueChange = onUsernameChange,
+            contentPadding = 16,
+            modifier = Modifier.fillMaxWidth(),
+            error = "",
+            enabled = true,
+        )
+
+        if (showActions) {
+            Spacer(modifier = Modifier.weight(1f))
+            AuthButton(
+                onClick = onComplete,
+                text = "Continue",
+                enabled = enabled
             )
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
-@Preview
+@Preview(showBackground = true, name = "Username - Light")
 @Composable
-fun UsernameScreenPreview() {
-    UsernameScreen()
+fun UsernameContentPreviewLight() {
+    MaterialTheme {
+        Surface {
+            Column(modifier = Modifier.fillMaxSize()) {
+                UsernameContent(
+                    username = "",
+                    onUsernameChange = {},
+                    onBack = {},
+                    onComplete = {},
+                    enabled = false,
+                    showActions = true
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, name = "Username - Dark")
+@Composable
+fun UsernameContentPreviewDark() {
+    MaterialTheme {
+        Surface {
+            Column(modifier = Modifier.fillMaxSize()) {
+                UsernameContent(
+                    username = "john_doe",
+                    onUsernameChange = {},
+                    onBack = {},
+                    onComplete = {},
+                    enabled = true,
+                    showActions = true
+                )
+            }
+        }
+    }
 }

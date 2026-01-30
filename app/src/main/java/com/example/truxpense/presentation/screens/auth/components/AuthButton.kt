@@ -18,10 +18,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AuthButton(
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     content: @Composable (() -> Unit)? = null,
     text: String? = null,
     enabled: Boolean = true,
-    modifier: Modifier = Modifier.fillMaxWidth(),
 ) {
     Button(
         onClick = onClick,
@@ -33,6 +33,7 @@ fun AuthButton(
             disabledContentColor = MaterialTheme.colorScheme.background.copy(alpha = 0.3f)
         ),
         modifier = modifier
+            .fillMaxWidth()
             .height(48.dp)
             .padding(vertical = 0.dp)
             .clip(shape = MaterialTheme.shapes.medium)
@@ -57,9 +58,10 @@ fun AuthButton(
 @Composable
 fun AuthButtonPreview() {
     AuthButton(
-        onClick = { }, content = {},
+        onClick = { },
+        modifier = Modifier,
+        content = {},
         text = "Get Started",
         enabled = true,
-        modifier = Modifier.fillMaxWidth(),
     )
 }

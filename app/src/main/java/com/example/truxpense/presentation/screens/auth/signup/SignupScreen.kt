@@ -1,5 +1,7 @@
-package com.example.truxpense.presentation.screens.auth.login
+package com.example.truxpense.presentation.screens.auth.signup
 
+import android.app.Activity
+import android.content.res.Configuration
 import android.graphics.Color.rgb
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -40,12 +42,12 @@ import com.example.truxpense.presentation.navigation.AuthFlowViewModel
 import com.example.truxpense.util.findActivity
 
 @Composable
-fun LoginScreen(
+fun SignupScreen(
     onBack: () -> Unit,
     onNavigateToOtp: () -> Unit,
-    onNavigateToHome: (String) -> Unit,
-    onNavigateToSignup: () -> Unit,
-    viewModel: LoginViewModel = hiltViewModel(),
+    onNavigateToUsername: (String) -> Unit,
+    onNavigateToLogin: () -> Unit,
+    viewModel: SignUpViewModel = hiltViewModel(),
     authFlowViewModel: AuthFlowViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -56,16 +58,16 @@ fun LoginScreen(
     // Handle navigation events
     LaunchedEffect(state.navigateToOtp) {
         if (state.navigateToOtp) {
-            authFlowViewModel.setLogin(state.email)
+            authFlowViewModel.setSignup(state.email)
             onNavigateToOtp()
-            viewModel.onEvent(LoginEvent.OnNavigationHandled)
+            viewModel.onEvent(SignupEvent.OnNavigationHandled)
         }
     }
 
-    LaunchedEffect(state.navigateToHome, state.authToken) {
-        if (state.navigateToHome && state.authToken != null) {
-            onNavigateToHome(state.authToken!!)
-            viewModel.onEvent(LoginEvent.OnNavigationHandled)
+    LaunchedEffect(state.navigateToUsername, state.authToken) {
+        if (state.navigateToUsername && state.authToken != null) {
+            onNavigateToUsername(state.authToken!!)
+            viewModel.onEvent(SignupEvent.OnNavigationHandled)
         }
     }
 
@@ -73,7 +75,7 @@ fun LoginScreen(
     val googleSignInLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
+        if (result.resultCode == Activity.RESULT_OK) {
             viewModel.handleGoogleSignInResult(result.data)
         }
     }
@@ -81,11 +83,11 @@ fun LoginScreen(
     // Show error dialog
     state.error?.let { error ->
         AlertDialog(
-            onDismissRequest = { viewModel.onEvent(LoginEvent.ClearError) },
+            onDismissRequest = { viewModel.onEvent(SignupEvent.ClearError) },
             title = { Text("Error") },
             text = { Text(error) },
             confirmButton = {
-                TextButton(onClick = { viewModel.onEvent(LoginEvent.ClearError) }) {
+                TextButton(onClick = { viewModel.onEvent(SignupEvent.ClearError) }) {
                     Text("OK")
                 }
             }
@@ -94,16 +96,16 @@ fun LoginScreen(
 
     Scaffold(
         topBar = {
-            LoginTopBar(
+            SignupTopBar(
                 onBack = onBack,
                 enabled = !state.isLoading
             )
         },
         bottomBar = {
-            LoginBottomBar(
-                onLogin = { viewModel.onEvent(LoginEvent.LoginWithEmail) },
-                onNavigateToSignup = onNavigateToSignup,
-                enabled = state.canLogin && !state.isLoading,
+            SignupBottomBar(
+                onSignUp = { viewModel.onEvent(SignupEvent.SignUpWithEmail) },
+                onNavigateToLogin = onNavigateToLogin,
+                enabled = state.canSignUp && !state.isLoading,
                 isLoading = state.isLoading
             )
         }
@@ -115,11 +117,11 @@ fun LoginScreen(
                 .clearFocusOnTap()
                 .then(if (state.showTncDialog) Modifier.blur(16.dp) else Modifier)
         ) {
-            LoginContent(
+            SignupContent(
                 state = state,
                 onEvent = viewModel::onEvent,
                 onGoogleSignIn = {
-                    viewModel.onEvent(LoginEvent.LoginWithGoogle)
+                    viewModel.onEvent(SignupEvent.SignUpWithGoogle)
                     try {
                         val intent = if (activity != null) {
                             googleSignInRepository.getSignInIntent(activity)
@@ -128,7 +130,7 @@ fun LoginScreen(
                         }
                         googleSignInLauncher.launch(intent)
                     } catch (e: Exception) {
-                        Log.e("LoginScreen", "Failed to launch Google Sign-In", e)
+                        Log.e("SignupScreen", "Failed to launch Google Sign-In", e)
                     }
                 }
             )
@@ -142,14 +144,14 @@ fun LoginScreen(
         // Terms and Conditions Dialog
         if (state.showTncDialog) {
             TncDialog(
-                onDismiss = { viewModel.onEvent(LoginEvent.ShowTncDialog(false)) }
+                onDismiss = { viewModel.onEvent(SignupEvent.ShowTncDialog(false)) }
             )
         }
     }
 }
 
 @Composable
-private fun LoginTopBar(
+private fun SignupTopBar(
     onBack: () -> Unit,
     enabled: Boolean
 ) {
@@ -169,9 +171,9 @@ private fun LoginTopBar(
 }
 
 @Composable
-private fun LoginBottomBar(
-    onLogin: () -> Unit,
-    onNavigateToSignup: () -> Unit,
+private fun SignupBottomBar(
+    onSignUp: () -> Unit,
+    onNavigateToLogin: () -> Unit,
     enabled: Boolean,
     isLoading: Boolean
 ) {
@@ -182,8 +184,8 @@ private fun LoginBottomBar(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         AuthButton(
-            onClick = onLogin,
-            text = "Verify Email",
+            onClick = onSignUp,
+            text = "Sign Up",
             enabled = enabled
         )
 
@@ -194,20 +196,20 @@ private fun LoginBottomBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "New to TruXpense?",
+                text = "Already have an account?",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 fontSize = 13.sp,
                 lineHeight = 20.sp
             )
             Text(
-                text = " Sign up",
+                text = " Login",
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .clickable(enabled = !isLoading) { onNavigateToSignup() }
+                    .clickable(enabled = !isLoading) { onNavigateToLogin() }
                     .padding(4.dp)
             )
         }
@@ -215,9 +217,9 @@ private fun LoginBottomBar(
 }
 
 @Composable
-private fun LoginContent(
-    state: LoginUiState,
-    onEvent: (LoginEvent) -> Unit,
+private fun SignupContent(
+    state: SignUpUiState,
+    onEvent: (SignupEvent) -> Unit,
     onGoogleSignIn: () -> Unit
 ) {
     Column(
@@ -226,7 +228,7 @@ private fun LoginContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Header
-        LoginHeader()
+        SignupHeader()
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -238,7 +240,7 @@ private fun LoginContent(
             bottomLabel = "We'll send a verification code to this email",
             value = state.email,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            onValueChange = { onEvent(LoginEvent.EmailChanged(it)) },
+            onValueChange = { onEvent(SignupEvent.EmailChanged(it)) },
             enabled = !state.isLoading
         )
 
@@ -271,27 +273,27 @@ private fun LoginContent(
         // Terms and Conditions
         TncCheckbox(
             checked = state.agreeTnc,
-            onCheckedChange = { onEvent(LoginEvent.AgreeTncChanged(it)) },
-            onShowTnc = { onEvent(LoginEvent.ShowTncDialog(true)) },
+            onCheckedChange = { onEvent(SignupEvent.AgreeTncChanged(it)) },
+            onShowTnc = { onEvent(SignupEvent.ShowTncDialog(true)) },
             enabled = !state.isLoading
         )
     }
 }
 
 @Composable
-private fun LoginHeader() {
+private fun SignupHeader() {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "Login",
+            text = "Sign Up",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(5.dp))
         Text(
-            text = "Welcome back!",
+            text = "Create your account",
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
             lineHeight = 20.sp,
@@ -442,13 +444,57 @@ private fun TncDialog(onDismiss: () -> Unit) {
     )
 }
 
+@Preview(showBackground = true, name = "Signup - Light")
+@Composable
+fun SignupPreviewLight() {
+    MaterialTheme {
+        SignupContent(
+            state = SignUpUiState(
+                email = "demo@example.com",
+                agreeTnc = true,
+                isLoading = false,
+                error = null,
+                showTncDialog = false,
+                navigateToOtp = false,
+                navigateToUsername = false,
+                authToken = null,
+                isEmailValid = true,
+                canSignUp = true
+            ),
+            onEvent = {},
+            onGoogleSignIn = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Signup - Dark")
+@Composable
+fun SignupPreviewDark() {
+    MaterialTheme {
+        SignupContent(
+            state = SignUpUiState(
+                email = "demo@example.com",
+                agreeTnc = true,
+                isLoading = false,
+                error = null,
+                showTncDialog = false,
+                navigateToOtp = false,
+                navigateToUsername = false,
+                authToken = null,
+                isEmailValid = true,
+                canSignUp = true
+            ),
+            onEvent = {},
+            onGoogleSignIn = {}
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
-fun LoginScreenPreview() {
-    LoginScreen(
+fun SignupPreviewTopbar(){
+    SignupTopBar(
         onBack = {},
-        onNavigateToOtp = {},
-        onNavigateToHome = {},
-        onNavigateToSignup = {}
+        enabled = true
     )
 }

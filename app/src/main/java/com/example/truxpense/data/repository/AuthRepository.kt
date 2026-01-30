@@ -3,6 +3,12 @@ package com.example.truxpense.data.repository
 import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
 import com.example.truxpense.data.remote.api.TokenResponse
+import com.example.truxpense.data.remote.api.VerifySignupRequest
+import com.example.truxpense.data.remote.dto.request.VerifyLoginOtpRequest
+import com.example.truxpense.data.remote.dto.response.LoginOtpResponse
+import com.example.truxpense.data.remote.dto.response.ResendLoginOtpRequest
+import com.example.truxpense.data.remote.dto.response.ResendSignupOtpRequest
+import com.example.truxpense.data.remote.dto.response.SignupOtpResponse
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,6 +63,91 @@ class AuthRepository @Inject constructor(
             } catch (e: Exception) {
                 Result.failure(e)
             }
+        }
+    }
+
+    // OTP flows
+    suspend fun sendSignupOtp(email: String): Result<SignupOtpResponse> = withContext(Dispatchers.IO) {
+        try {
+            val resp = api.sendSignupOtp(mapOf("email" to email))
+            if (resp.isSuccessful) {
+                resp.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
+            } else {
+                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifySignupOtp(email: String, otp: String): Result<TokenResponse> = withContext(Dispatchers.IO) {
+        try {
+            val resp = api.verifySignupOtp(VerifySignupRequest(email, otp))
+            if (resp.isSuccessful) {
+                resp.body()?.let { body ->
+                    body.accessToken?.let { at -> body.refreshToken?.let { rt -> prefs.saveTokens(at, rt, body.expiresIn ?: 0L) } }
+                    Result.success(body)
+                } ?: Result.failure(Exception("Empty body"))
+            } else {
+                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun sendLoginOtp(email: String): Result<LoginOtpResponse> = withContext(Dispatchers.IO) {
+        try {
+            val resp = api.sendLoginOtp(mapOf("email" to email))
+            if (resp.isSuccessful) {
+                resp.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
+            } else {
+                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifyLoginOtp(email: String, otp: String): Result<TokenResponse> = withContext(Dispatchers.IO) {
+        try {
+            val resp = api.verifyLoginOtp(VerifyLoginOtpRequest(email, otp))
+            if (resp.isSuccessful) {
+                resp.body()?.let { body ->
+                    body.accessToken?.let { at -> body.refreshToken?.let { rt -> prefs.saveTokens(at, rt, body.expiresIn ?: 0L) } }
+                    Result.success(body)
+                } ?: Result.failure(Exception("Empty body"))
+            } else {
+                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun resendSignupOtp(email: String): Result<ResendSignupOtpRequest> = withContext(Dispatchers.IO) {
+        try {
+            val resp = api.resendSignupOtp(mapOf("email" to email))
+            if (resp.isSuccessful) {
+                resp.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
+            } else {
+                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun resendLoginOtp(email: String): Result<ResendLoginOtpRequest> = withContext(Dispatchers.IO) {
+        try {
+            val resp = api.resendLoginOtp(mapOf("email" to email))
+            if (resp.isSuccessful) {
+                resp.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
+            } else {
+                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

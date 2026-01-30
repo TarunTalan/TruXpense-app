@@ -6,10 +6,14 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import android.util.Log
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Scaffold
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -44,24 +48,49 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Keep the system splash only for cold starts while our Compose splash is not ready
         splashScreen.setKeepOnScreenCondition { isColdStart && keepSplashOn }
 
-        // Safety fallback: if something blocks the Compose splash entering (rare), ensure the
-        // system splash is dismissed after a short timeout to avoid a permanent frozen splash.
         Handler(Looper.getMainLooper()).postDelayed({
+            Log.w("MainActivity", "Splash fallback timeout reached — dismissing system splash")
             keepSplashOn = false
         }, 5000)
 
         setContent {
             TruXpenseTheme(darkTheme = isSystemInDarkTheme()) {
                 val navController = rememberNavController()
-                Scaffold(modifier = androidx.compose.ui.Modifier.fillMaxSize()) { _ ->
-                    Box(modifier = androidx.compose.ui.Modifier) {
-                        AppNavHost(navController = navController, startDestination = Screen.Splash, onSplashEnter = { keepSplashOn = false })
+                Scaffold(modifier = androidx.compose.ui.Modifier.fillMaxSize()) { innerPadding: PaddingValues ->
+                    val layoutDirection = LocalLayoutDirection.current
+
+                    val contentPadding = PaddingValues(
+                        start = innerPadding.calculateLeftPadding(layoutDirection) + 10.dp,
+                        top = 10.dp ,
+                        end = innerPadding.calculateRightPadding(layoutDirection) + 10.dp,
+                        bottom = innerPadding.calculateBottomPadding() + 10.dp
+                    )
+
+                    Box(modifier = androidx.compose.ui.Modifier.padding(contentPadding)) {
+                        AppNavHost(navController = navController, startDestination = Screen.Splash, contentPadding = contentPadding, onSplashEnter = {
+                            Log.d("MainActivity", "onSplashEnter received — dismissing system splash")
+                            keepSplashOn = false
+                        })
                     }
                 }
             }
+        }
+
+        try {
+            val decorView = window.decorView
+            val listener = object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    decorView.viewTreeObserver.removeOnPreDrawListener(this)
+                    Log.d("MainActivity", "decorView pre-draw -> dismissing system splash")
+                    keepSplashOn = false
+                    return true
+                }
+            }
+            decorView.viewTreeObserver.addOnPreDrawListener(listener)
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "Failed to add decorView pre-draw listener: ${t.message}")
         }
     }
 }
