@@ -19,7 +19,8 @@ fun OAuthButton(
     modifier: Modifier = Modifier,
     text: String = "Continue with Google",
     onClick: () -> Unit,
-    isGoogle: Boolean
+    isGoogle: Boolean,
+    enabled: Boolean
 ) {
     Button(
         onClick = onClick,
@@ -62,6 +63,8 @@ fun OAuthButtonPreview() {
     OAuthButton(
         text = "Login with Google",
         onClick = {},
-        isGoogle = true
+        isGoogle = true,
+        modifier = Modifier,
+        enabled = true,
     )
 }

@@ -112,14 +112,12 @@ fun SmsPermission(
                 }
             }
         }
-    ) { innerPadding ->
+    ) { _ ->
         Column(
             modifier = Modifier
                 .padding(top = 20.dp)
                 .fillMaxSize()
-                .clearFocusOnTap()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp),
+                .clearFocusOnTap(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {

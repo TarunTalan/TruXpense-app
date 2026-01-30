@@ -5,6 +5,7 @@ import com.example.truxpense.data.remote.api.AuthApi
 import com.example.truxpense.data.repository.AuthRepository
 import com.example.truxpense.data.repository.GoogleSignInRepository
 import com.example.truxpense.R
+import com.example.truxpense.data.prefs.AuthPreferences
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -48,5 +49,5 @@ object AuthModule {
 
     @Provides
     @Singleton
-    fun provideAuthRepository(api: AuthApi, prefs: com.example.truxpense.data.prefs.AuthPreferences): AuthRepository = AuthRepository(api, prefs)
+    fun provideAuthRepository(api: AuthApi, prefs: AuthPreferences): AuthRepository = AuthRepository(api, prefs)
 }

@@ -1,24 +1,25 @@
 [versions]
-agp = "8.12.0"
-kotlin = "1.9.22"
+agp = "8.9.1"  # Updated to support new dependencies
+kotlin = "2.1.0"  # Updated for AGP 8.9.1
 coreKtx = "1.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.12.1"
-composeBom = "2024.09.00"
-playServicesAuth = "20.7.0"
-retrofit = "2.9.0"
-gson = "2.10.1"
-okhttp = "4.11.0"
-securityCrypto = "1.1.0"
-coroutines = "1.7.3"
-hilt = "2.48.1"
-navigationCompose = "2.7.7"
-datastore = "1.1.0"
+composeBom = "2024.12.01"
+playServicesAuth = "21.2.0"
+retrofit = "2.11.0"
+gson = "2.11.0"
+okhttp = "4.12.0"
+securityCrypto = "1.1.0-alpha06"
+coroutines = "1.10.2"
+coroutinesPlayServices = "1.7.3"
+hilt = "2.54"  # Updated for Kotlin 2.1.0
+navigationCompose = "2.8.5"
+datastore = "1.1.1"
 coreSplash = "1.2.0"
-hiltNavigationCompose = "1.1.0"
+hiltNavigationCompose = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -43,16 +44,18 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
-google-fonts-compose = { group = "androidx.compose.ui", name = "ui-text-google-fonts", version = "1.6.0" }
+google-fonts-compose = { group = "androidx.compose.ui", name = "ui-text-google-fonts", version = "1.7.5" }
 core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplash" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
