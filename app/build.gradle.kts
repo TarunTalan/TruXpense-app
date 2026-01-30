@@ -25,6 +25,15 @@ android {
         } else {
             resValue("string", "default_web_client_id", "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com")
         }
+
+        // Backend base URL: prefer a project property `backendBaseUrl` (set in gradle.properties locally),
+        // otherwise fallback to the current value in strings.xml
+        val backendBaseUrl: String? = (project.findProperty("backendBaseUrl") as? String)
+        if (!backendBaseUrl.isNullOrBlank()) {
+            resValue("string", "backend_base_url", backendBaseUrl)
+        } else {
+            resValue("string", "backend_base_url", "http://192.168.29.104:8082")
+        }
     }
 
     buildTypes {
