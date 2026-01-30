@@ -20,6 +20,7 @@ class AuthPreferences @Inject constructor(@ApplicationContext private val contex
         private val EXPIRES_IN = longPreferencesKey("expires_in")
         private val USERNAME = stringPreferencesKey("username")
         private val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+        private val SIGNUP_STARTED = booleanPreferencesKey("signup_started")
     }
 
     suspend fun saveTokens(access: String, refresh: String, expiresIn: Long) {
@@ -54,4 +55,13 @@ class AuthPreferences @Inject constructor(@ApplicationContext private val contex
     }
 
     val onboardingComplete: Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_COMPLETE] ?: false }
+
+    // Mark that signup flow has started (user completed signup step and should be routed to Username on restart)
+    suspend fun setSignupStarted(value: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SIGNUP_STARTED] = value
+        }
+    }
+
+    val signupStarted: Flow<Boolean> = context.dataStore.data.map { it[SIGNUP_STARTED] ?: false }
 }

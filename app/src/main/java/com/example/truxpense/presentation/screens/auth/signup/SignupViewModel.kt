@@ -2,22 +2,25 @@ package com.example.truxpense.presentation.screens.auth.signup
 
 import android.content.Intent
 import android.util.Log
-import android.util.Patterns
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.repository.AuthRepository
+import com.example.truxpense.presentation.utils.InputValidators
+import com.example.truxpense.presentation.utils.InputValidators.filterEmailInput
+import com.example.truxpense.presentation.utils.ResponseHandler
+import com.google.android.gms.common.api.ApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.repository.AuthRepository
-import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
-import com.example.truxpense.presentation.utils.ResponseHandler
+import javax.inject.Inject
 
 @HiltViewModel
 class SignUpViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val prefs: AuthPreferences
 ) : ViewModel() {
 
     companion object {
@@ -30,19 +33,23 @@ class SignUpViewModel @Inject constructor(
     fun onEvent(event: SignupEvent) {
         when (event) {
             is SignupEvent.EmailChanged -> {
-                val email = event.email
-                val isValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
+                val email = filterEmailInput(event.email)
+                val isValid = InputValidators.isValidEmail(email)
+                // Reset error when user edits the email
                 _state.value = _state.value.copy(
                     email = email,
                     isEmailValid = isValid,
-                    canSignUp = isValid && _state.value.agreeTnc
+                    canSignUp = isValid && _state.value.agreeTnc,
+                    error = null
                 )
             }
 
             is SignupEvent.AgreeTncChanged -> {
                 _state.value = _state.value.copy(
                     agreeTnc = event.agreed,
-                    canSignUp = event.agreed && _state.value.isEmailValid
+                    canSignUp = event.agreed && _state.value.isEmailValid,
+                    // clear TnC-related error when user accepts
+                    error = if (event.agreed) null else _state.value.error
                 )
             }
 
@@ -51,7 +58,23 @@ class SignUpViewModel @Inject constructor(
             }
 
             SignupEvent.SignUpWithEmail -> {
-                sendSignupOtp()
+                // Validate email before sending OTP. If invalid, show inline error
+                val isValidNow = InputValidators.isValidEmail(_state.value.email)
+                if (!isValidNow) {
+                    _state.value = _state.value.copy(
+                        isEmailValid = false,
+                        canSignUp = false,
+                        error = "Please enter a valid email address"
+                    )
+                } else if (!_state.value.agreeTnc) {
+                    _state.value = _state.value.copy(
+                        canSignUp = false,
+                        error = "Please accept the Terms and Conditions to continue"
+                    )
+                } else {
+                    _state.value = _state.value.copy(error = null)
+                    sendSignupOtp()
+                }
             }
 
             SignupEvent.SignUpWithGoogle -> {
@@ -105,6 +128,10 @@ class SignUpViewModel @Inject constructor(
 
                 if (result.isSuccess) {
                     val tokenResponse = result.getOrNull()!!
+                    // Persist that signup reached username step so app restart resumes here
+                    viewModelScope.launch {
+                        prefs.setSignupStarted(true)
+                    }
                     _state.value = _state.value.copy(
                         navigateToUsername = true,
                         authToken = tokenResponse.accessToken
@@ -155,23 +182,4 @@ class SignUpViewModel @Inject constructor(
         }
     }
 
-    fun verifySignupOtp(otp: String) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, error = null)
-            val emailVal = _state.value.email
-            val result = authRepository.verifySignupOtp(emailVal, otp)
-            _state.value = _state.value.copy(isLoading = false)
-
-            if (result.isSuccess) {
-                val tokenResp = result.getOrNull()!!
-                _state.value = _state.value.copy(
-                    navigateToUsername = true,
-                    authToken = tokenResp.accessToken
-                )
-            } else {
-                val msg = ResponseHandler.getMessageFromResult(result, "Failed to verify OTP")
-                _state.value = _state.value.copy(error = msg)
-            }
-        }
-    }
 }

@@ -4,20 +4,22 @@ import android.app.Activity
 import android.content.res.Configuration
 import android.graphics.Color.rgb
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -27,28 +29,22 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.data.repository.GoogleSignInRepository
+import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 import com.example.truxpense.presentation.screens.auth.components.OAuthButton
 import com.example.truxpense.presentation.utils.clearFocusOnTap
-import com.example.truxpense.data.repository.GoogleSignInRepository
-import com.example.truxpense.presentation.navigation.AuthFlowViewModel
 import com.example.truxpense.util.findActivity
 
 @Composable
 fun SignupScreen(
     onBack: () -> Unit,
-    onNavigateToOtp: () -> Unit,
+    onNavigateToOtp: (String, AuthFlowType) -> Unit,
     onNavigateToUsername: (String) -> Unit,
     onNavigateToLogin: () -> Unit,
-    viewModel: SignUpViewModel = hiltViewModel(),
-    authFlowViewModel: AuthFlowViewModel = hiltViewModel()
+    viewModel: SignUpViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -58,8 +54,8 @@ fun SignupScreen(
     // Handle navigation events
     LaunchedEffect(state.navigateToOtp) {
         if (state.navigateToOtp) {
-            authFlowViewModel.setSignup(state.email)
-            onNavigateToOtp()
+            // delegate navigation to the NavHost with email + flow so AppNavHost can persist it
+            onNavigateToOtp(state.email, AuthFlowType.SIGNUP)
             viewModel.onEvent(SignupEvent.OnNavigationHandled)
         }
     }
@@ -80,32 +76,18 @@ fun SignupScreen(
         }
     }
 
-    // Show error dialog
-    state.error?.let { error ->
-        AlertDialog(
-            onDismissRequest = { viewModel.onEvent(SignupEvent.ClearError) },
-            title = { Text("Error") },
-            text = { Text(error) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onEvent(SignupEvent.ClearError) }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-
     Scaffold(
         topBar = {
             SignupTopBar(
-                onBack = onBack,
-                enabled = !state.isLoading
+                onBack = onBack
             )
         },
         bottomBar = {
+            // Keep Sign Up enabled unless the email field is empty or an API call is running
             SignupBottomBar(
                 onSignUp = { viewModel.onEvent(SignupEvent.SignUpWithEmail) },
                 onNavigateToLogin = onNavigateToLogin,
-                enabled = state.canSignUp && !state.isLoading,
+                enabled = state.email.isNotBlank() && !state.isLoading,
                 isLoading = state.isLoading
             )
         }
@@ -131,14 +113,10 @@ fun SignupScreen(
                         googleSignInLauncher.launch(intent)
                     } catch (e: Exception) {
                         Log.e("SignupScreen", "Failed to launch Google Sign-In", e)
+                        // rely on ViewModel to set state.error which will be shown inline
                     }
                 }
             )
-
-            // Loading overlay
-            if (state.isLoading) {
-                LoadingOverlay()
-            }
         }
 
         // Terms and Conditions Dialog
@@ -152,8 +130,7 @@ fun SignupScreen(
 
 @Composable
 private fun SignupTopBar(
-    onBack: () -> Unit,
-    enabled: Boolean
+    onBack: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -186,7 +163,8 @@ private fun SignupBottomBar(
         AuthButton(
             onClick = onSignUp,
             text = "Sign Up",
-            enabled = enabled
+            enabled = enabled,
+            isLoading = isLoading
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -238,6 +216,7 @@ private fun SignupContent(
             label = "Email Address",
             placeholder = "Example@xyz.com",
             bottomLabel = "We'll send a verification code to this email",
+            error = state.error, // show inline error instead of dialog
             value = state.email,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             onValueChange = { onEvent(SignupEvent.EmailChanged(it)) },
@@ -252,8 +231,10 @@ private fun SignupContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // OAuth Buttons
+        // Keep OAuth button label constant; it should not show "Signing in..." when
+        // the email verify flow is running. Only disable the button while any loading is active.
         OAuthButton(
-            text = if (state.isLoading) "Signing in..." else "Continue with Google",
+            text = "Continue with Google",
             onClick = onGoogleSignIn,
             isGoogle = true,
             enabled = !state.isLoading
@@ -386,17 +367,6 @@ private fun TncCheckbox(
     }
 }
 
-@Composable
-private fun LoadingOverlay() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.3f)),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
-}
 
 @Composable
 private fun TncDialog(onDismiss: () -> Unit) {
@@ -494,7 +464,6 @@ fun SignupPreviewDark() {
 @Composable
 fun SignupPreviewTopbar(){
     SignupTopBar(
-        onBack = {},
-        enabled = true
+        onBack = {}
     )
 }

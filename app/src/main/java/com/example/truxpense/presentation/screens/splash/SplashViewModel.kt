@@ -17,6 +17,11 @@ class SplashViewModel @Inject constructor(private val prefs: AuthPreferences): V
     // AuthPreferences.onboardingComplete is a Flow<Boolean> (DataStore), so expose as Flow here.
     val onboardingComplete: Flow<Boolean> = prefs.onboardingComplete
 
+    // Expose persisted auth state so startup can route correctly
+    val accessToken: Flow<String?> = prefs.accessToken
+    val username: Flow<String?> = prefs.username
+    val signupStarted: Flow<Boolean> = prefs.signupStarted
+
     fun markReady() {
         _isReady.value = true
     }

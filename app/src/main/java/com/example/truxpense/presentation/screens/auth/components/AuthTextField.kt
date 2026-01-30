@@ -45,13 +45,15 @@ fun AuthTextField(
             )
         }
 
-        // Choose border color: if there is an error, use outline (as requested), otherwise
-        // show primary when focused and a subtle outline when not focused.
+        // Choose border color: error has priority, otherwise primary when focused, else outline
         val borderColor = when {
             !error.isNullOrEmpty() -> MaterialTheme.colorScheme.error
             isFocused -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.outline
         }
+
+        // Border width: make error and focused states more prominent (2.dp), otherwise 1.dp
+        val borderWidth = if (!error.isNullOrEmpty() || isFocused) 2.dp else 1.dp
 
         BasicTextField(
             value = value,
@@ -63,7 +65,7 @@ fun AuthTextField(
                 .clip(shape = MaterialTheme.shapes.medium)
                 .onFocusChanged { isFocused = it.isFocused }
                 .border(
-                    width = if (isFocused) 2.dp else 1.dp,
+                    width = borderWidth,
                     color = borderColor,
                     shape = MaterialTheme.shapes.medium
                 ),

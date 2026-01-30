@@ -36,14 +36,32 @@ fun AppNavHost(
         // Splash Screen
         composable(Screen.Splash) {
             val viewModel: SplashViewModel = hiltViewModel()
+
+            // Read persisted values
             val onboardingComplete by viewModel.onboardingComplete.collectAsState(initial = false)
+            val accessToken by viewModel.accessToken.collectAsState(initial = null)
+            val username by viewModel.username.collectAsState(initial = null)
+            val signupStarted by viewModel.signupStarted.collectAsState(initial = false)
 
             Box(modifier = Modifier.padding(contentPadding)) {
                 LaunchedEffect(Unit) { onSplashEnter() }
 
                 SplashScreen(
                     onFinished = {
-                        val destination = if (onboardingComplete) Screen.Home else Screen.Intro
+                        // routing decision:
+                        // 1) If accessToken exists -> Home
+                        // 2) else if username exists -> Username
+                        // 3) else if signupStarted -> Username (user started signup previously)
+                        // 4) else if onboardingComplete -> Intro
+                        // 5) else -> Intro (default)
+                        val destination = when {
+                            !accessToken.isNullOrBlank() -> Screen.Home
+                            !username.isNullOrBlank() -> Screen.Username
+                            signupStarted -> Screen.Username
+                            onboardingComplete -> Screen.Intro
+                            else -> Screen.Intro
+                        }
+
                         navController.navigate(destination) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
@@ -75,10 +93,13 @@ fun AppNavHost(
                             popUpTo(Screen.Login) { inclusive = true }
                         }
                     },
-                    onNavigateToOtp = {
+                    onNavigateToOtp = { email, flow ->
+                        // store flow/email on the current backstack entry's SavedStateHandle so OTP dest can read it
+                        navController.currentBackStackEntry?.savedStateHandle?.set("auth_email", email)
+                        navController.currentBackStackEntry?.savedStateHandle?.set("auth_flow", flow.name)
                         navController.navigate(Screen.Otp)
                     },
-                    onNavigateToHome = { token ->
+                    onNavigateToHome = { _ ->
                         // TODO: Save token
                         navController.navigate(Screen.Home) {
                             popUpTo(Screen.Splash) { inclusive = true }
@@ -102,10 +123,13 @@ fun AppNavHost(
                             popUpTo(Screen.Signup) { inclusive = true }
                         }
                     },
-                    onNavigateToOtp = {
+                    onNavigateToOtp = { email, flow ->
+                        // store flow/email on the current backstack entry's SavedStateHandle so OTP dest can read it
+                        navController.currentBackStackEntry?.savedStateHandle?.set("auth_email", email)
+                        navController.currentBackStackEntry?.savedStateHandle?.set("auth_flow", flow.name)
                         navController.navigate(Screen.Otp)
                     },
-                    onNavigateToUsername = { token ->
+                    onNavigateToUsername = { _ ->
                         // TODO: Save token
                         navController.navigate(Screen.Username)
                     },
@@ -121,8 +145,15 @@ fun AppNavHost(
         // OTP Screen
         composable(Screen.Otp) {
             Box(modifier = Modifier.padding(contentPadding)) {
-                val authFlowViewModel: AuthFlowViewModel = hiltViewModel()
-                val flowType by authFlowViewModel.flow.collectAsState()
+                // Read saved auth_flow/auth_email from the previous backstack entry (where we stored them)
+                val prevEntry = navController.previousBackStackEntry
+                val savedFlowName: String? = prevEntry?.savedStateHandle?.get<String>("auth_flow")
+                val savedEmail: String? = prevEntry?.savedStateHandle?.get<String>("auth_email")
+                val savedFlow: AuthFlowType? = when (savedFlowName) {
+                    AuthFlowType.SIGNUP.name -> AuthFlowType.SIGNUP
+                    AuthFlowType.LOGIN.name -> AuthFlowType.LOGIN
+                    else -> null
+                }
 
                 OtpScreen(
                     onBack = {
@@ -130,7 +161,7 @@ fun AppNavHost(
                     },
                     onVerified = {
                         // TODO: Save token
-                        when (flowType) {
+                        when (savedFlow) {
                             AuthFlowType.SIGNUP -> {
                                 navController.navigate(Screen.Username) {
                                     popUpTo(Screen.Signup) { inclusive = true }
@@ -141,7 +172,7 @@ fun AppNavHost(
                                     popUpTo(Screen.Splash) { inclusive = true }
                                 }
                             }
-                            null -> {
+                            else -> {
                                 // Fallback if flow type not set
                                 navController.navigate(Screen.Username)
                             }
@@ -149,7 +180,9 @@ fun AppNavHost(
                     },
                     onResend = {
                         // Resend logic handled in OtpViewModel
-                    }
+                    },
+                    authEmailParam = savedEmail,
+                    flowParam = savedFlow
                 )
             }
         }
@@ -159,37 +192,38 @@ fun AppNavHost(
             Box(modifier = Modifier.padding(contentPadding)) {
                 UsernameScreen(
                     onBack = {
-                        navController.popBackStack()
+                        navController.navigate(Screen.Intro) {
+                            popUpTo(Screen.Username) { inclusive = true }
+                        }
                     },
                     onComplete = {
-                        navController.navigate(Screen.SmsPermission)
+                        // TODO: Save username
+                        navController.navigate(Screen.Home) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
                     }
                 )
             }
         }
 
-        // SMS Permission Screen
-        composable(Screen.SmsPermission) {
+        // Home Screen
+        composable(Screen.Home) {
             Box(modifier = Modifier.padding(contentPadding)) {
-                SmsPermission(
-                    onAllow = {
-                        navController.navigate(Screen.Loading)
-                    },
-                    onSkip = {
-                        navController.navigate(Screen.Loading)
+                HomeScreen(onLogout = {
+                    // Clear back stack and navigate to Intro
+                    navController.navigate(Screen.Intro) {
+                        popUpTo(Screen.Home) { inclusive = true }
                     }
-                )
+                })
             }
         }
 
         // Loading Screen
         composable(Screen.Loading) {
             Box(modifier = Modifier.padding(contentPadding)) {
-                LoadingScreen(
-                    onFinished = {
-                        navController.navigate(Screen.CompleteSetup)
-                    }
-                )
+                LoadingScreen(onFinished = {
+                    navController.navigate(Screen.CompleteSetup)
+                })
             }
         }
 
@@ -206,10 +240,18 @@ fun AppNavHost(
             }
         }
 
-        // Home Screen
-        composable(Screen.Home) {
+        // SMS Permission Screen
+        composable(Screen.SmsPermission) {
             Box(modifier = Modifier.padding(contentPadding)) {
-                HomeScreen()
+                SmsPermission(
+                    onAllow = {
+                        navController.navigate(Screen.Loading)
+                    },
+                    onSkip = {
+                        // On skip navigate to Loading so it shows continue without SMS flow
+                        navController.navigate(Screen.Loading)
+                    }
+                )
             }
         }
     }
