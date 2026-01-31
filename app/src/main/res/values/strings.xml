@@ -1,4 +1,3 @@
 <resources>
     <string name="app_name">TruXpense</string>
-    <!-- backend base url is injected from Gradle property `backendBaseUrl` via resValue at build time -->
 </resources>

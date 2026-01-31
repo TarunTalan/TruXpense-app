@@ -5,5 +5,5 @@ data class VerifyLoginOtpResponse(
     val expiresIn: Int,
     val refreshToken: String,
     val tokenType: String,
-    val user: User
+    val user: LoggedInUser
 )

@@ -7,7 +7,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
+import com.example.truxpense.presentation.screens.auth.components.OAuthButton
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
@@ -50,6 +50,21 @@ fun IntroScreen(
     val pages = remember { introPages }
     val pagerState = rememberPagerState { pages.size }
 
+    // Intro handles Google sign-in directly via IntroViewModel
+    val viewModel: IntroViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    val state by viewModel.state.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // One Tap IntentSender launcher: start when IntroViewModel.signInIntentSender becomes available
+    val intentSenderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
+        onResult = { result ->
+            // forward the resulting Intent to ViewModel for processing
+            viewModel.handleOneTapResult(context, result.data)
+            viewModel.clearSignInIntentSender()
+        }
+    )
+
     LaunchedEffect(pagerState.isScrollInProgress) {
         if (!pagerState.isScrollInProgress) {
             delay(4000)
@@ -63,7 +78,12 @@ fun IntroScreen(
         bottomBar = {
             IntroBottomActions(
                 onGetStarted = onGetStarted,
-                onLogin = onLogin
+                onLogin = onLogin,
+                onGoogle = {
+                    // Start One Tap sign-in flow: ask ViewModel to begin and expose an IntentSender
+                    viewModel.startOneTapSignIn(context)
+                },
+                isLoading = state.isLoading
             )
         }
     ) { innerPadding ->
@@ -99,7 +119,7 @@ fun IntroScreen(
                     )
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(20.dp))
 
                 AnimatedPagerIndicator(
                     pagerState = pagerState,
@@ -109,6 +129,20 @@ fun IntroScreen(
                 Spacer(Modifier.height(16.dp))
 
                 Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+        // If ViewModel exposed a pending IntentSender, launch it from the ActivityResult launcher
+        LaunchedEffect(state.signInIntentSender) {
+            val sender = state.signInIntentSender
+            if (sender != null) {
+                try {
+                    val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                    intentSenderLauncher.launch(intentSenderRequest)
+                } catch (e: Exception) {
+                    // Surface to viewmodel
+                    viewModel.handleOneTapResult(context, null)
+                    viewModel.clearSignInIntentSender()
+                }
             }
         }
     }
@@ -240,7 +274,9 @@ private fun AnimatedPagerIndicator(
 @Composable
 private fun IntroBottomActions(
     onGetStarted: () -> Unit,
-    onLogin: () -> Unit
+    onLogin: () -> Unit,
+    onGoogle: () -> Unit,
+    isLoading: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -256,21 +292,15 @@ private fun IntroBottomActions(
 
         Spacer(Modifier.height(10.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Already have an account?",
-                fontSize = 13.sp
-            )
-            Text(
-                text = " Login",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .clickable(onClick = onLogin)
-                    .padding(start = 4.dp)
-            )
-        }
+        // OAuth lives on Intro screen; clicking it launches Google sign-in
+        OAuthButton(
+            text = if (isLoading) "Signing in..." else "Continue with Google",
+            onClick = onGoogle,
+            isGoogle = true,
+            enabled = !isLoading
+        )
+
+        Spacer(Modifier.height(8.dp))
     }
 }
 

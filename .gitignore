@@ -16,3 +16,5 @@ local.properties
 strings.xml
 network_security_config.xml
 gradle.properties
+gradle-local.properties
+gradle-local.properties.example

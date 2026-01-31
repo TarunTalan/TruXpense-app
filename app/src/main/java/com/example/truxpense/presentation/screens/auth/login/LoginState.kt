@@ -10,6 +10,7 @@ data class LoginUiState(
     // Navigation events
     val navigateToOtp: Boolean = false,
     val navigateToHome: Boolean = false,
+    val navigateToUsername: Boolean = false,
     val authToken: String? = null,
 
     // Validation

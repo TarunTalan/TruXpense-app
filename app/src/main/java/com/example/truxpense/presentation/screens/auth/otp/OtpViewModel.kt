@@ -8,15 +8,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import com.example.truxpense.data.repository.AuthRepository
 import com.example.truxpense.presentation.utils.ResponseHandler
 import com.example.truxpense.data.remote.api.TokenResponse
 import com.example.truxpense.presentation.navigation.AuthFlowType
+import com.example.truxpense.data.prefs.AuthPreferences
 
 @HiltViewModel
 class OtpViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val prefs: AuthPreferences
 ) : ViewModel() {
     private val _digits = MutableStateFlow(List(6) { "" })
     val digits: StateFlow<List<String>> = _digits
@@ -42,8 +45,6 @@ class OtpViewModel @Inject constructor(
         // clear any previous error when user enters input
         _error.value = null
     }
-
-    fun setCanResend(value: Boolean) { _canResend.value = value }
 
     fun startResendTimer(seconds: Int = 30) {
         // cancel any existing timer
@@ -87,6 +88,18 @@ class OtpViewModel @Inject constructor(
 
                 if (result.isSuccess) {
                     val token = result.getOrNull()!!
+
+                    // Wait for the access token to be persisted to DataStore so TokenManager picks it up
+                    try {
+                        if (!token.accessToken.isNullOrBlank()) {
+                            prefs.accessToken.first { it == token.accessToken }
+                        } else {
+                            prefs.accessToken.first { !it.isNullOrBlank() }
+                        }
+                    } catch (_: Exception) {
+                        // ignore persistence wait failures; proceed with best-effort
+                    }
+
                     _isLoading.value = false
                     onSuccess(token)
                 } else {
@@ -145,5 +158,4 @@ class OtpViewModel @Inject constructor(
         }
     }
 
-    fun clearError() { _error.value = null }
 }

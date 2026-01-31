@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -12,15 +15,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.truxpense.presentation.screens.auth.intro.IntroScreen
 import com.example.truxpense.presentation.screens.auth.login.LoginScreen
-import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
 import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
-import com.example.truxpense.presentation.screens.onboarding.username.UsernameScreen
-import com.example.truxpense.presentation.screens.onboarding.permission.SmsPermission
-import com.example.truxpense.presentation.screens.splash.SplashScreen
+import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
 import com.example.truxpense.presentation.screens.home.HomeScreen
-import com.example.truxpense.presentation.screens.onboarding.loading.LoadingScreen
 import com.example.truxpense.presentation.screens.onboarding.complete.CompleteSetupScreen
+import com.example.truxpense.presentation.screens.onboarding.loading.LoadingScreen
+import com.example.truxpense.presentation.screens.onboarding.permission.SmsPermission
+import com.example.truxpense.presentation.screens.onboarding.username.UsernameScreen
+import com.example.truxpense.presentation.screens.splash.SplashScreen
 import com.example.truxpense.presentation.screens.splash.SplashViewModel
+
+// App lifecycle stages used by splash routing
+private enum class Stage { AUTH, ONBOARDING, HOME }
 
 @Composable
 fun AppNavHost(
@@ -48,18 +54,23 @@ fun AppNavHost(
 
                 SplashScreen(
                     onFinished = {
-                        // routing decision:
-                        // 1) If accessToken exists -> Home
-                        // 2) else if username exists -> Username
-                        // 3) else if signupStarted -> Username (user started signup previously)
-                        // 4) else if onboardingComplete -> Intro
-                        // 5) else -> Intro (default)
-                        val destination = when {
-                            !accessToken.isNullOrBlank() -> Screen.Home
-                            !username.isNullOrBlank() -> Screen.Username
-                            signupStarted -> Screen.Username
-                            onboardingComplete -> Screen.Intro
-                            else -> Screen.Intro
+                        // Determine app stage and route accordingly.
+                        // Stages (priority order):
+                        // 1) HOME: onboardingComplete == true -> Home
+                        // 2) ONBOARDING: signupStarted == true OR (accessToken exists but username missing) -> Username
+                        // 3) AUTH: default -> Intro
+
+                        val stage = when {
+                            onboardingComplete -> Stage.HOME
+                            signupStarted -> Stage.ONBOARDING
+                            !accessToken.isNullOrBlank() && username.isNullOrBlank() -> Stage.ONBOARDING
+                            else -> Stage.AUTH
+                        }
+
+                        val destination = when (stage) {
+                            Stage.HOME -> Screen.Home
+                            Stage.ONBOARDING -> Screen.Username
+                            Stage.AUTH -> Screen.Intro
                         }
 
                         navController.navigate(destination) {
@@ -73,6 +84,22 @@ fun AppNavHost(
         // Intro Screen
         composable(Screen.Intro) {
             Box(modifier = Modifier.padding(contentPadding)) {
+                val introViewModel: com.example.truxpense.presentation.screens.auth.intro.IntroViewModel = hiltViewModel()
+                val introState by introViewModel.state.collectAsState()
+
+                // Observe viewmodel navigation signals and navigate from the NavHost (main thread)
+                LaunchedEffect(introState.navigateToHome, introState.navigateToUsername) {
+                    if (introState.navigateToHome) {
+                        navController.navigate(Screen.Home) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    } else if (introState.navigateToUsername) {
+                        navController.navigate(Screen.Username) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    }
+                }
+
                 IntroScreen(
                     onGetStarted = {
                         navController.navigate(Screen.Signup)
@@ -102,6 +129,12 @@ fun AppNavHost(
                     onNavigateToHome = { _ ->
                         // TODO: Save token
                         navController.navigate(Screen.Home) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    },
+                    onNavigateToUsername = { _ ->
+                        // route newly-signed-up OAuth users to username onboarding
+                        navController.navigate(Screen.Username) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
                     },
@@ -145,14 +178,53 @@ fun AppNavHost(
         // OTP Screen
         composable(Screen.Otp) {
             Box(modifier = Modifier.padding(contentPadding)) {
-                // Read saved auth_flow/auth_email from the previous backstack entry (where we stored them)
+                // Read auth_flow/auth_email from either the previous backstack's SavedStateHandle (normal in-app navigation)
+                // or from the current NavBackStackEntry arguments (supports deep-links / cold starts that provide params).
                 val prevEntry = navController.previousBackStackEntry
-                val savedFlowName: String? = prevEntry?.savedStateHandle?.get<String>("auth_flow")
-                val savedEmail: String? = prevEntry?.savedStateHandle?.get<String>("auth_email")
+                val savedFlowNameFromSavedState: String? = prevEntry?.savedStateHandle?.get<String>("auth_flow")
+                val savedEmailFromSavedState: String? = prevEntry?.savedStateHandle?.get<String>("auth_email")
+
+                val currentArgs = navController.currentBackStackEntry?.arguments
+                val savedFlowNameFromArgs: String? = currentArgs?.getString("auth_flow")
+                val savedEmailFromArgs: String? = currentArgs?.getString("auth_email")
+
+                // Prefer savedStateHandle (in-app navigation), fallback to nav args (deep links / cold start)
+                val savedFlowName: String? = savedFlowNameFromSavedState ?: savedFlowNameFromArgs
+                val savedEmail: String? = savedEmailFromSavedState ?: savedEmailFromArgs
+
                 val savedFlow: AuthFlowType? = when (savedFlowName) {
                     AuthFlowType.SIGNUP.name -> AuthFlowType.SIGNUP
                     AuthFlowType.LOGIN.name -> AuthFlowType.LOGIN
                     else -> null
+                }
+
+                // We will trigger navigation after OTP verification by checking persisted username
+                val splashViewModel: SplashViewModel = hiltViewModel()
+                var otpVerifiedTrigger by remember { mutableStateOf(false) }
+
+                // When otpVerifiedTrigger toggles, read persisted username and route accordingly
+                LaunchedEffect(otpVerifiedTrigger) {
+                    if (!otpVerifiedTrigger) return@LaunchedEffect
+
+                    // Wait for persisted username (or empty) from DataStore
+                    val persistedUsername = try {
+                        splashViewModel.username.first()
+                    } catch (_: Exception) { null }
+
+                    if (!persistedUsername.isNullOrBlank()) {
+                        // existing user -> Home
+                        navController.safeNavigate(Screen.Home) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    } else {
+                        // new user -> Username onboarding
+                        navController.safeNavigate(Screen.Username) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    }
+
+                    // reset trigger
+                    otpVerifiedTrigger = false
                 }
 
                 OtpScreen(
@@ -160,23 +232,8 @@ fun AppNavHost(
                         navController.popBackStack()
                     },
                     onVerified = {
-                        // TODO: Save token
-                        when (savedFlow) {
-                            AuthFlowType.SIGNUP -> {
-                                navController.navigate(Screen.Username) {
-                                    popUpTo(Screen.Signup) { inclusive = true }
-                                }
-                            }
-                            AuthFlowType.LOGIN -> {
-                                navController.navigate(Screen.Home) {
-                                    popUpTo(Screen.Splash) { inclusive = true }
-                                }
-                            }
-                            else -> {
-                                // Fallback if flow type not set
-                                navController.navigate(Screen.Username)
-                            }
-                        }
+                        // Set trigger which will cause the LaunchedEffect above to check persisted username
+                        otpVerifiedTrigger = true
                     },
                     onResend = {
                         // Resend logic handled in OtpViewModel
@@ -198,13 +255,13 @@ fun AppNavHost(
                     },
                     onComplete = {
                         // TODO: Save username
-                        navController.navigate(Screen.Home) {
+                        navController.safeNavigate(Screen.Home) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
                     }
-                )
-            }
-        }
+                 )
+             }
+         }
 
         // Home Screen
         composable(Screen.Home) {

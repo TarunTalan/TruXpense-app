@@ -1,6 +1,7 @@
 package com.example.truxpense.presentation.screens.onboarding.username
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,12 +9,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.presentation.utils.InputValidators
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.example.truxpense.data.repository.OnboardingRepository
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
-class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences): ViewModel() {
+class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, private val repo: OnboardingRepository): ViewModel() {
     private val _username = MutableStateFlow("")
     val username: StateFlow<String> = _username.asStateFlow()
 
@@ -33,17 +35,35 @@ class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences):
     // Save username and mark onboarding complete
     fun saveAndComplete(onComplete: (() -> Unit)? = null) {
         val name = _username.value
-        CoroutineScope(Dispatchers.IO).launch {
+        // Use viewModelScope so lifecycle is respected and switch contexts as needed
+        viewModelScope.launch {
+            // update UI state on main
             _isSaving.value = true
             try {
-                prefs.saveUsername(name)
-                // mark onboarding complete and clear signupStarted so app restarts in the correct state
-                prefs.setOnboardingComplete(true)
-                prefs.setSignupStarted(false)
-                onComplete?.invoke()
-            } catch (_: Throwable) {
+                // perform network + IO on background thread
+                val res = withContext(Dispatchers.IO) { repo.setUsername(name) }
+
+                // Handle result on main thread (UI-safe). Persisting onboarding flags uses IO.
+                res.fold(onSuccess = {
+                    try {
+                        // persist onboarding flags off the main thread
+                        withContext(Dispatchers.IO) {
+                            prefs.setOnboardingComplete(true)
+                            prefs.setSignupStarted(false)
+                        }
+                        // Ensure navigation/UI callbacks run on the main thread
+                        withContext(Dispatchers.Main) {
+                            onComplete?.invoke()
+                        }
+                    } catch (e: Throwable) {
+                        _error.value = e.message ?: "Failed to save username. Please try again."
+                    }
+                }, onFailure = { err ->
+                    _error.value = err.message ?: "Failed to save username. Please try again."
+                })
+            } catch (t: Throwable) {
                 // expose a friendly error to UI
-                _error.value = "Failed to save username. Please try again."
+                _error.value = t.message ?: "Failed to save username. Please try again."
             } finally {
                 _isSaving.value = false
             }
