@@ -1,11 +1,7 @@
 package com.example.truxpense.presentation.screens.auth.signup
 
-import android.app.Activity
 import android.content.res.Configuration
 import android.graphics.Color.rgb
-import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -18,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -30,13 +25,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.truxpense.data.repository.GoogleSignInRepository
 import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
-import com.example.truxpense.presentation.screens.auth.components.OAuthButton
 import com.example.truxpense.presentation.utils.clearFocusOnTap
-import com.example.truxpense.util.findActivity
 
 @Composable
 fun SignupScreen(
@@ -47,9 +39,6 @@ fun SignupScreen(
     viewModel: SignUpViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val context = LocalContext.current
-    val activity = context.findActivity()
-    val googleSignInRepository = remember { GoogleSignInRepository(context) }
 
     // Handle navigation events
     LaunchedEffect(state.navigateToOtp) {
@@ -64,15 +53,6 @@ fun SignupScreen(
         if (state.navigateToUsername && state.authToken != null) {
             onNavigateToUsername(state.authToken!!)
             viewModel.onEvent(SignupEvent.OnNavigationHandled)
-        }
-    }
-
-    // Google Sign-In launcher
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            viewModel.handleGoogleSignInResult(result.data)
         }
     }
 
@@ -101,21 +81,7 @@ fun SignupScreen(
         ) {
             SignupContent(
                 state = state,
-                onEvent = viewModel::onEvent,
-                onGoogleSignIn = {
-                    viewModel.onEvent(SignupEvent.SignUpWithGoogle)
-                    try {
-                        val intent = if (activity != null) {
-                            googleSignInRepository.getSignInIntent(activity)
-                        } else {
-                            googleSignInRepository.getSignInIntent()
-                        }
-                        googleSignInLauncher.launch(intent)
-                    } catch (e: Exception) {
-                        Log.e("SignupScreen", "Failed to launch Google Sign-In", e)
-                        // rely on ViewModel to set state.error which will be shown inline
-                    }
-                }
+                onEvent = viewModel::onEvent
             )
         }
 
@@ -197,8 +163,7 @@ private fun SignupBottomBar(
 @Composable
 private fun SignupContent(
     state: SignUpUiState,
-    onEvent: (SignupEvent) -> Unit,
-    onGoogleSignIn: () -> Unit
+    onEvent: (SignupEvent) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -226,28 +191,11 @@ private fun SignupContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Divider
-        OrDivider()
+//        OrDivider()
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // OAuth Buttons
-        // Keep OAuth button label constant; it should not show "Signing in..." when
-        // the email verify flow is running. Only disable the button while any loading is active.
-        OAuthButton(
-            text = "Continue with Google",
-            onClick = onGoogleSignIn,
-            isGoogle = true,
-            enabled = !state.isLoading
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OAuthButton(
-            text = "Continue with Facebook",
-            onClick = { /* TODO: Implement Facebook sign-in */ },
-            isGoogle = false,
-            enabled = !state.isLoading
-        )
+        // (Email OTP flow only) — Signup uses email verification; Google OAuth is handled on Intro
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -283,29 +231,29 @@ private fun SignupHeader() {
     }
 }
 
-@Composable
-private fun OrDivider() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            thickness = DividerDefaults.Thickness,
-            color = Color(rgb(193, 199, 205))
-        )
-        Text(
-            text = "  or  ",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            thickness = DividerDefaults.Thickness,
-            color = Color(rgb(193, 199, 205))
-        )
-    }
-}
+//@Composable
+//private fun OrDivider() {
+//    Row(
+//        verticalAlignment = Alignment.CenterVertically,
+//        modifier = Modifier.fillMaxWidth()
+//    ) {
+//        HorizontalDivider(
+//            modifier = Modifier.weight(1f),
+//            thickness = DividerDefaults.Thickness,
+//            color = Color(rgb(193, 199, 205))
+//        )
+//        Text(
+//            text = "  or  ",
+//            style = MaterialTheme.typography.bodyMedium,
+//            color = MaterialTheme.colorScheme.onSurface
+//        )
+//        HorizontalDivider(
+//            modifier = Modifier.weight(1f),
+//            thickness = DividerDefaults.Thickness,
+//            color = Color(rgb(193, 199, 205))
+//        )
+//    }
+//}
 
 @Composable
 private fun TncCheckbox(
@@ -431,8 +379,7 @@ fun SignupPreviewLight() {
                 isEmailValid = true,
                 canSignUp = true
             ),
-            onEvent = {},
-            onGoogleSignIn = {}
+            onEvent = {}
         )
     }
 }
@@ -454,8 +401,7 @@ fun SignupPreviewDark() {
                 isEmailValid = true,
                 canSignUp = true
             ),
-            onEvent = {},
-            onGoogleSignIn = {}
+            onEvent = {}
         )
     }
 }

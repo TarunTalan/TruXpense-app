@@ -3,31 +3,36 @@ package com.example.truxpense
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import android.util.Log
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Scaffold
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
+import com.example.truxpense.data.auth.AuthSessionManager
 import com.example.truxpense.presentation.navigation.AppNavHost
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.theme.TruXpenseTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Volatile
     private var keepSplashOn = true
 
+    @Inject
+    lateinit var sessionManager: AuthSessionManager
     override fun onCreate(savedInstanceState: Bundle?) {
         // Determine whether this is a cold start. If not (e.g. theme change), don't keep system splash.
         val isColdStart = savedInstanceState == null
@@ -69,6 +74,15 @@ class MainActivity : ComponentActivity() {
                     )
 
                     Box(modifier = androidx.compose.ui.Modifier.padding(contentPadding)) {
+                        // Observe logout events; on logout navigate to Intro screen and clear backstack
+                        LaunchedEffect(sessionManager) {
+                            sessionManager.logoutEvents.collect {
+                                navController.navigate(Screen.Intro) {
+                                    popUpTo(Screen.Splash) { inclusive = true }
+                                }
+                            }
+                        }
+
                         AppNavHost(navController = navController, startDestination = Screen.Splash, contentPadding = contentPadding, onSplashEnter = {
                             Log.d("MainActivity", "onSplashEnter received — dismissing system splash")
                             keepSplashOn = false

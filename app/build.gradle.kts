@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -27,12 +29,26 @@ android {
         }
 
         // Backend base URL: prefer a project property `backendBaseUrl` (set in gradle.properties locally),
-        // otherwise fallback to the current value in strings.xml
-        val backendBaseUrl: String? = (project.findProperty("backendBaseUrl") as? String)
+        // otherwise prefer an untracked local file 'gradle-local.properties' at project root, and finally
+        // fall back to the development default.
+        var backendBaseUrl: String? = (project.findProperty("backendBaseUrl") as? String)
+        if (backendBaseUrl.isNullOrBlank()) {
+            val localFile = rootProject.file("gradle-local.properties")
+            if (localFile.exists()) {
+                val props = Properties()
+                localFile.inputStream().use { stream ->
+                    props.load(stream)
+                }
+                backendBaseUrl = props.getProperty("backendBaseUrl")
+            }
+        }
+
         if (!backendBaseUrl.isNullOrBlank()) {
+            // Ensure base URL ends with a trailing slash required by Retrofit
+            if (!backendBaseUrl.endsWith("/")) backendBaseUrl += "/"
             resValue("string", "backend_base_url", backendBaseUrl)
         } else {
-            resValue("string", "backend_base_url", "http://192.168.29.104:8082")
+            resValue("string", "backend_base_url", "")
         }
     }
 

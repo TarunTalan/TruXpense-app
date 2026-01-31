@@ -1,53 +1,73 @@
 package com.example.truxpense.di
 
 import android.content.Context
+import com.example.truxpense.data.auth.AuthSessionManager
+import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
+import com.example.truxpense.data.remote.api.OnboardingApi
 import com.example.truxpense.data.repository.AuthRepository
 import com.example.truxpense.data.repository.GoogleSignInRepository
-import com.example.truxpense.R
-import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.repository.OnboardingRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
+/**
+ * Module providing auth-specific dependencies.
+ *
+ * Note: Network-related auth components (TokenManager, TokenRefresher, etc.)
+ * are now in NetworkModule to maintain proper dependency hierarchy.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object AuthModule {
 
+    /**
+     * Manages session logout events.
+     * UI components collect logoutEvents to navigate to login.
+     */
     @Provides
     @Singleton
-    fun provideGoogleSignInRepository(@ApplicationContext context: Context): GoogleSignInRepository =
-        GoogleSignInRepository(context)
-
-    @Provides
-    @Singleton
-    fun provideRetrofit(@ApplicationContext context: Context): Retrofit {
-        val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .build()
-
-        val baseUrl = context.getString(R.string.backend_base_url)
-
-        return Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
+    fun provideAuthSessionManager(prefs: AuthPreferences): AuthSessionManager {
+        return AuthSessionManager(prefs)
     }
 
+    /**
+     * Google Sign-In repository for handling Google OAuth flow
+     */
     @Provides
     @Singleton
-    fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)
+    fun provideGoogleSignInRepository(
+        @ApplicationContext context: Context
+    ): GoogleSignInRepository {
+        return GoogleSignInRepository(context)
+    }
 
+    /**
+     * Main authentication repository.
+     * Handles login, signup, OTP verification, etc.
+     */
     @Provides
     @Singleton
-    fun provideAuthRepository(api: AuthApi, prefs: AuthPreferences): AuthRepository = AuthRepository(api, prefs)
+    fun provideAuthRepository(
+        api: AuthApi,
+        prefs: AuthPreferences
+    ): AuthRepository {
+        return AuthRepository(api, prefs)
+    }
+
+    /**
+     * Onboarding repository for handling user onboarding process
+     */
+    @Provides
+    @Singleton
+    fun provideOnboardingRepository(
+        onboardingApi: OnboardingApi,
+        prefs: AuthPreferences
+    ): OnboardingRepository {
+        return OnboardingRepository(onboardingApi, prefs)
+    }
 }

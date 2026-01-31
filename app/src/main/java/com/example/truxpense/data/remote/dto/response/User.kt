@@ -4,7 +4,7 @@ data class User(
     val authProvider: String,
     val email: String,
     val id: Int,
-    val profilePicture: Any,
+    val profilePicture: String?,
     val role: String,
-    val username: Any
+    val username: String?
 )

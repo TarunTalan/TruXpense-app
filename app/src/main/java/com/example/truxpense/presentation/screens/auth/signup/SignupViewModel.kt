@@ -1,15 +1,11 @@
 package com.example.truxpense.presentation.screens.auth.signup
 
-import android.content.Intent
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.data.repository.AuthRepository
 import com.example.truxpense.presentation.utils.InputValidators
 import com.example.truxpense.presentation.utils.InputValidators.filterEmailInput
 import com.example.truxpense.presentation.utils.ResponseHandler
-import com.google.android.gms.common.api.ApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,13 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SignUpViewModel @Inject constructor(
-    private val authRepository: AuthRepository,
-    private val prefs: AuthPreferences
+    private val authRepository: AuthRepository
 ) : ViewModel() {
-
-    companion object {
-        private const val TAG = "SignUpViewModel"
-    }
 
     private val _state = MutableStateFlow(SignUpUiState())
     val state: StateFlow<SignUpUiState> = _state.asStateFlow()
@@ -78,9 +69,7 @@ class SignUpViewModel @Inject constructor(
             }
 
             SignupEvent.SignUpWithGoogle -> {
-                // Google sign-in is handled separately via handleGoogleSignInResult
-                // This event is just for logging/tracking if needed
-                Log.d(TAG, "Google sign-up initiated")
+                // Google sign-in handled centrally by IntroViewModel; ignore here
             }
 
             SignupEvent.ClearError -> {
@@ -96,75 +85,6 @@ class SignUpViewModel @Inject constructor(
         }
     }
 
-    fun handleGoogleSignInResult(intent: Intent?) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, error = null)
-
-            Log.d(TAG, "handleGoogleSignInResult: intent=$intent")
-
-            try {
-                val task = com.google.android.gms.auth.api.signin.GoogleSignIn
-                    .getSignedInAccountFromIntent(intent)
-
-                val account = task.getResult(ApiException::class.java)
-                Log.d(TAG, "Google account obtained: id=${account?.id}, email=${account?.email}")
-                val idToken = account?.idToken
-
-                if (idToken.isNullOrEmpty()) {
-                    val error = "Failed to get ID token. Please check your Google Sign-In configuration."
-                    Log.w(TAG, "ID token empty or null")
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        error = error
-                    )
-                    return@launch
-                }
-
-                // Send ID token to backend
-                val result = authRepository.sendIdTokenToServer(idToken)
-
-                _state.value = _state.value.copy(isLoading = false)
-                Log.d(TAG, "sendIdTokenToServer completed: success=${result.isSuccess}")
-
-                if (result.isSuccess) {
-                    val tokenResponse = result.getOrNull()!!
-                    // Persist that signup reached username step so app restart resumes here
-                    viewModelScope.launch {
-                        prefs.setSignupStarted(true)
-                    }
-                    _state.value = _state.value.copy(
-                        navigateToUsername = true,
-                        authToken = tokenResponse.accessToken
-                    )
-                } else {
-                    val message = ResponseHandler.getMessageFromResult(result, "Server error occurred")
-                    _state.value = _state.value.copy(error = message)
-                }
-
-            } catch (e: ApiException) {
-                Log.w(TAG, "Google Sign-In ApiException (status=${e.statusCode}): ${e.localizedMessage}")
-                val errorMessage = when (e.statusCode) {
-                    com.google.android.gms.common.api.CommonStatusCodes.CANCELED -> null // Don't show error for user cancellation
-                    com.google.android.gms.common.api.CommonStatusCodes.NETWORK_ERROR -> "Network error. Please check your connection."
-                    com.google.android.gms.common.api.CommonStatusCodes.INVALID_ACCOUNT -> "Invalid Google account"
-                    else -> "Google Sign-In failed: ${e.localizedMessage}"
-                }
-
-                _state.value = _state.value.copy(
-                    isLoading = false,
-                    error = errorMessage
-                )
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Unexpected exception during Google sign-in: ${e.localizedMessage}", e)
-                val errorMessage = ResponseHandler.parseThrowable(e)
-                _state.value = _state.value.copy(
-                    isLoading = false,
-                    error = errorMessage
-                )
-            }
-        }
-    }
 
     private fun sendSignupOtp() {
         viewModelScope.launch {

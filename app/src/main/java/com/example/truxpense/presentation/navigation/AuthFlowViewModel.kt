@@ -16,18 +16,4 @@ class AuthFlowViewModel @Inject constructor(): ViewModel() {
     private val _email = MutableStateFlow("")
     val email: StateFlow<String> = _email
 
-    fun setSignup(emailValue: String) {
-        _flow.value = AuthFlowType.SIGNUP
-        _email.value = emailValue
-    }
-
-    fun setLogin(emailValue: String) {
-        _flow.value = AuthFlowType.LOGIN
-        _email.value = emailValue
-    }
-
-    fun clear() {
-        _flow.value = null
-        _email.value = ""
-    }
 }
