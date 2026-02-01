@@ -1,67 +1,140 @@
 package com.example.truxpense.data.prefs
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.security.MessageDigest
 import javax.inject.Inject
+import javax.inject.Singleton
 
-class AuthPreferences @Inject constructor(@ApplicationContext private val context: Context) {
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "auth_prefs")
+
+@Singleton
+class AuthPreferences @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val dataStore = context.dataStore
+
     companion object {
-        private const val DATASTORE_NAME = "auth_prefs"
-        private val Context.dataStore by preferencesDataStore(DATASTORE_NAME)
+        // Tokens
         private val ACCESS_TOKEN = stringPreferencesKey("access_token")
         private val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val EXPIRES_IN = longPreferencesKey("expires_in")
+
+        // User
         private val USERNAME = stringPreferencesKey("username")
+
+        // Onboarding flags
         private val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         private val SIGNUP_STARTED = booleanPreferencesKey("signup_started")
+
+        // Per-email OTP keys
+        private const val OTP_FAIL_COUNT_PREFIX = "otp_fail_count_"
+        private const val OTP_LOCK_UNTIL_PREFIX = "otp_lock_until_"
+        private const val OTP_FAIL_TS_PREFIX = "otp_fail_ts_"
     }
 
+    // Tokens
     suspend fun saveTokens(access: String, refresh: String, expiresIn: Long) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[ACCESS_TOKEN] = access
             prefs[REFRESH_TOKEN] = refresh
             prefs[EXPIRES_IN] = expiresIn
         }
     }
 
-    val accessToken: Flow<String?> = context.dataStore.data.map { it[ACCESS_TOKEN] }
-    val refreshToken: Flow<String?> = context.dataStore.data.map { it[REFRESH_TOKEN] }
-    val expiresIn: Flow<Long?> = context.dataStore.data.map { it[EXPIRES_IN] }
+    val accessToken: Flow<String?> = dataStore.data.map { prefs -> prefs[ACCESS_TOKEN] }
+    val refreshToken: Flow<String?> = dataStore.data.map { prefs -> prefs[REFRESH_TOKEN] }
 
-    suspend fun clear() {
-        context.dataStore.edit { it.clear() }
-    }
-
-    // Username and onboarding flag helpers
+    // Username
     suspend fun saveUsername(username: String) {
-        context.dataStore.edit { prefs ->
-            prefs[USERNAME] = username
-        }
+        dataStore.edit { prefs -> prefs[USERNAME] = username }
     }
 
-    val username: Flow<String?> = context.dataStore.data.map { it[USERNAME] }
+    val username: Flow<String?> = dataStore.data.map { prefs -> prefs[USERNAME] }
 
+    // Onboarding
     suspend fun setOnboardingComplete(value: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[ONBOARDING_COMPLETE] = value
-        }
+        dataStore.edit { prefs -> prefs[ONBOARDING_COMPLETE] = value }
     }
 
-    val onboardingComplete: Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_COMPLETE] ?: false }
+    val onboardingComplete: Flow<Boolean> = dataStore.data.map { prefs -> prefs[ONBOARDING_COMPLETE] ?: false }
 
-    // Mark that signup flow has started (user completed signup step and should be routed to Username on restart)
     suspend fun setSignupStarted(value: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[SIGNUP_STARTED] = value
+        dataStore.edit { prefs -> prefs[SIGNUP_STARTED] = value }
+    }
+
+    val signupStarted: Flow<Boolean> = dataStore.data.map { prefs -> prefs[SIGNUP_STARTED] ?: false }
+
+    // OTP per-email helpers
+    private fun hashEmail(email: String): String {
+        return try {
+            val md = MessageDigest.getInstance("SHA-256")
+            val normalizedEmail = email.trim().lowercase()
+            val bytes = md.digest(normalizedEmail.toByteArray(Charsets.UTF_8))
+            bytes.joinToString(separator = "") { byte -> String.format("%02x", byte) }
+        } catch (_: Exception) {
+            email.trim().lowercase().replace(Regex("[^a-z0-9]"), "_")
         }
     }
 
-    val signupStarted: Flow<Boolean> = context.dataStore.data.map { it[SIGNUP_STARTED] ?: false }
+    private fun failCountKeyFor(emailHash: String): Preferences.Key<Int> = intPreferencesKey(OTP_FAIL_COUNT_PREFIX + emailHash)
+    private fun lockUntilKeyFor(emailHash: String): Preferences.Key<Long> = longPreferencesKey(OTP_LOCK_UNTIL_PREFIX + emailHash)
+    private fun lastFailKeyFor(emailHash: String): Preferences.Key<Long> = longPreferencesKey(OTP_FAIL_TS_PREFIX + emailHash)
+
+    fun otpLastFailFor(email: String): Flow<Long> {
+        val key = lastFailKeyFor(hashEmail(email))
+        return dataStore.data.map { prefs -> prefs[key] ?: 0L }
+    }
+
+    fun otpLockUntilFor(email: String): Flow<Long> {
+        val key = lockUntilKeyFor(hashEmail(email))
+        return dataStore.data.map { prefs -> prefs[key] ?: 0L }
+    }
+
+    suspend fun resetOtpFailCountFor(email: String) {
+        val key = failCountKeyFor(hashEmail(email))
+        dataStore.edit { prefs -> prefs[key] = 0 }
+    }
+
+    suspend fun setOtpLockUntilFor(email: String, millis: Long) {
+        val key = lockUntilKeyFor(hashEmail(email))
+        dataStore.edit { prefs -> prefs[key] = millis }
+    }
+
+    suspend fun clearOtpLockFor(email: String) {
+        val key = lockUntilKeyFor(hashEmail(email))
+        dataStore.edit { prefs -> prefs[key] = 0L }
+    }
+
+    suspend fun incrementOtpFailCountAndSetLastFailFor(email: String, millis: Long): Int {
+        val key = failCountKeyFor(hashEmail(email))
+        val tsKey = lastFailKeyFor(hashEmail(email))
+        var newCount = 0
+        dataStore.edit { prefs ->
+            val current = prefs[key] ?: 0
+            newCount = current + 1
+            prefs[key] = newCount
+            prefs[tsKey] = millis
+        }
+        return newCount
+    }
+
+    suspend fun clearOtpLockAndFailDataFor(email: String) {
+        val lockKey = lockUntilKeyFor(hashEmail(email))
+        val countKey = failCountKeyFor(hashEmail(email))
+        val tsKey = lastFailKeyFor(hashEmail(email))
+        dataStore.edit { prefs ->
+            prefs[lockKey] = 0L
+            prefs[countKey] = 0
+            prefs[tsKey] = 0L
+        }
+    }
+
+    // Utility
+    suspend fun clear() { dataStore.edit { prefs -> prefs.clear() } }
 }

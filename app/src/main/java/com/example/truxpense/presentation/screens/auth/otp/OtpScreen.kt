@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -18,8 +19,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -32,11 +34,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.navigation.AuthFlowViewModel
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.utils.clearFocusOnTap
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +75,29 @@ fun OtpScreen(
         viewModel.startResendTimer(resendSeconds)
     }
 
+    // Ensure we resume any persisted per-email lock countdown when this screen is shown
+    LaunchedEffect(authEmail) {
+        val emailNorm = authEmail.trim().lowercase()
+        if (emailNorm.isNotEmpty()) {
+            viewModel.watchLockFor(emailNorm)
+        }
+    }
+
+    // Also restart watching when the screen lifecycle resumes (covers background/resume)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, authEmail) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val emailNorm = authEmail.trim().lowercase()
+                if (emailNorm.isNotEmpty()) viewModel.watchLockFor(emailNorm)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Delegate UI to a UI-only composable so we can preview safely
     OtpContent(
         otpDigits = otpDigits,
@@ -90,8 +118,7 @@ fun OtpScreen(
                 flowType = currentFlow,
                 onSuccess = {
                     onVerified?.invoke()
-                },
-                onError = { /* handled via viewModel.error */ }
+                }
             )
         },
         onResend = {
@@ -103,8 +130,7 @@ fun OtpScreen(
                     // restart timer and notify parent
                     viewModel.startResendTimer(resendSeconds)
                     onResend?.invoke()
-                },
-                onError = { /* handled via viewModel.error */ }
+                }
             )
         },
         // show vm error (set by viewModel when API fails)
@@ -130,11 +156,14 @@ fun OtpContent(
 ) {
     val vm: OtpViewModel = hiltViewModel()
     val isLoading by vm.isLoading.collectAsState()
+    val otpLockSeconds by vm.otpLockSecondsRemaining.collectAsState()
 
     val focusRequesters = remember { List(otpLength) { FocusRequester() } }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val enabledVerify = otpDigits.all { it.isNotEmpty() } && !isLoading
+    val isOtpLocked = otpLockSeconds > 0
+    val effectiveEnabledVerify = enabledVerify && !isOtpLocked
 
     Scaffold(
         topBar = {
@@ -144,10 +173,11 @@ fun OtpContent(
                     .padding(top = 20.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
+                val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
                 Icon(
                     painter = painterResource(id = R.drawable.back_icon),
                     contentDescription = null,
-                    tint = Color.Unspecified,
+                    tint = backTint,
                     modifier = Modifier.clickable { onBack?.invoke() }.padding(vertical = 20.dp)
                 )
             }
@@ -165,30 +195,35 @@ fun OtpContent(
                         // Build OTP string
                         val otp = otpDigits.joinToString(separator = "")
                         // Call ViewModel verify which will hit the backend and return parsed messages
-                        onVerify(otp)
+                        if (!isOtpLocked) onVerify(otp)
                     },
                     text = "Verify OTP",
-                    enabled = enabledVerify,
+                    enabled = effectiveEnabledVerify,
                     isLoading = isLoading
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
                 ResendButton(
                     onClick = {
-                        // Use ViewModel (vm) to resend and restart timer
-                        vm.resendOtp(
-                            email = authEmail,
-                            flowType = currentFlow,
-                            onSuccess = {
-                                // restart timer and notify parent
-                                vm.startResendTimer(resendSeconds)
-                                onResend()
-                            },
-                            onError = { /* handled via viewModel.error */ }
-                        )
+                        // Use ViewModel (vm) to resend and restart timer if not locked
+                        if (!isOtpLocked) {
+                            vm.resendOtp(
+                                email = authEmail,
+                                flowType = currentFlow,
+                                onSuccess = {
+                                    // restart timer and notify parent
+                                    vm.startResendTimer(resendSeconds)
+                                    onResend()
+                                }
+                            )
+                        }
                     },
-                    text = if (canResend) "Resend OTP" else "Resend in ${resendRemaining}s",
-                    enabled = canResend && !isLoading,
+                    text = when {
+                        isOtpLocked -> "Try again in ${formatSeconds(otpLockSeconds)}"
+                        canResend -> "Resend OTP"
+                        else -> "Resend in ${resendRemaining}s"
+                    },
+                    enabled = (canResend && !isLoading) && !isOtpLocked,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -295,13 +330,25 @@ fun OtpContent(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Inline error message instead of AlertDialog
-            if (!errorMessage.isNullOrEmpty()) {
+            // Inline error message instead of AlertDialog. Suppress inline error while
+            // the OTP lock countdown is active to avoid duplicate messages (lock text
+            // is shown separately when `isOtpLocked` is true).
+            if (!errorMessage.isNullOrEmpty() && !isOtpLocked) {
                 Text(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            // When OTP is locked, show a small countdown message below the error area
+            if (isOtpLocked) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Too many invalid attempts. Try again in ${formatSeconds(otpLockSeconds)}",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
@@ -313,17 +360,18 @@ fun OtpContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
-                    .pointerInput(Unit) {
-                        // Consume all pointer events while loading
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent()
-                            }
-                        }
-                    }
+                    .pointerInput(Unit) { /* no-op to restart when shown */ }
+                    .pointerInteropFilter { true },
             )
         }
     }
+}
+
+// simple helper to format seconds as mm:ss
+private fun formatSeconds(totalSeconds: Int): String {
+    val m = totalSeconds / 60
+    val s = totalSeconds % 60
+    return String.format(Locale.getDefault(), "%d:%02d", m, s)
 }
 
 @Composable
@@ -332,12 +380,12 @@ fun OtpDigitBox(
     index: Int,
     otpLength: Int,
     isFocused: Boolean,
+    modifier: Modifier = Modifier,
     hasError: Boolean = false,
     onValueChange: (String) -> Unit,
     onBackspace: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     focusRequester: FocusRequester,
-    modifier: Modifier = Modifier
 ) {
     val borderColor = when {
         hasError -> MaterialTheme.colorScheme.error
@@ -348,10 +396,12 @@ fun OtpDigitBox(
 
     // Use TextFieldValue to control cursor position
     var textFieldValue by remember(value) {
-        mutableStateOf(TextFieldValue(
-            text = value,
-            selection = TextRange(value.length)
-        ))
+        mutableStateOf(
+            TextFieldValue(
+                text = value,
+                selection = TextRange(value.length)
+            )
+        )
     }
 
     Box(
@@ -549,3 +599,4 @@ fun OtpContentPreviewDark() {
         errorMessage = "Invalid code, please try again"
     )
 }
+

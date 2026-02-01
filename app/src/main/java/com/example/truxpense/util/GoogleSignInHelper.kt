@@ -1,5 +1,7 @@
 package com.example.truxpense.util
 
+// Short helper for Google Sign-In
+
 import android.app.Activity
 import android.content.Context
 import com.google.android.gms.auth.api.signin.GoogleSignIn

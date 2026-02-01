@@ -1,5 +1,7 @@
 package com.example.truxpense.presentation.utils
 
+// Keyboard utilities
+
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize

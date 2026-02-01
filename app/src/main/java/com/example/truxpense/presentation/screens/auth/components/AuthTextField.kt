@@ -32,8 +32,7 @@ fun AuthTextField(
     value: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     onValueChange: (String) -> Unit,
-    contentPadding: Int = 0,
-    enabled: Boolean
+    contentPadding: Int = 0
 ) {
     var isFocused by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -127,6 +126,5 @@ fun AuthTextFieldPreview() {
         value = "",
         onValueChange = {},
         modifier = Modifier,
-        enabled = true,
     )
 }

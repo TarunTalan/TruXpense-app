@@ -11,9 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * HomeViewModel handles logout including clearing local data and signing out of Google if needed.
- */
+// ViewModel for home screen managing logout
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val prefs: AuthPreferences,

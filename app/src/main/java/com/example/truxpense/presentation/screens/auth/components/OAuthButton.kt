@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -24,14 +25,19 @@ fun OAuthButton(
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
+            // visually fade the whole button (icon + text) when disabled
+            .alpha(if (enabled) 1f else 0.4f)
             .border(1.dp, MaterialTheme.colorScheme.onSecondary, MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            disabledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.3f),
+            disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
         ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
     ) {

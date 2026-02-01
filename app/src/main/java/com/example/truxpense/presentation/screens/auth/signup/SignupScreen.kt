@@ -1,6 +1,5 @@
 package com.example.truxpense.presentation.screens.auth.signup
 
-import android.content.res.Configuration
 import android.graphics.Color.rgb
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -19,15 +18,20 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.utils.blockTouchesWhen
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 @Composable
@@ -39,11 +43,11 @@ fun SignupScreen(
     viewModel: SignUpViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val otpLockSeconds by viewModel.otpLockSecondsRemaining.collectAsState()
 
     // Handle navigation events
     LaunchedEffect(state.navigateToOtp) {
         if (state.navigateToOtp) {
-            // delegate navigation to the NavHost with email + flow so AppNavHost can persist it
             onNavigateToOtp(state.email, AuthFlowType.SIGNUP)
             viewModel.onEvent(SignupEvent.OnNavigationHandled)
         }
@@ -56,18 +60,24 @@ fun SignupScreen(
         }
     }
 
+    // If the screen is opened with an already-filled email (cold start), ensure we start watching its lock
+    LaunchedEffect(state.email) {
+        val emailNorm = state.email.trim().lowercase()
+        if (emailNorm.isNotEmpty()) viewModel.watchLockFor(emailNorm)
+    }
+
     Scaffold(
         topBar = {
             SignupTopBar(
-                onBack = onBack
+                onBack = onBack,
+                enabled = !state.isLoading
             )
         },
         bottomBar = {
-            // Keep Sign Up enabled unless the email field is empty or an API call is running
             SignupBottomBar(
                 onSignUp = { viewModel.onEvent(SignupEvent.SignUpWithEmail) },
                 onNavigateToLogin = onNavigateToLogin,
-                enabled = state.email.isNotBlank() && !state.isLoading,
+                enabled = state.email.isNotBlank() && !state.isLoading && otpLockSeconds == 0,
                 isLoading = state.isLoading
             )
         }
@@ -78,25 +88,40 @@ fun SignupScreen(
                 .padding(innerPadding)
                 .clearFocusOnTap()
                 .then(if (state.showTncDialog) Modifier.blur(16.dp) else Modifier)
+                .blockTouchesWhen(state.isLoading)
         ) {
             SignupContent(
                 state = state,
+                otpLockSeconds = otpLockSeconds,
                 onEvent = viewModel::onEvent
             )
         }
 
-        // Terms and Conditions Dialog
         if (state.showTncDialog) {
             TncDialog(
                 onDismiss = { viewModel.onEvent(SignupEvent.ShowTncDialog(false)) }
             )
         }
     }
+
+    // Ensure lock is watched on resume (covers background -> foreground)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, state.email) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val emailNorm = state.email.trim().lowercase()
+                if (emailNorm.isNotEmpty()) viewModel.watchLockFor(emailNorm)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 }
 
 @Composable
 private fun SignupTopBar(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    enabled: Boolean
 ) {
     Box(
         modifier = Modifier
@@ -104,11 +129,14 @@ private fun SignupTopBar(
             .padding(top = 20.dp),
         contentAlignment = Alignment.CenterStart
     ) {
+        val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
         Icon(
-            painter = painterResource(id = com.example.truxpense.R.drawable.back_icon),
-            contentDescription = null,
-            tint = Color.Unspecified,
-            modifier = Modifier.clickable { onBack() }.padding(vertical = 20.dp)
+            painter = painterResource(id = R.drawable.back_icon),
+            contentDescription = "Back",
+            tint = backTint,
+            modifier = Modifier
+                .clickable(enabled = enabled) { onBack() }
+                .padding(vertical = 20.dp)
         )
     }
 }
@@ -163,48 +191,36 @@ private fun SignupBottomBar(
 @Composable
 private fun SignupContent(
     state: SignUpUiState,
+    otpLockSeconds: Int,
     onEvent: (SignupEvent) -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Header
         SignupHeader()
-
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Email Input
+        // Email Input with integrated lockout display
+        val lockMsg = if (otpLockSeconds > 0) "Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null
         AuthTextField(
             bgColor = MaterialTheme.colorScheme.background,
             label = "Email Address",
             placeholder = "Example@xyz.com",
             bottomLabel = "We'll send a verification code to this email",
-            error = state.error, // show inline error instead of dialog
+            error = state.error ?: lockMsg,
             value = state.email,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            onValueChange = { onEvent(SignupEvent.EmailChanged(it)) },
-            enabled = !state.isLoading
+            onValueChange = { onEvent(SignupEvent.EmailChanged(it)) }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Divider
-//        OrDivider()
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // (Email OTP flow only) — Signup uses email verification; Google OAuth is handled on Intro
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Terms and Conditions
         TncCheckbox(
             checked = state.agreeTnc,
             onCheckedChange = { onEvent(SignupEvent.AgreeTncChanged(it)) },
             onShowTnc = { onEvent(SignupEvent.ShowTncDialog(true)) },
-            enabled = !state.isLoading
+            enabled = !state.isLoading && otpLockSeconds == 0
         )
     }
 }
@@ -213,12 +229,13 @@ private fun SignupContent(
 private fun SignupHeader() {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Sign Up",
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(5.dp))
         Text(
@@ -226,34 +243,11 @@ private fun SignupHeader() {
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
             lineHeight = 20.sp,
-            color = MaterialTheme.colorScheme.secondary
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center,
         )
     }
 }
-
-//@Composable
-//private fun OrDivider() {
-//    Row(
-//        verticalAlignment = Alignment.CenterVertically,
-//        modifier = Modifier.fillMaxWidth()
-//    ) {
-//        HorizontalDivider(
-//            modifier = Modifier.weight(1f),
-//            thickness = DividerDefaults.Thickness,
-//            color = Color(rgb(193, 199, 205))
-//        )
-//        Text(
-//            text = "  or  ",
-//            style = MaterialTheme.typography.bodyMedium,
-//            color = MaterialTheme.colorScheme.onSurface
-//        )
-//        HorizontalDivider(
-//            modifier = Modifier.weight(1f),
-//            thickness = DividerDefaults.Thickness,
-//            color = Color(rgb(193, 199, 205))
-//        )
-//    }
-//}
 
 @Composable
 private fun TncCheckbox(
@@ -309,12 +303,10 @@ private fun TncCheckbox(
             style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface
             ),
-            modifier = Modifier
-                .clickable(enabled = enabled) { onShowTnc() }
+            modifier = Modifier.clickable(enabled = enabled) { onShowTnc() }
         )
     }
 }
-
 
 @Composable
 private fun TncDialog(onDismiss: () -> Unit) {
@@ -362,54 +354,29 @@ private fun TncDialog(onDismiss: () -> Unit) {
     )
 }
 
-@Preview(showBackground = true, name = "Signup - Light")
-@Composable
-fun SignupPreviewLight() {
-    MaterialTheme {
-        SignupContent(
-            state = SignUpUiState(
-                email = "demo@example.com",
-                agreeTnc = true,
-                isLoading = false,
-                error = null,
-                showTncDialog = false,
-                navigateToOtp = false,
-                navigateToUsername = false,
-                authToken = null,
-                isEmailValid = true,
-                canSignUp = true
-            ),
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Signup - Dark")
-@Composable
-fun SignupPreviewDark() {
-    MaterialTheme {
-        SignupContent(
-            state = SignUpUiState(
-                email = "demo@example.com",
-                agreeTnc = true,
-                isLoading = false,
-                error = null,
-                showTncDialog = false,
-                navigateToOtp = false,
-                navigateToUsername = false,
-                authToken = null,
-                isEmailValid = true,
-                canSignUp = true
-            ),
-            onEvent = {}
-        )
+private fun formatLockTime(seconds: Int): String {
+    val minutes = seconds / 60
+    val secs = seconds % 60
+    return if (minutes > 0) {
+        "$minutes:${secs.toString().padStart(2, '0')}"
+    } else {
+        "$secs seconds"
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun SignupPreviewTopbar(){
-    SignupTopBar(
-        onBack = {}
-    )
+fun SignupScreenPreview() {
+    MaterialTheme {
+        SignupContent(
+            state = SignUpUiState(
+                email = "demo@example.com",
+                agreeTnc = true,
+                isEmailValid = true,
+                canSignUp = true
+            ),
+            otpLockSeconds = 0,
+            onEvent = {}
+        )
+    }
 }

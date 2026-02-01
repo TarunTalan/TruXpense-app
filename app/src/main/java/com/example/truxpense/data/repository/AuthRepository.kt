@@ -1,5 +1,7 @@
 package com.example.truxpense.data.repository
 
+// Auth repository
+
 import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
 import com.example.truxpense.data.remote.api.TokenResponse
@@ -9,146 +11,223 @@ import com.example.truxpense.data.remote.dto.request.SignupOtpRequest
 import com.example.truxpense.data.remote.dto.response.LoginOtpResponse
 import com.example.truxpense.data.remote.dto.response.SignupOtpResponse
 import com.example.truxpense.data.remote.dto.response.VerifyLoginOtpResponse
-import java.lang.reflect.Field
+import com.example.truxpense.presentation.utils.ResponseHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.lang.reflect.Field
 import javax.inject.Inject
 
 class AuthRepository @Inject constructor(
     private val api: AuthApi,
     private val prefs: AuthPreferences
 ) {
-    // Google OAuth: send ID token to backend and return TokenResponse via Result
-    // Backend now returns VerifyLoginOtpResponse for OAuth/login verification which includes user info.
-    // Return the raw VerifyLoginOtpResponse so callers can inspect user info immediately.
+
+    /**
+     * Google OAuth: send ID token to backend and return VerifyLoginOtpResponse
+     */
     suspend fun sendIdTokenToServer(idToken: String): Result<VerifyLoginOtpResponse> {
         return withContext(Dispatchers.IO) {
             try {
-                val resp = api.loginWithGoogle(mapOf("idToken" to idToken))
-                if (resp.isSuccessful) {
-                    val body = resp.body()
-                    if (body != null) {
-                        // persist tokens (fields are non-nullable in VerifyLoginOtpResponse)
-                        try {
-                            prefs.saveTokens(body.accessToken, body.refreshToken, body.expiresIn.toLong())
-                        } catch (_: Exception) {}
-                        // persist username if backend returned it (handle multiple possible DTO shapes)
-                        try {
-                            val usernameRaw: String? = getUsernameFromResponse(body)
-                            val uname = usernameRaw?.takeIf { it.isNotBlank() }
-                            if (uname != null) prefs.saveUsername(uname)
-                        } catch (_: Exception) {}
+                val response = api.loginWithGoogle(mapOf("idToken" to idToken))
 
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        // Persist tokens
+                        saveTokensAndUsername(body)
                         Result.success(body)
                     } else {
-                        Result.failure(Exception("Empty body"))
+                        Result.failure(Exception("Empty response from server"))
                     }
                 } else {
-                    Result.failure(Exception("Server error: ${resp.code()} - ${resp.errorBody()?.string()}"))
+                    val errorMessage = ResponseHandler.parseHttpResponse(
+                        response.code(),
+                        response.errorBody()?.string()
+                    )
+                    Result.failure(Exception(errorMessage))
                 }
             } catch (e: Exception) {
-                Result.failure(e)
+                val errorMessage = ResponseHandler.parseThrowable(e)
+                Result.failure(Exception(errorMessage))
             }
         }
     }
 
-    // OTP flows
-    suspend fun sendSignupOtp(email: String): Result<SignupOtpResponse> = withContext(Dispatchers.IO) {
-        try {
-            val resp = api.sendSignupOtp(SignupOtpRequest(email))
-            if (resp.isSuccessful) {
-                resp.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
-            } else {
-                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+    /**
+     * Send OTP for signup
+     */
+    suspend fun sendSignupOtp(email: String): Result<SignupOtpResponse> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = api.sendSignupOtp(SignupOtpRequest(email))
 
-    suspend fun verifySignupOtp(email: String, otp: String): Result<TokenResponse> = withContext(Dispatchers.IO) {
-        try {
-            val resp = api.verifySignupOtp(com.example.truxpense.data.remote.api.VerifySignupRequest(email, otp))
-            if (resp.isSuccessful) {
-                val body = resp.body()
-                if (body != null) {
-                    // body is VerifyLoginOtpResponse (non-nullable fields)
-                    // persist tokens
-                    try {
-                        prefs.saveTokens(body.accessToken, body.refreshToken, body.expiresIn.toLong())
-                    } catch (_: Exception) {}
-                    // persist username if present (support multiple DTOs)
-                    try {
-                        val usernameRaw: String? = getUsernameFromResponse(body)
-                        val uname = usernameRaw?.takeIf { it.isNotBlank() }
-                        if (uname != null) prefs.saveUsername(uname)
-                    } catch (_: Exception) {}
-
-                    val token = TokenResponse(body.accessToken, body.refreshToken, body.expiresIn.toLong())
-                    Result.success(token)
+                if (response.isSuccessful) {
+                    response.body()?.let {
+                        Result.success(it)
+                    } ?: Result.failure(Exception("Empty response from server"))
                 } else {
-                    Result.failure(Exception("Empty body"))
+                    val errorMessage = ResponseHandler.parseHttpResponse(
+                        response.code(),
+                        response.errorBody()?.string()
+                    )
+                    Result.failure(Exception(errorMessage))
                 }
-            } else {
-                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            } catch (e: Exception) {
+                val errorMessage = ResponseHandler.parseThrowable(e)
+                Result.failure(Exception(errorMessage))
             }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
 
-    suspend fun sendLoginOtp(email: String): Result<LoginOtpResponse> = withContext(Dispatchers.IO) {
-        try {
-            val resp = api.sendLoginOtp(LoginOtpRequest(email))
-            if (resp.isSuccessful) {
-                resp.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
-            } else {
-                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+    /**
+     * Verify signup OTP
+     */
+    suspend fun verifySignupOtp(email: String, otp: String): Result<TokenResponse> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = api.verifySignupOtp(
+                    com.example.truxpense.data.remote.api.VerifySignupRequest(email, otp)
+                )
 
-    // verifyLoginOtp now returns VerifyLoginOtpResponse from backend which includes user info
-    // We convert it to TokenResponse for existing callers and persist username if present.
-    suspend fun verifyLoginOtp(email: String, otp: String): Result<TokenResponse> = withContext(Dispatchers.IO) {
-        try {
-            val resp = api.verifyLoginOtp(VerifyLoginOtpRequest(email, otp))
-            if (resp.isSuccessful) {
-                val body = resp.body()
-                if (body != null) {
-                    val token = TokenResponse(body.accessToken, body.refreshToken, body.expiresIn.toLong())
-                    token.accessToken?.let { at -> token.refreshToken?.let { rt -> prefs.saveTokens(at, rt, token.expiresIn ?: 0L) } }
-                    try {
-                        val usernameRaw: String? = getUsernameFromResponse(body)
-                        val uname = usernameRaw?.takeIf { it.isNotBlank() }
-                        if (uname != null) prefs.saveUsername(uname)
-                    } catch (_: Exception) {}
-                    Result.success(token)
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        // Persist tokens and username
+                        saveTokensAndUsername(body)
+
+                        val token = TokenResponse(
+                            body.accessToken,
+                            body.refreshToken,
+                            body.expiresIn.toLong()
+                        )
+                        Result.success(token)
+                    } else {
+                        Result.failure(Exception("Empty response from server"))
+                    }
                 } else {
-                    Result.failure(Exception("Empty body"))
+                    val errorMessage = ResponseHandler.parseHttpResponse(
+                        response.code(),
+                        response.errorBody()?.string()
+                    )
+                    Result.failure(Exception(errorMessage))
                 }
-            } else {
-                Result.failure(Exception("Server returned ${resp.code()} - ${resp.errorBody()?.string()}"))
+            } catch (e: Exception) {
+                val errorMessage = ResponseHandler.parseThrowable(e)
+                Result.failure(Exception(errorMessage))
             }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
 
-    // resendSignupOtp removed because it's not referenced anywhere in the app.
+    /**
+     * Send OTP for login
+     */
+    suspend fun sendLoginOtp(email: String): Result<LoginOtpResponse> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = api.sendLoginOtp(LoginOtpRequest(email))
 
-    // Helper function to extract username from response using reflection
+                if (response.isSuccessful) {
+                    response.body()?.let {
+                        Result.success(it)
+                    } ?: Result.failure(Exception("Empty response from server"))
+                } else {
+                    val errorMessage = ResponseHandler.parseHttpResponse(
+                        response.code(),
+                        response.errorBody()?.string()
+                    )
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: Exception) {
+                val errorMessage = ResponseHandler.parseThrowable(e)
+                Result.failure(Exception(errorMessage))
+            }
+        }
+    }
+
+    /**
+     * Verify login OTP
+     */
+    suspend fun verifyLoginOtp(email: String, otp: String): Result<TokenResponse> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = api.verifyLoginOtp(VerifyLoginOtpRequest(email, otp))
+
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        // Persist tokens and username
+                        val token = TokenResponse(
+                            body.accessToken,
+                            body.refreshToken,
+                            body.expiresIn.toLong()
+                        )
+
+                        token.accessToken?.let { at ->
+                            token.refreshToken?.let { rt ->
+                                prefs.saveTokens(at, rt, token.expiresIn ?: 0L)
+                            }
+                        }
+
+                        saveUsername(body)
+                        Result.success(token)
+                    } else {
+                        Result.failure(Exception("Empty response from server"))
+                    }
+                } else {
+                    val errorMessage = ResponseHandler.parseHttpResponse(
+                        response.code(),
+                        response.errorBody()?.string()
+                    )
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: Exception) {
+                val errorMessage = ResponseHandler.parseThrowable(e)
+                Result.failure(Exception(errorMessage))
+            }
+        }
+    }
+
+    /**
+     * Helper to save tokens and username
+     */
+    private suspend fun saveTokensAndUsername(body: VerifyLoginOtpResponse) {
+        try {
+            prefs.saveTokens(
+                body.accessToken,
+                body.refreshToken,
+                body.expiresIn.toLong()
+            )
+        } catch (_: Exception) {
+            // Log error but don't fail the operation
+        }
+
+        saveUsername(body)
+    }
+
+    /**
+     * Helper to extract and save username from response
+     */
+    private suspend fun saveUsername(body: VerifyLoginOtpResponse) {
+        try {
+            val username = getUsernameFromResponse(body)
+            username?.takeIf { it.isNotBlank() }?.let {
+                prefs.saveUsername(it)
+            }
+        } catch (_: Exception) {
+            // Log error but don't fail the operation
+        }
+    }
+
+    /**
+     * Extract username from response using reflection
+     */
     private fun getUsernameFromResponse(body: VerifyLoginOtpResponse): String? {
-        // Attempt to get the "username" field via reflection
         return try {
             val userField: Field = body.javaClass.getDeclaredField("user")
             userField.isAccessible = true
-            val user = userField.get(body)
+            val user = userField.get(body) ?: return null
 
-            // Check if the user object has a "username" field
-            val usernameField: Field = user?.javaClass?.getDeclaredField("username") ?: return null
+            val usernameField: Field = user.javaClass.getDeclaredField("username")
             usernameField.isAccessible = true
             usernameField.get(user) as? String
         } catch (_: Exception) {

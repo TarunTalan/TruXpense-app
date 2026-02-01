@@ -1,5 +1,7 @@
 package com.example.truxpense.data.remote.api
 
+// Onboarding API definitions
+
 import com.example.truxpense.data.remote.dto.request.UsernameRequest
 import com.example.truxpense.data.remote.dto.response.UsernameResponse
 import retrofit2.Response
