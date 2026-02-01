@@ -130,14 +130,16 @@ private fun SignupTopBar(
         contentAlignment = Alignment.CenterStart
     ) {
         val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
-        Icon(
-            painter = painterResource(id = R.drawable.back_icon),
-            contentDescription = "Back",
-            tint = backTint,
-            modifier = Modifier
-                .clickable(enabled = enabled) { onBack() }
-                .padding(vertical = 20.dp)
-        )
+        IconButton(
+            onClick = { if (enabled) onBack() },
+            modifier = Modifier.padding(vertical = 20.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.back_icon),
+                contentDescription = "Back",
+                tint = backTint
+            )
+        }
     }
 }
 

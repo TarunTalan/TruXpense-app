@@ -36,9 +36,7 @@ class SignUpViewModel @Inject constructor(
     // call `watchLockFor(email)` (or `onEvent(EmailChanged)` will start watching)
     // so the lock watcher is tied to the active email context.
 
-    /**
-     * Watches lockout for a specific email
-     */
+    // Watches lockout for a specific email
     private fun startEmailLockWatcher(email: String) {
         lockWatcherJob?.cancel()
         if (email.isBlank()) return

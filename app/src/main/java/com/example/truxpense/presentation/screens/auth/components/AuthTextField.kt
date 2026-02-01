@@ -32,7 +32,8 @@ fun AuthTextField(
     value: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     onValueChange: (String) -> Unit,
-    contentPadding: Int = 0
+    contentPadding: Int = 0,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -75,7 +76,9 @@ fun AuthTextField(
             decorationBox = { innerTextField ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = contentPadding.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = contentPadding.dp)
                 ) {
                     if (keyboardOptions.keyboardType == KeyboardType.Email) {
                         Icon(
@@ -85,7 +88,8 @@ fun AuthTextField(
                             modifier = Modifier.padding(start = 12.dp, end = 4.dp)
                         )
                     }
-                    Box(modifier = Modifier.padding(start = 4.dp).fillMaxWidth()) {
+
+                    Box(modifier = Modifier.weight(1f)) {
                         if (value.isEmpty() && placeholder != null) {
                             Text(
                                 text = placeholder,
@@ -96,6 +100,12 @@ fun AuthTextField(
                             )
                         }
                         innerTextField()
+                    }
+
+                    if (trailing != null) {
+                        Box(modifier = Modifier.padding(start = 8.dp)) {
+                            trailing()
+                        }
                     }
                 }
             }

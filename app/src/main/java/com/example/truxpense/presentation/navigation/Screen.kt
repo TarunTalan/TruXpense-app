@@ -11,4 +11,5 @@ object Screen {
     const val Loading = "loading"
     const val CompleteSetup = "complete_setup"
     const val Home = "home"
+    const val Currency = "currency"
 }

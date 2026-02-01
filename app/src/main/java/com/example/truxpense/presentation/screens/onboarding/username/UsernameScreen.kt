@@ -26,6 +26,7 @@ import com.example.truxpense.presentation.utils.clearFocusOnTap
 @Composable
 fun UsernameScreen(
     onComplete: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
     viewModel: UsernameViewModel = hiltViewModel()
 ) {
     // Read username from ViewModel
@@ -40,15 +41,7 @@ fun UsernameScreen(
         activity?.finish()
     }
 
-    Scaffold(
-        bottomBar = {
-            UsernameBottomBar(
-                onComplete = { if (username.isNotBlank()) viewModel.saveAndComplete { onComplete?.invoke() } },
-                enabled = enabled,
-                isLoading = isSaving
-            )
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         // Main content
         Box(
             modifier = Modifier
@@ -63,31 +56,10 @@ fun UsernameScreen(
                 onComplete = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } },
                 enabled = enabled,
                 showActions = false,
-                error = usernameError
+                error = usernameError,
+                onSkip = onSkip
             )
         }
-    }
-}
-
-
-@Composable
-private fun UsernameBottomBar(
-    onComplete: () -> Unit,
-    enabled: Boolean,
-    isLoading: Boolean
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        AuthButton(
-            onClick = onComplete,
-            text = "Continue",
-            enabled = enabled,
-            isLoading = isLoading
-        )
     }
 }
 
@@ -98,56 +70,74 @@ fun UsernameContent(
     onComplete: () -> Unit = {},
     enabled: Boolean = false,
     showActions: Boolean = false,
-    error: String? = null
+    error: String? = null,
+    onSkip: (() -> Unit)?
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .clearFocusOnTap(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = "What should we call you?",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "This helps us personalize your experience",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier,
-            textAlign = TextAlign.Center
-        )
+        Column(
 
-        Spacer(modifier = Modifier.height(20.dp))
+        ) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "What should we call you?",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "This helps us personalize your experience",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier,
+                textAlign = TextAlign.Center
+            )
 
-        AuthTextField(
-            bgColor = MaterialTheme.colorScheme.background,
-            label = "Full Name",
-            placeholder = "e.g. john_doe",
-            bottomLabel = "You can change this later",
-            value = username,
-            keyboardOptions = KeyboardOptions.Default,
-            onValueChange = onUsernameChange,
-            contentPadding = 16,
-            modifier = Modifier.fillMaxWidth(),
-            error = error,
-        )
+            Spacer(modifier = Modifier.height(20.dp))
 
-        if (showActions) {
-            Spacer(modifier = Modifier.weight(1f))
+            AuthTextField(
+                bgColor = MaterialTheme.colorScheme.background,
+                label = "Full Name",
+                placeholder = "e.g. Tarun Talan",
+                bottomLabel = "You can change this later",
+                value = username,
+                keyboardOptions = KeyboardOptions.Default,
+                onValueChange = onUsernameChange,
+                contentPadding = 16,
+                modifier = Modifier.fillMaxWidth(),
+                error = error,
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             AuthButton(
                 onClick = onComplete,
                 text = "Continue",
-                enabled = enabled
+                enabled = enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+
+            if (onSkip != null) {
+                TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
+                    Text("Skip for now", color = MaterialTheme.colorScheme.onBackground)
+                }
+            }
         }
     }
+
 }
 
 @Preview(showBackground = true, name = "Username - Light")
@@ -161,7 +151,8 @@ fun UsernameContentPreviewLight() {
                     onUsernameChange = {},
                     onComplete = {},
                     enabled = false,
-                    showActions = true
+                    showActions = true,
+                    onSkip = {}
                 )
             }
         }
@@ -179,7 +170,8 @@ fun UsernameContentPreviewDark() {
                     onUsernameChange = {},
                     onComplete = {},
                     enabled = true,
-                    showActions = true
+                    showActions = true,
+                    onSkip = {},
                 )
             }
         }
