@@ -14,7 +14,7 @@ import androidx.compose.ui.text.googlefonts.Font as GoogleFontsFont
 
 private val interFontFamily: FontFamily
     @Composable get() {
-        val context = LocalContext.current
+        LocalContext.current
         val provider = GoogleFont.Provider(
             providerAuthority = "com.google.android.gms.fonts",
             providerPackage = "com.google.android.gms",

@@ -3,7 +3,6 @@ package com.example.truxpense.presentation.screens.auth.intro
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.prefs.AuthPreferences
@@ -26,8 +25,6 @@ class IntroViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val prefs: AuthPreferences
 ) : ViewModel() {
-
-    companion object { private const val TAG = "IntroViewModel" }
 
     private val _state = MutableStateFlow(IntroUiState())
     val state: StateFlow<IntroUiState> = _state.asStateFlow()
@@ -54,7 +51,8 @@ class IntroViewModel @Inject constructor(
 
                 oneTapClient.beginSignIn(signInRequest)
                     .addOnSuccessListener { result ->
-                        _state.value = _state.value.copy(isLoading = false, signInIntentSender = result.pendingIntent.intentSender)
+                        // Keep isLoading = true until the IntentSender is actually launched from the UI.
+                        _state.value = _state.value.copy(signInIntentSender = result.pendingIntent.intentSender)
                     }
                     .addOnFailureListener { e ->
                         // No saved credentials or OneTap not available; surface error to UI
@@ -70,6 +68,11 @@ class IntroViewModel @Inject constructor(
     // Clear the pending IntentSender after UI launches it
     fun clearSignInIntentSender() {
         _state.value = _state.value.copy(signInIntentSender = null)
+    }
+
+    // Clear any error shown in the UI (used after showing a toast)
+    fun clearError() {
+        _state.value = _state.value.copy(error = null)
     }
 
     // Handle result Intent from One Tap; extract idToken and send to backend
@@ -100,20 +103,32 @@ class IntroViewModel @Inject constructor(
                         }
                     } catch (_: Exception) {}
 
-                    // determine username directly from response.user when available
-                    try {
-                        val uname = resp.user?.username
-                        if (!uname.isNullOrBlank()) {
-                            prefs.saveUsername(uname)
-                            _state.value = _state.value.copy(navigateToHome = true, authToken = resp.accessToken)
-                        } else {
-                            prefs.setSignupStarted(true)
-                            _state.value = _state.value.copy(navigateToUsername = true, authToken = resp.accessToken)
-                        }
-                    } catch (_: Exception) {
+                    // Route based on newUser flag returned by backend
+                    if (resp.newUser) {
+                        // New user -> go to onboarding/username flow. If server already returned a username,
+                        // persist it so onboarding can prefill the username field.
+                        try {
+                            val uname = resp.user?.username
+                            if (!uname.isNullOrBlank()) {
+                                prefs.saveUsername(uname)
+                            }
+                        } catch (_: Exception) { }
+
                         prefs.setSignupStarted(true)
                         _state.value = _state.value.copy(navigateToUsername = true, authToken = resp.accessToken)
+
+                    } else {
+                        // Existing user -> navigate directly to home
+                        try {
+                            val uname = resp.user?.username
+                            if (!uname.isNullOrBlank()) {
+                                prefs.saveUsername(uname)
+                            }
+                        } catch (_: Exception) { }
+
+                        _state.value = _state.value.copy(navigateToHome = true, authToken = resp.accessToken)
                     }
+
                 } else {
                     val msg = ResponseHandler.getMessageFromResult(result, "Server error")
                     _state.value = _state.value.copy(error = msg)

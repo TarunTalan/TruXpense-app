@@ -1,5 +1,7 @@
 package com.example.truxpense.presentation.utils
 
+// Error response parsing helpers
+
 import retrofit2.HttpException
 
 object ResponseHandler {
@@ -20,7 +22,7 @@ object ResponseHandler {
                 // Treat 5xx server errors as a generic server-unavailable message
                 val code = try { t.code() } catch (_: Exception) { -1 }
                 if (code in 500..599) {
-                    "Server error. Please try again later."
+                    "Server unavailable. Please try again later."
                 } else {
                     try {
                         val body = t.response()?.errorBody()?.string()
@@ -34,6 +36,20 @@ object ResponseHandler {
                 val msg = t.localizedMessage
                 if (!msg.isNullOrBlank()) extractMessage(msg) else "Something went wrong. Please try again."
             }
+        }
+    }
+
+    /**
+     * Parse an HTTP response code and optional error body into a friendly message.
+     * Use this for non-exception HTTP errors (when you have Response<T> available).
+     */
+    fun parseHttpResponse(code: Int, errorBody: String?): String {
+        return when {
+            code in 500..599 -> "Server unavailable. Please try again later."
+            code == 404 -> "Resource not found."
+            code == 401 || code == 403 -> "Authentication error. Please login again."
+            !errorBody.isNullOrBlank() -> extractMessage(errorBody)
+            else -> "Server returned an error (code $code). Please try again."
         }
     }
 

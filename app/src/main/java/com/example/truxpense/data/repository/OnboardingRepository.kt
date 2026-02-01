@@ -1,5 +1,7 @@
 package com.example.truxpense.data.repository
 
+// Onboarding repository
+
 import com.example.truxpense.data.prefs.AuthPreferences
 import com.example.truxpense.data.remote.api.OnboardingApi
 import com.example.truxpense.data.remote.dto.request.UsernameRequest
@@ -8,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.truxpense.presentation.utils.ResponseHandler
 
 
 @Singleton
@@ -27,12 +30,13 @@ class OnboardingRepository @Inject constructor(
                     Result.success(it)
                 } ?: Result.failure(Exception("Empty body"))
             } else {
-                val errBody = try { resp.errorBody()?.string() } catch (_: Exception) { "<error reading body>" }
-
-                Result.failure(Exception("Server returned ${resp.code()} - $errBody"))
+                val errBody = try { resp.errorBody()?.string() } catch (_: Exception) { null }
+                val friendly = ResponseHandler.parseHttpResponse(resp.code(), errBody)
+                Result.failure(Exception(friendly))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            val friendly = ResponseHandler.parseThrowable(e)
+            Result.failure(Exception(friendly))
         }
     }
 }

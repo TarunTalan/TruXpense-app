@@ -1,5 +1,7 @@
 package com.example.truxpense.di
 
+// Auth bindings
+
 import android.content.Context
 import com.example.truxpense.data.auth.AuthSessionManager
 import com.example.truxpense.data.prefs.AuthPreferences
@@ -15,12 +17,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Module providing auth-specific dependencies.
- *
- * Note: Network-related auth components (TokenManager, TokenRefresher, etc.)
- * are now in NetworkModule to maintain proper dependency hierarchy.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object AuthModule {

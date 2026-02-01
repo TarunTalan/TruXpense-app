@@ -1,5 +1,7 @@
 package com.example.truxpense
 
+// Main activity
+
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.truxpense.data.auth.AuthSessionManager
 import com.example.truxpense.presentation.navigation.AppNavHost
 import com.example.truxpense.presentation.navigation.Screen
+import com.example.truxpense.presentation.navigation.safeNavigate
 import com.example.truxpense.presentation.theme.TruXpenseTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -77,7 +80,7 @@ class MainActivity : ComponentActivity() {
                         // Observe logout events; on logout navigate to Intro screen and clear backstack
                         LaunchedEffect(sessionManager) {
                             sessionManager.logoutEvents.collect {
-                                navController.navigate(Screen.Intro) {
+                                navController.safeNavigate(Screen.Intro) {
                                     popUpTo(Screen.Splash) { inclusive = true }
                                 }
                             }

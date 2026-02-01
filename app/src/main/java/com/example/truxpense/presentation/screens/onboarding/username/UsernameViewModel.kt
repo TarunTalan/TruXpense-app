@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.truxpense.data.repository.OnboardingRepository
 import kotlinx.coroutines.withContext
+import com.example.truxpense.presentation.utils.ResponseHandler
+import kotlinx.coroutines.flow.first
 
 @HiltViewModel
 class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, private val repo: OnboardingRepository): ViewModel() {
@@ -24,6 +26,20 @@ class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, 
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    init {
+        // Load any persisted username (e.g., returned by OAuth) and prefill the field
+        viewModelScope.launch {
+            try {
+                val saved = prefs.username.first()
+                if (!saved.isNullOrBlank()) {
+                    _username.value = saved
+                }
+            } catch (_: Exception) {
+                // ignore failures to read prefs; user will type username manually
+            }
+        }
+    }
 
     fun onUsernameChanged(new: String) {
         // Filter username to letters only and cap length
@@ -56,14 +72,16 @@ class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, 
                             onComplete?.invoke()
                         }
                     } catch (e: Throwable) {
-                        _error.value = e.message ?: "Failed to save username. Please try again."
+                        _error.value = ResponseHandler.parseThrowable(e)
                     }
-                }, onFailure = { err ->
-                    _error.value = err.message ?: "Failed to save username. Please try again."
+                }, onFailure = { _ ->
+                    // Use ResponseHandler to normalize repository errors
+                    val message = ResponseHandler.getMessageFromResult(res, "Failed to save username. Please try again.")
+                    _error.value = message
                 })
             } catch (t: Throwable) {
                 // expose a friendly error to UI
-                _error.value = t.message ?: "Failed to save username. Please try again."
+                _error.value = ResponseHandler.parseThrowable(t)
             } finally {
                 _isSaving.value = false
             }

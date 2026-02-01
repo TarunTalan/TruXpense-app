@@ -1,7 +1,9 @@
 package com.example.truxpense.presentation.screens.onboarding.username
 
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.res.Configuration
-import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -10,19 +12,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.utils.blockTouchesWhen
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
+@SuppressLint("ContextCastToActivity")
 @Composable
 fun UsernameScreen(
-    onBack: (() -> Unit)? = null,
     onComplete: (() -> Unit)? = null,
     viewModel: UsernameViewModel = hiltViewModel()
 ) {
@@ -32,33 +34,19 @@ fun UsernameScreen(
     val isSaving by viewModel.isSaving.collectAsState(initial = false)
     val enabled = username.isNotBlank() && !isSaving
 
+    // When on the username screen, pressing system back should exit the app.
+    val activity = LocalContext.current as? Activity
+    BackHandler(enabled = true) {
+        activity?.finish()
+    }
+
     Scaffold(
-        topBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 20.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                IconButton(onClick = { onBack?.invoke() }) {
-                    Icon(painter = painterResource(id = R.drawable.back_icon), contentDescription = "Back")
-                }
-            }
-        },
         bottomBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AuthButton(
-                    onClick = { if (username.isNotBlank()) viewModel.saveAndComplete { onComplete?.invoke() } },
-                    text = "Continue",
-                    enabled = enabled,
-                    isLoading = isSaving
-                )
-            }
+            UsernameBottomBar(
+                onComplete = { if (username.isNotBlank()) viewModel.saveAndComplete { onComplete?.invoke() } },
+                enabled = enabled,
+                isLoading = isSaving
+            )
         }
     ) { innerPadding ->
         // Main content
@@ -67,11 +55,11 @@ fun UsernameScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .clearFocusOnTap()
+                .blockTouchesWhen(isSaving) // disable taps during saving
         ) {
             UsernameContent(
                 username = username,
                 onUsernameChange = { viewModel.onUsernameChanged(it) },
-                onBack = { onBack?.invoke() },
                 onComplete = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } },
                 enabled = enabled,
                 showActions = false,
@@ -81,11 +69,32 @@ fun UsernameScreen(
     }
 }
 
+
+@Composable
+private fun UsernameBottomBar(
+    onComplete: () -> Unit,
+    enabled: Boolean,
+    isLoading: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AuthButton(
+            onClick = onComplete,
+            text = "Continue",
+            enabled = enabled,
+            isLoading = isLoading
+        )
+    }
+}
+
 @Composable
 fun UsernameContent(
     username: String,
     onUsernameChange: (String) -> Unit,
-    onBack: () -> Unit = {},
     onComplete: () -> Unit = {},
     enabled: Boolean = false,
     showActions: Boolean = false,
@@ -97,42 +106,28 @@ fun UsernameContent(
             .clearFocusOnTap(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (showActions) {
-            // Small top back action for preview-only
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 20.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.back_icon),
-                    contentDescription = null,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.clickable { onBack() }.padding(vertical = 20.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             text = "What should we call you?",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.align(Alignment.Start)
+            modifier = Modifier,
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "This helps us personalize your experience",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.align(Alignment.Start)
+            modifier = Modifier,
+            textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
         AuthTextField(
             bgColor = MaterialTheme.colorScheme.background,
-            label = "Username",
+            label = "Full Name",
             placeholder = "e.g. john_doe",
             bottomLabel = "You can change this later",
             value = username,
@@ -141,7 +136,6 @@ fun UsernameContent(
             contentPadding = 16,
             modifier = Modifier.fillMaxWidth(),
             error = error,
-            enabled = true,
         )
 
         if (showActions) {
@@ -165,7 +159,6 @@ fun UsernameContentPreviewLight() {
                 UsernameContent(
                     username = "",
                     onUsernameChange = {},
-                    onBack = {},
                     onComplete = {},
                     enabled = false,
                     showActions = true
@@ -184,7 +177,6 @@ fun UsernameContentPreviewDark() {
                 UsernameContent(
                     username = "john_doe",
                     onUsernameChange = {},
-                    onBack = {},
                     onComplete = {},
                     enabled = true,
                     showActions = true

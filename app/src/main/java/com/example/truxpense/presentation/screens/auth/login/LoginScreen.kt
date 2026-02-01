@@ -7,32 +7,36 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.truxpense.R
+import com.example.truxpense.presentation.navigation.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.utils.blockTouchesWhen
 import com.example.truxpense.presentation.utils.clearFocusOnTap
-import com.example.truxpense.presentation.navigation.AuthFlowType
-import com.example.truxpense.presentation.navigation.AuthFlowViewModel
 
 @Composable
 fun LoginScreen(
@@ -41,16 +45,14 @@ fun LoginScreen(
     onNavigateToHome: (String) -> Unit,
     onNavigateToSignup: () -> Unit,
     onNavigateToUsername: (String) -> Unit,
-    viewModel: LoginViewModel = hiltViewModel(),
-    authFlowViewModel: AuthFlowViewModel = hiltViewModel()
+    viewModel: LoginViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val context = LocalContext.current
+    val otpLockSeconds by viewModel.otpLockSecondsRemaining.collectAsState()
 
     // Handle navigation events
     LaunchedEffect(state.navigateToOtp) {
         if (state.navigateToOtp) {
-            // delegate navigation to the NavHost so it can persist flow/email
             onNavigateToOtp(state.email, AuthFlowType.LOGIN)
             viewModel.onEvent(LoginEvent.OnNavigationHandled)
         }
@@ -70,7 +72,6 @@ fun LoginScreen(
         }
     }
 
-
     Scaffold(
         topBar = {
             LoginTopBar(
@@ -79,11 +80,10 @@ fun LoginScreen(
             )
         },
         bottomBar = {
-            // Keep Verify enabled unless field is empty or an API call is running
             LoginBottomBar(
                 onLogin = { viewModel.onEvent(LoginEvent.LoginWithEmail) },
                 onNavigateToSignup = onNavigateToSignup,
-                enabled = state.email.isNotBlank() && !state.isLoading,
+                enabled = state.email.isNotBlank() && !state.isLoading && otpLockSeconds == 0,
                 isLoading = state.isLoading
             )
         }
@@ -94,21 +94,33 @@ fun LoginScreen(
                 .padding(innerPadding)
                 .clearFocusOnTap()
                 .then(if (state.showTncDialog) Modifier.blur(16.dp) else Modifier)
+                .blockTouchesWhen(state.isLoading)
         ) {
             LoginContent(
                 state = state,
+                otpLockSeconds = otpLockSeconds,
                 onEvent = viewModel::onEvent
             )
-
-            // Removed full screen LoadingOverlay; button-level loading is used instead
         }
 
-        // Terms and Conditions Dialog (keep)
         if (state.showTncDialog) {
             TncDialog(
                 onDismiss = { viewModel.onEvent(LoginEvent.ShowTncDialog(false)) }
             )
         }
+    }
+
+    // Ensure lock is watched on resume (covers background -> foreground)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, state.email) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val emailNorm = state.email.trim().lowercase()
+                if (emailNorm.isNotEmpty()) viewModel.watchLockFor(emailNorm)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 
@@ -123,11 +135,14 @@ private fun LoginTopBar(
             .padding(top = 20.dp),
         contentAlignment = Alignment.CenterStart
     ) {
+        val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
         Icon(
             painter = painterResource(id = R.drawable.back_icon),
-            contentDescription = null,
-            tint = Color.Unspecified,
-            modifier = Modifier.clickable { onBack() }.padding(vertical = 20.dp)
+            contentDescription = "Back",
+            tint = backTint,
+            modifier = Modifier
+                .clickable(enabled = enabled) { onBack() }
+                .padding(vertical = 20.dp)
         )
     }
 }
@@ -182,46 +197,36 @@ private fun LoginBottomBar(
 @Composable
 private fun LoginContent(
     state: LoginUiState,
+    otpLockSeconds: Int,
     onEvent: (LoginEvent) -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Header
         LoginHeader()
-
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Email Input
+        // Email Input with integrated error display
+        val lockMsg = if (otpLockSeconds > 0) "Locked: Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null
         AuthTextField(
             bgColor = MaterialTheme.colorScheme.background,
             label = "Email Address",
             placeholder = "Example@xyz.com",
             bottomLabel = "We'll send a verification code to this email",
-            error = state.error, // show inline error instead of dialog
+            error = state.error ?: lockMsg,
             value = state.email,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            onValueChange = { onEvent(LoginEvent.EmailChanged(it)) },
-            enabled = !state.isLoading
+            onValueChange = { onEvent(LoginEvent.EmailChanged(it)) }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Divider
-//        OrDivider()
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // (Email OTP flow only) — no phone input or OAuth on this screen
-
-        // Terms and Conditions
         TncCheckbox(
             checked = state.agreeTnc,
             onCheckedChange = { onEvent(LoginEvent.AgreeTncChanged(it)) },
             onShowTnc = { onEvent(LoginEvent.ShowTncDialog(true)) },
-            enabled = !state.isLoading
+            enabled = !state.isLoading && otpLockSeconds == 0
         )
     }
 }
@@ -230,12 +235,13 @@ private fun LoginContent(
 private fun LoginHeader() {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Login",
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(5.dp))
         Text(
@@ -243,34 +249,11 @@ private fun LoginHeader() {
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
             lineHeight = 20.sp,
-            color = MaterialTheme.colorScheme.secondary
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center,
         )
     }
 }
-
-//@Composable
-//private fun OrDivider() {
-//    Row(
-//        verticalAlignment = Alignment.CenterVertically,
-//        modifier = Modifier.fillMaxWidth()
-//    ) {
-//        HorizontalDivider(
-//            modifier = Modifier.weight(1f),
-//            thickness = DividerDefaults.Thickness,
-//            color = Color(rgb(193, 199, 205))
-//        )
-//        Text(
-//            text = "  or  ",
-//            style = MaterialTheme.typography.bodyMedium,
-//            color = MaterialTheme.colorScheme.onSurface
-//        )
-//        HorizontalDivider(
-//            modifier = Modifier.weight(1f),
-//            thickness = DividerDefaults.Thickness,
-//            color = Color(rgb(193, 199, 205))
-//        )
-//    }
-//}
 
 @Composable
 private fun TncCheckbox(
@@ -326,12 +309,10 @@ private fun TncCheckbox(
             style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface
             ),
-            modifier = Modifier
-                .clickable(enabled = enabled) { onShowTnc() }
+            modifier = Modifier.clickable(enabled = enabled) { onShowTnc() }
         )
     }
 }
-
 
 @Composable
 private fun TncDialog(onDismiss: () -> Unit) {
@@ -379,6 +360,16 @@ private fun TncDialog(onDismiss: () -> Unit) {
     )
 }
 
+private fun formatLockTime(seconds: Int): String {
+    val minutes = seconds / 60
+    val secs = seconds % 60
+    return if (minutes > 0) {
+        "$minutes:${secs.toString().padStart(2, '0')}"
+    } else {
+        "$secs seconds"
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
@@ -387,6 +378,6 @@ fun LoginScreenPreview() {
         onNavigateToHome = {},
         onNavigateToSignup = {},
         onNavigateToUsername = {},
-        onNavigateToOtp = TODO(),
+        onNavigateToOtp = { _, _ -> }
     )
 }

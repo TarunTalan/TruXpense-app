@@ -1,5 +1,7 @@
 package com.example.truxpense.di
 
+// Network dependencies
+
 import android.content.Context
 import com.example.truxpense.R
 import com.example.truxpense.data.auth.AuthAuthenticator
@@ -26,13 +28,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
-/**
- * Network module providing HTTP clients and Retrofit instances.
- *
- * This implementation reads `backend_base_url` from resources (populated at build time
- * from local gradle properties). It normalizes the value (adds scheme if omitted and
- * trailing slash) and does NOT hardcode any host in the source code.
- */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class AuthRetrofit
@@ -47,21 +42,16 @@ object NetworkModule {
 
     private const val PLACEHOLDER = "REPLACE_WITH_BACKEND_BASE_URL"
 
-    // Normalize a provided base URL by trimming and ensuring a scheme and trailing slash.
-    // This function does not hardcode any fallback; it uses the value supplied via local gradle properties.
     private fun normalizeBaseUrl(raw: String?): String {
-        // Read the build-time resource value; require the developer to configure it locally.
         val trimmed = raw?.trim().orEmpty()
         if (trimmed.isEmpty() || trimmed == PLACEHOLDER) {
             throw IllegalStateException("Backend base URL is not configured. Set 'backendBaseUrl' in your local gradle properties or gradle-local.properties.")
         }
 
         var url = trimmed
-        // If the developer omitted the scheme, assume http by default.
         if (!url.contains("://")) {
             url = "http://$url"
         }
-        // Ensure trailing slash
         if (!url.endsWith("/")) url += "/"
         return url
     }

@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.auth.intro
 
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -12,13 +13,15 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,10 +31,17 @@ import androidx.compose.ui.unit.sp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.OAuthButton
+import com.example.truxpense.presentation.utils.blockTouchesWhen
 import com.example.truxpense.presentation.utils.clearFocusOnTap
-import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
 
+// New animation imports
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
 
 
 data class IntroPage(
@@ -44,16 +54,28 @@ data class IntroPage(
 @Suppress("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun IntroScreen(
-    onGetStarted: () -> Unit = {},
-    onLogin: () -> Unit = {}
+    onGetStarted: () -> Unit = {}
 ) {
     val pages = remember { introPages }
-    val pagerState = rememberPagerState { pages.size }
+
+    // Create a large virtual page space so user can swipe indefinitely; keep paging manual (no auto-advance)
+    val LOOP_MULTIPLIER = 1000
+    val totalPages = pages.size * LOOP_MULTIPLIER
+    val initialPage = totalPages / 2 // start near middle to allow both-direction swipes
+    val pagerState = rememberPagerState(initialPage = initialPage) { totalPages }
 
     // Intro handles Google sign-in directly via IntroViewModel
     val viewModel: IntroViewModel = androidx.hilt.navigation.compose.hiltViewModel()
     val state by viewModel.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Show a toast when an error appears in the view state and clear it afterwards
+    LaunchedEffect(state.error) {
+        state.error?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
 
     // One Tap IntentSender launcher: start when IntroViewModel.signInIntentSender becomes available
     val intentSenderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -65,84 +87,79 @@ fun IntroScreen(
         }
     )
 
-    LaunchedEffect(pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress) {
-            delay(4000)
-            pagerState.animateScrollToPage(
-                (pagerState.currentPage + 1) % pages.size
-            )
-        }
-    }
-
-    Scaffold(
-        bottomBar = {
-            IntroBottomActions(
-                onGetStarted = onGetStarted,
-                onLogin = onLogin,
-                onGoogle = {
-                    // Start One Tap sign-in flow: ask ViewModel to begin and expose an IntentSender
-                    viewModel.startOneTapSignIn(context)
-                },
-                isLoading = state.isLoading
-            )
-        }
-    ) { innerPadding ->
-        BoxWithConstraints(modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)
-            .clearFocusOnTap()) {
-            val availableHeight = this.maxHeight
-            // Reserve space for bottom actions (~120.dp) + some padding, then let pager use the rest
-            val bottomReserved = 140.dp
-            val pagerHeight = (availableHeight - bottomReserved).coerceAtLeast(360.dp)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Top
-            ) {
-                Spacer(Modifier.height(24.dp))
-
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(pagerHeight),
-                    pageSpacing = 16.dp
-                ) { index ->
-                    IntroPageContent(
-                        page = pages[index],
-                        pagerState = pagerState,
-                        pageIndex = index,
-                        pagerHeight = pagerHeight
-                    )
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                AnimatedPagerIndicator(
-                    pagerState = pagerState,
-                    pageCount = pages.size
+    Box(modifier = Modifier.fillMaxSize().blockTouchesWhen(state.isLoading)) {
+        Scaffold(
+            bottomBar = {
+                IntroBottomActions(
+                    onGetStarted = onGetStarted,
+                    onGoogle = {
+                        // Start One Tap sign-in flow: ask ViewModel to begin and expose an IntentSender
+                        viewModel.startOneTapSignIn(context)
+                    },
+                    isLoading = state.isLoading
                 )
+            }
+        ) { innerPadding ->
+            BoxWithConstraints(modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .clearFocusOnTap()) {
+                val availableHeight = this.maxHeight
+                // Reserve space for bottom actions (~120.dp) + some padding, then let pager use the rest
+                val bottomReserved = 140.dp
+                val pagerHeight = (availableHeight - bottomReserved).coerceAtLeast(360.dp)
 
-                Spacer(Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    Spacer(Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.weight(1f))
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(pagerHeight),
+                        pageSpacing = 8.dp,
+                        userScrollEnabled = !state.isLoading
+                    ) { index ->
+                        // map virtual index to real page
+                        val page = pages[index % pages.size]
+                        IntroPageContent(
+                            page = page,
+                            pagerState = pagerState,
+                            pageIndex = index,
+                            pagerHeight = pagerHeight
+                        )
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    AnimatedPagerIndicator(
+                        pagerState = pagerState,
+                        pageCount = pages.size
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
-        // If ViewModel exposed a pending IntentSender, launch it from the ActivityResult launcher
-        LaunchedEffect(state.signInIntentSender) {
-            val sender = state.signInIntentSender
-            if (sender != null) {
-                try {
-                    val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(sender).build()
-                    intentSenderLauncher.launch(intentSenderRequest)
-                } catch (e: Exception) {
-                    // Surface to viewmodel
-                    viewModel.handleOneTapResult(context, null)
-                    viewModel.clearSignInIntentSender()
-                }
+    }
+    // If ViewModel exposed a pending IntentSender, launch it from the ActivityResult launcher
+    LaunchedEffect(state.signInIntentSender) {
+        val sender = state.signInIntentSender
+        if (sender != null) {
+            try {
+                val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                intentSenderLauncher.launch(intentSenderRequest)
+            } catch (_: Exception) {
+                // Surface to viewmodel
+                viewModel.handleOneTapResult(context, null)
+                viewModel.clearSignInIntentSender()
             }
         }
     }
@@ -175,27 +192,42 @@ private fun IntroPageContent(
 
         val clamped = offset.coerceIn(0f, 1f)
         val imageAlpha = 1f - (clamped * 0.25f)
-        val imageScale = 1f - (clamped * 0.03f)
 
+        // Subtle infinite "bobbing" animation that loops.
+        // We modulate the animation amplitude by how centered the page is (so offscreen pages don't animate strongly).
+        val visibilityFactor = (1f - clamped).coerceAtLeast(0f).coerceAtMost(1f)
+        val infiniteTransition = rememberInfiniteTransition()
+        val bobDp by infiniteTransition.animateFloat(
+            initialValue = -8f,
+            targetValue = 8f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            )
+        )
+        val bobOffset = (bobDp * visibilityFactor).dp
+
+        // Keep layout size consistent and avoid scaling the image view itself so
+        // the text block remains vertically aligned across pages. Use ContentScale.Fit
+        // so the whole illustration is visible.
         Image(
             painter = painterResource(page.imageRes),
             contentDescription = page.title,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = Modifier
                 .height(imageHeight)
                 .fillMaxWidth()
+                .offset(y = bobOffset)
                 .graphicsLayer {
                     alpha = imageAlpha
-                    scaleX = imageScale
-                    scaleY = imageScale
                 }
         )
 
-        // Text block with flexible height so longer text can show fully while keeping baseline alignment
+        // Text block with fixed height so longer text can show fully while keeping baseline alignment
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 120.dp, max = textMaxHeight),
+                .height(textMaxHeight),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -240,7 +272,9 @@ private fun AnimatedPagerIndicator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(pageCount) { index ->
-            val selected = pagerState.currentPage == index
+            // derive the selected dot from the virtual current page modulo the real page count
+            val currentReal = (pagerState.currentPage % pageCount + pageCount) % pageCount
+            val selected = currentReal == index
 
             val width by animateDpAsState(
                 targetValue = if (selected) 10.dp else 8.dp,
@@ -274,20 +308,22 @@ private fun AnimatedPagerIndicator(
 @Composable
 private fun IntroBottomActions(
     onGetStarted: () -> Unit,
-    onLogin: () -> Unit,
     onGoogle: () -> Unit,
     isLoading: Boolean
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding( vertical = 28.dp),
+            .padding( vertical = 28.dp)
+            .blockTouchesWhen(isLoading),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         AuthButton(
             onClick = onGetStarted,
-            text = "Get Started"
+            text = "Get Started",
+            enabled = true,
+            isLoading = false
         )
 
         Spacer(Modifier.height(10.dp))

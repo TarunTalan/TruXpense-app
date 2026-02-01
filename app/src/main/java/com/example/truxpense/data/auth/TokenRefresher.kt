@@ -10,10 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Manages token refresh with proper synchronization.
- * Uses injected AuthApi instead of creating new Retrofit instances.
- */
+// Manages token refresh with proper synchronization
 @Singleton
 class TokenRefresher @Inject constructor(
     private val authApi: AuthApi,
@@ -21,10 +18,7 @@ class TokenRefresher @Inject constructor(
 ) {
     private val mutex = Mutex()
 
-    /**
-     * Refreshes the access token. Only one refresh runs at a time.
-     * Other callers wait for the result.
-     */
+    // Refreshes the access token; only one refresh runs at a time
     suspend fun refresh(): TokenResponse? = mutex.withLock {
         val refreshToken = prefs.refreshToken.first()
         if (refreshToken.isNullOrBlank()) return null
@@ -35,7 +29,6 @@ class TokenRefresher @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    // Persist tokens using AuthPreferences.saveTokens(access, refresh, expiresIn)
                     prefs.saveTokens(
                         body.accessToken.orEmpty(),
                         body.refreshToken ?: refreshToken,
@@ -45,10 +38,8 @@ class TokenRefresher @Inject constructor(
                 }
             }
 
-            // Server returned error or empty body
             null
         } catch (_: Exception) {
-            // Network error or other exception
             null
         }
     }
