@@ -64,7 +64,8 @@ class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, 
                     try {
                         // persist onboarding flags off the main thread
                         withContext(Dispatchers.IO) {
-                            prefs.setOnboardingComplete(true)
+                            // Save that user completed username step and is moving to currency
+                            prefs.saveOnboardingStep("currency")
                             prefs.setSignupStarted(false)
                         }
                         // Ensure navigation/UI callbacks run on the main thread

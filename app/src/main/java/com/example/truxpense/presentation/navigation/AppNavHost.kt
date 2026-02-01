@@ -17,17 +17,18 @@ import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
 import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
 import com.example.truxpense.presentation.screens.home.HomeScreen
 import com.example.truxpense.presentation.screens.onboarding.complete.CompleteSetupScreen
+import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyScreen
+import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.presentation.screens.onboarding.loading.LoadingScreen
 import com.example.truxpense.presentation.screens.onboarding.permission.SmsPermission
 import com.example.truxpense.presentation.screens.onboarding.username.UsernameScreen
-import com.example.truxpense.presentation.screens.splash.SplashScreen
 import com.example.truxpense.presentation.screens.splash.SplashViewModel
 import kotlinx.coroutines.flow.first
 
-/**
- * App lifecycle stages used by splash routing
- */
-private enum class AppStage {
+
+// App lifecycle stages used by splash routing
+// Make public for use in SplashNavigator
+enum class AppStage {
     AUTH,        // User needs to login/signup
     ONBOARDING,  // User authenticated but needs to complete onboarding
     HOME         // User fully onboarded, go to home
@@ -46,39 +47,11 @@ fun AppNavHost(
     ) {
         // ==================== SPLASH SCREEN ====================
         composable(Screen.Splash) {
-            val viewModel: SplashViewModel = hiltViewModel()
-
-            val onboardingComplete by viewModel.onboardingComplete.collectAsState(initial = false)
-            val accessToken by viewModel.accessToken.collectAsState(initial = null)
-            val username by viewModel.username.collectAsState(initial = null)
-            val signupStarted by viewModel.signupStarted.collectAsState(initial = false)
-
-            Box(modifier = Modifier.padding(contentPadding)) {
-                LaunchedEffect(Unit) {
-                    onSplashEnter()
-                }
-
-                SplashScreen(
-                    onFinished = {
-                        val stage = determineAppStage(
-                            onboardingComplete = onboardingComplete,
-                            signupStarted = signupStarted,
-                            accessToken = accessToken,
-                            username = username
-                        )
-
-                        val destination = when (stage) {
-                            AppStage.HOME -> Screen.Home
-                            AppStage.ONBOARDING -> Screen.Username
-                            AppStage.AUTH -> Screen.Intro
-                        }
-
-                        navController.safeNavigate(destination) {
-                            popUpTo(Screen.Splash) { inclusive = true }
-                        }
-                    }
-                )
-            }
+            SplashNavigator(
+                navController = navController,
+                contentPadding = contentPadding,
+                onSplashEnter = onSplashEnter
+            )
         }
 
         // ==================== INTRO SCREEN ====================
@@ -95,6 +68,7 @@ fun AppNavHost(
                                 popUpTo(Screen.Splash) { inclusive = true }
                             }
                         }
+
                         introState.navigateToUsername -> {
                             navController.safeNavigate(Screen.Username) {
                                 popUpTo(Screen.Splash) { inclusive = true }
@@ -219,9 +193,66 @@ fun AppNavHost(
         // ==================== USERNAME SCREEN ====================
         composable(Screen.Username) {
             Box(modifier = Modifier.padding(contentPadding)) {
+                val splashViewModel: SplashViewModel = hiltViewModel()
+                // Mark current onboarding step so restart resumes here
+                LaunchedEffect(Unit) { splashViewModel.saveOnboardingStep("username") }
+
                 UsernameScreen(
                     onComplete = {
+                        // Username is saved in UsernameViewModel along with onboarding step
+                        // navigate to currency selection after username
+                        navController.safeNavigate(Screen.Currency) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    },
+                    onSkip = {
+                        // User skipped username -> save step and proceed to currency selection
+                        splashViewModel.saveOnboardingStep("currency")
+                        navController.safeNavigate(Screen.Currency) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    }
+                )
+            }
+        }
+
+        // ==================== CURRENCY SCREEN ====================
+        composable(Screen.Currency) {
+            Box(modifier = Modifier.padding(contentPadding)) {
+                val splashViewModel: SplashViewModel = hiltViewModel()
+                val currencyViewModel: CurrencyViewModel = hiltViewModel()
+
+                CurrencyScreen(
+                    onContinue = {
+                        // Persist selected currency, then save step and proceed to sms permission
+                        currencyViewModel.persistSelectedCurrency()
+                        splashViewModel.saveOnboardingStep("sms_permission")
                         navController.safeNavigate(Screen.SmsPermission) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    },
+                    onSkip = {
+                        // User skipped currency selection, save step and proceed to sms permission
+                        // Ensure default currency is set if nothing selected
+                        val sel = currencyViewModel.selectedCurrency.value
+                        if (sel == null) {
+                            val default = currencyViewModel.localeDefaultCurrency()
+                            if (default != null) {
+                                currencyViewModel.selectCurrency(default)
+                                // persist the default choice
+                                currencyViewModel.persistSelectedCurrency()
+                            }
+                        }
+                        // persist current selection (if user had selected earlier)
+                        currencyViewModel.persistSelectedCurrency()
+                        splashViewModel.saveOnboardingStep("sms_permission")
+                        navController.safeNavigate(Screen.SmsPermission) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    },
+                    onBack = {
+                        // Navigate back to username screen
+                        navController.safeNavigate(Screen.Username) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
                     }
@@ -232,12 +263,24 @@ fun AppNavHost(
         // ==================== SMS PERMISSION SCREEN ====================
         composable(Screen.SmsPermission) {
             Box(modifier = Modifier.padding(contentPadding)) {
+                val splashViewModel: SplashViewModel = hiltViewModel()
+
                 SmsPermission(
                     onAllow = {
+                        // Save onboarding step before navigating
+                        splashViewModel.saveOnboardingStep("loading")
                         navController.safeNavigate(Screen.Loading)
                     },
                     onSkip = {
+                        // Save onboarding step before navigating
+                        splashViewModel.saveOnboardingStep("loading")
                         navController.safeNavigate(Screen.Loading)
+                    },
+                    onBack = {
+                        // Navigate back to currency screen
+                        navController.safeNavigate(Screen.Currency) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
                     }
                 )
             }
@@ -246,8 +289,12 @@ fun AppNavHost(
         // ==================== LOADING SCREEN ====================
         composable(Screen.Loading) {
             Box(modifier = Modifier.padding(contentPadding)) {
+                val splashViewModel: SplashViewModel = hiltViewModel()
+
                 LoadingScreen(
                     onFinished = {
+                        // Save onboarding step before navigating
+                        splashViewModel.saveOnboardingStep("complete_setup")
                         navController.safeNavigate(Screen.CompleteSetup)
                     }
                 )
@@ -257,8 +304,12 @@ fun AppNavHost(
         // ==================== COMPLETE SETUP SCREEN ====================
         composable(Screen.CompleteSetup) {
             Box(modifier = Modifier.padding(contentPadding)) {
+                val splashViewModel: SplashViewModel = hiltViewModel()
+
                 CompleteSetupScreen(
                     onFinished = {
+                        // Mark onboarding as complete and clear the step
+                        splashViewModel.markOnboardingComplete()
                         navController.safeNavigate(Screen.Home) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
@@ -286,24 +337,70 @@ fun AppNavHost(
 
 /**
  * Determine which app stage the user is in based on their state
+ * onboardingStep takes precedence to keep the user inside onboarding
  */
-private fun determineAppStage(
+fun determineAppStage(
     onboardingComplete: Boolean,
     signupStarted: Boolean,
     accessToken: String?,
-    username: String?
+    username: String?,
+    onboardingStep: String?
 ): AppStage {
     return when {
         // Fully onboarded user
         onboardingComplete -> AppStage.HOME
 
+        // If any onboarding step is saved (username/currency/sms/loading/complete_setup), remain in onboarding
+        !onboardingStep.isNullOrBlank() && onboardingStep != "completed" -> AppStage.ONBOARDING
+
         // User started signup or has token but no username
-        signupStarted || (!accessToken.isNullOrBlank() && username.isNullOrBlank()) -> {
-            AppStage.ONBOARDING
-        }
+        signupStarted || (!accessToken.isNullOrBlank() && username.isNullOrBlank()) -> AppStage.ONBOARDING
 
         // Default: needs authentication
         else -> AppStage.AUTH
+    }
+}
+
+
+/**
+ * Determine which onboarding screen to resume from based on saved step
+ * This enables users to continue from where they left off if app restarts
+ *
+ * Special behavior: If user was at SMS Permission or beyond, auto-complete
+ * onboarding and login user directly to Home screen (critical data already collected)
+ */
+fun determineOnboardingScreen(
+    onboardingStep: String?,
+    username: String?
+): String {
+    return when (onboardingStep) {
+        "username" -> {
+            Screen.Username
+        }
+
+        "currency" -> {
+            Screen.Currency
+        }
+
+        "sms_permission", "loading", "complete_setup" -> {
+            Screen.Home
+        }
+
+        "completed" -> {
+            // Onboarding was completed, go to home
+            Screen.Home
+        }
+
+        else -> {
+            // No saved step or unknown step - start from beginning
+            // Also restart if username is blank (safety check)
+            if (username.isNullOrBlank()) {
+                Screen.Username
+            } else {
+                // Username exists but step is unclear, resume at currency
+                Screen.Currency
+            }
+        }
     }
 }
 

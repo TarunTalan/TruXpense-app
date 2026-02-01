@@ -21,6 +21,8 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = Color(rgb(154, 163, 171)),
     error = Color(rgb(224, 122, 122)),
     outline = Color(rgb(110, 119, 129,)),
+    onPrimaryContainer = Color(rgb(110, 119, 129)),
+    primaryContainer = Color(rgb(58, 63, 69,))
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -36,6 +38,9 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color(rgb(154, 163, 171)),
     error = Color(rgb(214, 69, 69)),
     outline = Color(rgb(154, 163, 171)),
+    onPrimaryContainer = Color(rgb(255, 255, 255,)),
+    primaryContainer = Color(rgb(238, 241, 243,))
+
 )
 
 @Composable

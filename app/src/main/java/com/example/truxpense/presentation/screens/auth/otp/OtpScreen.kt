@@ -3,7 +3,6 @@ package com.example.truxpense.presentation.screens.auth.otp
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -174,12 +173,13 @@ fun OtpContent(
                 contentAlignment = Alignment.CenterStart
             ) {
                 val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
-                Icon(
-                    painter = painterResource(id = R.drawable.back_icon),
-                    contentDescription = null,
-                    tint = backTint,
-                    modifier = Modifier.clickable { onBack?.invoke() }.padding(vertical = 20.dp)
-                )
+                IconButton(onClick = { onBack?.invoke() }, modifier = Modifier.padding(vertical = 20.dp)) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.back_icon),
+                        contentDescription = null,
+                        tint = backTint
+                    )
+                }
             }
         },
         // bottomBar with loading-aware button
@@ -599,4 +599,3 @@ fun OtpContentPreviewDark() {
         errorMessage = "Invalid code, please try again"
     )
 }
-

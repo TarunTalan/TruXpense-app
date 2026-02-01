@@ -31,6 +31,7 @@ class AuthPreferences @Inject constructor(
         // Onboarding flags
         private val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         private val SIGNUP_STARTED = booleanPreferencesKey("signup_started")
+        private val ONBOARDING_STEP = stringPreferencesKey("onboarding_step")
 
         // Per-email OTP keys
         private const val OTP_FAIL_COUNT_PREFIX = "otp_fail_count_"
@@ -69,6 +70,13 @@ class AuthPreferences @Inject constructor(
     }
 
     val signupStarted: Flow<Boolean> = dataStore.data.map { prefs -> prefs[SIGNUP_STARTED] ?: false }
+
+    // Onboarding step tracking for resume functionality
+    suspend fun saveOnboardingStep(step: String) {
+        dataStore.edit { prefs -> prefs[ONBOARDING_STEP] = step }
+    }
+
+    val onboardingStep: Flow<String?> = dataStore.data.map { prefs -> prefs[ONBOARDING_STEP] }
 
     // OTP per-email helpers
     private fun hashEmail(email: String): String {

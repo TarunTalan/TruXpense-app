@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+                                                                                                                                                                                                                                                    import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.Image
@@ -49,6 +50,12 @@ fun SmsPermission(
     // Two-step skip flow state
     var skipConfirmed by remember { mutableStateOf(false) } // false = default 'Skip', true = show confirmation UI (icon/small text change)
 
+    // Handle back navigation
+    // When user presses system back on this screen, exit the app instead of navigating back
+    BackHandler(enabled = true) {
+        activity?.finishAffinity()
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted ->
         if (granted) {
             // Permission granted -> navigate to centralized Loading screen via callback
@@ -78,7 +85,7 @@ fun SmsPermission(
 
     Scaffold(
         bottomBar = {
-            Column(modifier = modifier.padding(horizontal = 20.dp)) {
+            Column(modifier = modifier) {
                 AuthButton(
                     onClick = { requestPermission() },
                     text = "Allow access",
@@ -184,20 +191,24 @@ fun SmsPermission(
         }
     }
 
+    // helpers to close dialogs (avoids linter "assigned value is never read" warnings)
+    fun closeRationale() { showRationaleDialog = false }
+    fun closePermanentlyDenied() { showPermanentlyDeniedDialog = false }
+
     // Rationale dialog when permission denied but should show rationale
     if (showRationaleDialog) {
         AlertDialog(
-            onDismissRequest = { showRationaleDialog = false },
+            onDismissRequest = { closeRationale() },
             title = { Text("Why we need SMS access") },
             text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.") },
             confirmButton = {
                 Button(onClick = {
-                    showRationaleDialog = false
+                    closeRationale()
                     permissionLauncher.launch(permission)
                 }) { Text("Grant") }
             },
             dismissButton = {
-                TextButton(onClick = { showRationaleDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { closeRationale() }) { Text("Cancel") }
             }
         )
     }
@@ -205,12 +216,12 @@ fun SmsPermission(
     // Permanently denied dialog: guide user to app settings
     if (showPermanentlyDeniedDialog) {
         AlertDialog(
-            onDismissRequest = { showPermanentlyDeniedDialog = false },
+            onDismissRequest = { closePermanentlyDenied() },
             title = { Text("Permission blocked") },
             text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.") },
             confirmButton = {
                 Button(onClick = {
-                    showPermanentlyDeniedDialog = false
+                    closePermanentlyDenied()
                     // Open app settings
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", context.packageName, null)
@@ -219,7 +230,7 @@ fun SmsPermission(
                 }) { Text("Open settings") }
             },
             dismissButton = {
-                TextButton(onClick = { showPermanentlyDeniedDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { closePermanentlyDenied() }) { Text("Cancel") }
             }
         )
     }
