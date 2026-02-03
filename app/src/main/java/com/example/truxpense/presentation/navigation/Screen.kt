@@ -9,7 +9,6 @@ object Screen {
     const val Username = "username"
     const val SmsPermission = "sms_permission"
     const val Loading = "loading"
-    const val CompleteSetup = "complete_setup"
     const val Home = "home"
     const val Currency = "currency"
 }
