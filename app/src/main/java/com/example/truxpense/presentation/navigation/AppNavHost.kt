@@ -275,12 +275,6 @@ fun AppNavHost(
                         // Save onboarding step before navigating
                         splashViewModel.saveOnboardingStep("loading")
                         navController.safeNavigate(Screen.Loading)
-                    },
-                    onBack = {
-                        // Navigate back to currency screen
-                        navController.safeNavigate(Screen.Currency) {
-                            popUpTo(Screen.Splash) { inclusive = true }
-                        }
                     }
                 )
             }

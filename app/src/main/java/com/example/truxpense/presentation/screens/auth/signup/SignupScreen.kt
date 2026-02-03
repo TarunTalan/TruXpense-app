@@ -132,7 +132,7 @@ private fun SignupTopBar(
         val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
         IconButton(
             onClick = { if (enabled) onBack() },
-            modifier = Modifier.padding(vertical = 20.dp)
+            modifier = Modifier
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.back_icon),
@@ -201,7 +201,7 @@ private fun SignupContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SignupHeader()
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(26.dp))
 
         // Email Input with integrated lockout display
         val lockMsg = if (otpLockSeconds > 0) "Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null

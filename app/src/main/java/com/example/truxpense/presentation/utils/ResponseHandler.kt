@@ -14,7 +14,7 @@ object ResponseHandler {
     }
 
     fun parseThrowable(t: Throwable): String {
-        return when (t) {
+        val message = when (t) {
             is java.net.SocketTimeoutException -> "Connection timed out. Please try again."
             is java.net.UnknownHostException -> "No internet connection. Please check your network."
             is java.io.IOException -> "Network error. Please check your connection."
@@ -37,6 +37,7 @@ object ResponseHandler {
                 if (!msg.isNullOrBlank()) extractMessage(msg) else "Something went wrong. Please try again."
             }
         }
+        return message
     }
 
     /**

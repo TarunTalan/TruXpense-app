@@ -161,7 +161,7 @@ class OtpViewModel @Inject constructor(
                     _isLoading.value = false
 
                     // Register failure in manager (handles sliding window & locking)
-                    val locked = lockManager.registerFailure(normEmail)
+                    val (locked, attemptsLeft) = lockManager.registerFailure(normEmail)
 
                     if (locked) {
                         val remaining = lockManager.getRemainingLockSeconds(normEmail)
@@ -170,12 +170,14 @@ class OtpViewModel @Inject constructor(
                         emitLock(lockMsg)
                         startLockCountdownFromManager(normEmail)
                     } else {
-                        // No lock; show the server-provided message (if any)
-                        val errorMessage = ResponseHandler.getMessageFromResult(
+                        // No lock; show the server-provided message and attempts left
+                        val baseError = ResponseHandler.getMessageFromResult(
                             result,
                             "Invalid OTP. Please try again."
                         )
-                        emitError(errorMessage)
+                        val attemptsMsg = "Attempts left: $attemptsLeft"
+                        val combined = if (baseError.isNotBlank()) "$baseError ($attemptsMsg)" else attemptsMsg
+                        emitError(combined)
                     }
                 }
             } catch (e: Exception) {
@@ -234,7 +236,7 @@ class OtpViewModel @Inject constructor(
                     _isLoading.value = false
 
                     // Register failure in manager (handles sliding window & locking)
-                    val locked = lockManager.registerFailure(normEmail)
+                    val (locked, attemptsLeft) = lockManager.registerFailure(normEmail)
 
                     if (locked) {
                         val remaining = lockManager.getRemainingLockSeconds(normEmail)
@@ -243,12 +245,14 @@ class OtpViewModel @Inject constructor(
                         emitLock(lockMsg)
                         startLockCountdownFromManager(normEmail)
                     } else {
-                        // No lock; show server-provided message (if any)
-                        val errorMessage = ResponseHandler.getMessageFromResult(
+                        // No lock; show server-provided message and attempts left
+                        val baseError = ResponseHandler.getMessageFromResult(
                             result,
                             "Failed to resend OTP"
                         )
-                        emitError(errorMessage)
+                        val attemptsMsg = "Attempts left: $attemptsLeft"
+                        val combined = if (baseError.isNotBlank()) "$baseError ($attemptsMsg)" else attemptsMsg
+                        emitError(combined)
                     }
                 }
             } catch (e: Exception) {

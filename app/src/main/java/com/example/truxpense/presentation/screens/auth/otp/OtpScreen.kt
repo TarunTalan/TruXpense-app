@@ -173,7 +173,7 @@ fun OtpContent(
                 contentAlignment = Alignment.CenterStart
             ) {
                 val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
-                IconButton(onClick = { onBack?.invoke() }, modifier = Modifier.padding(vertical = 20.dp)) {
+                IconButton(onClick = { onBack?.invoke() }) {
                     Icon(
                         painter = painterResource(id = R.drawable.back_icon),
                         contentDescription = null,
@@ -254,7 +254,7 @@ fun OtpContent(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(26.dp))
 
             // OTP boxes
             Row(

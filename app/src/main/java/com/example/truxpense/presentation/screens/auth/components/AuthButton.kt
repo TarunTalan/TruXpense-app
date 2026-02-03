@@ -7,6 +7,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -22,7 +27,24 @@ fun AuthButton(
     text: String? = null,
     enabled: Boolean = true,
     isLoading: Boolean = false,
+    loadingDelayMs: Long = 300L,
 ) {
+    // Only show the spinner if loading has lasted longer than loadingDelayMs
+    var showSpinner by remember { mutableStateOf(false) }
+    LaunchedEffect(isLoading) {
+        if (isLoading) {
+            showSpinner = false
+            try {
+                kotlinx.coroutines.delay(loadingDelayMs)
+                showSpinner = true
+            } catch (_: Exception) {
+                showSpinner = true
+            }
+        } else {
+            showSpinner = false
+        }
+    }
+
     Button(
         onClick = onClick,
         enabled = enabled && !isLoading,
@@ -42,7 +64,8 @@ fun AuthButton(
             ),
         shape = MaterialTheme.shapes.medium,
     ) {
-        if (isLoading) {
+        val displaySpinner = isLoading && showSpinner
+        if (displaySpinner) {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.background,
                 strokeWidth = 2.dp,

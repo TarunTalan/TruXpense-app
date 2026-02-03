@@ -42,15 +42,21 @@ class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, 
     }
 
     fun onUsernameChanged(new: String) {
-        // Filter username to letters only and cap length
-        _username.value = InputValidators.filterUsernameInput(new)
-        // clear any previous error when user edits
+        // Filter username and set immediate validation error (if any)
+        val filtered = InputValidators.filterUsernameInput(new)
+        _username.value = filtered
         _error.value = null
     }
 
     // Save username and mark onboarding complete
     fun saveAndComplete(onComplete: (() -> Unit)? = null) {
         val name = _username.value
+        // Validate before saving
+        val validationError = InputValidators.usernameError(name)
+        if (validationError != null) {
+            _error.value = validationError
+            return
+        }
         // Use viewModelScope so lifecycle is respected and switch contexts as needed
         viewModelScope.launch {
             // update UI state on main
@@ -67,6 +73,11 @@ class UsernameViewModel @Inject constructor(private val prefs: AuthPreferences, 
                             // Save that user completed username step and is moving to currency
                             prefs.saveOnboardingStep("currency")
                             prefs.setSignupStarted(false)
+                            // Persist trimmed username in preferences
+                            val trimmed = name.trim()
+                            prefs.saveUsername(trimmed)
+                            // Update in-memory username to the trimmed value on main after IO
+                            _username.value = trimmed
                         }
                         // Ensure navigation/UI callbacks run on the main thread
                         withContext(Dispatchers.Main) {

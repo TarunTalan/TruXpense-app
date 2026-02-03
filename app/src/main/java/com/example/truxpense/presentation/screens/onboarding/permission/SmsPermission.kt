@@ -92,7 +92,7 @@ fun SmsPermission(
                     enabled = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .height(48.dp)
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -122,13 +122,12 @@ fun SmsPermission(
     ) { _ ->
         Column(
             modifier = Modifier
-                .padding(top = 20.dp)
+                .padding(top = 32.dp)
                 .fillMaxSize()
                 .clearFocusOnTap(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-
             Text(
                 text = "Allow SMS access",
                 style = MaterialTheme.typography.headlineMedium.copy(

@@ -88,8 +88,6 @@ class LoginViewModel @Inject constructor(
     fun onEvent(event: LoginEvent) {
         when (event) {
             is LoginEvent.EmailChanged -> handleEmailChanged(event.email)
-            is LoginEvent.AgreeTncChanged -> handleTncChanged(event.agreed)
-            is LoginEvent.ShowTncDialog -> handleShowTncDialog(event.show)
             LoginEvent.LoginWithEmail -> handleLoginWithEmail()
             LoginEvent.ClearError -> handleClearError()
             LoginEvent.OnNavigationHandled -> handleNavigationHandled()
@@ -107,21 +105,8 @@ class LoginViewModel @Inject constructor(
         _state.value = _state.value.copy(
             email = sanitizedEmail,
             isEmailValid = isValid,
-            canLogin = isValid && _state.value.agreeTnc,
             error = null
         )
-    }
-
-    private fun handleTncChanged(agreed: Boolean) {
-        _state.value = _state.value.copy(
-            agreeTnc = agreed,
-            canLogin = agreed && _state.value.isEmailValid,
-            error = if (agreed) null else _state.value.error
-        )
-    }
-
-    private fun handleShowTncDialog(show: Boolean) {
-        _state.value = _state.value.copy(showTncDialog = show)
     }
 
     private fun handleLoginWithEmail() {
@@ -139,17 +124,7 @@ class LoginViewModel @Inject constructor(
         if (!InputValidators.isValidEmail(email)) {
             _state.value = _state.value.copy(
                 isEmailValid = false,
-                canLogin = false,
                 error = "Please enter a valid email address"
-            )
-            return
-        }
-
-        // Check T&C acceptance
-        if (!_state.value.agreeTnc) {
-            _state.value = _state.value.copy(
-                canLogin = false,
-                error = "Please accept the Terms and Conditions to continue"
             )
             return
         }

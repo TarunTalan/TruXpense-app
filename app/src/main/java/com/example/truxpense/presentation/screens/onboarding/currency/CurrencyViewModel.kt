@@ -32,11 +32,18 @@ class CurrencyViewModel @Inject constructor(
                 try {
                     val code = currency.currencyCode
                     // prefer device locale display name
-                    val name = try {
+                    var name = try {
                         currency.getDisplayName(deviceLocale)
                     } catch (_: Exception) {
                         currency.currencyCode
                     }
+                    // Remove trailing year-like suffixes and parenthesized year-only parts, e.g. " (2020)" or trailing " 2020"
+                    name = name.replace(Regex("\\s*\\(\\d{4}\\)\\s*\$"), "")
+                    name = name.replace(Regex("\\s*\\d{4}\\s*\$"), "")
+                    // Also remove parentheses that contain only digits or date ranges like (1999–)
+                    name = name.replace(Regex("\\s*\\(\\s*\\d{3,}([–-]\\d{0,4})?\\s*\\)\\s*\$"), "")
+                    name = name.trim()
+
                     val symbol = try {
                         val s = currency.getSymbol(deviceLocale)
                         if (s.isNullOrBlank()) currency.currencyCode else s
@@ -54,14 +61,14 @@ class CurrencyViewModel @Inject constructor(
             // sort by display name using device locale collator
             .sortedWith { a, b -> collator.compare(a.name, b.name) }
 
-        // Prefer device locale currency first, then USD, then the rest in sorted order
+        // Prefer device locale currency first, then USD, then INR, keeping order and removing duplicates
         val deviceCurrencyCode = try {
             Currency.getInstance(deviceLocale).currencyCode
         } catch (_: Exception) {
             null
         }
 
-        val preferredOrder = listOfNotNull(deviceCurrencyCode, "USD").distinct()
+        val preferredOrder = listOfNotNull(deviceCurrencyCode, "USD", "INR").distinct()
         val preferredItems = preferredOrder.mapNotNull { code -> baseList.firstOrNull { it.code == code } }
         val others = baseList.filterNot { item -> preferredOrder.contains(item.code) }
         preferredItems + others
@@ -69,6 +76,8 @@ class CurrencyViewModel @Inject constructor(
 
     private val _selectedCurrency = MutableStateFlow<CurrencyItem?>(null)
     val selectedCurrency: StateFlow<CurrencyItem?> = _selectedCurrency
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving
 
     init {
         // load saved value
@@ -91,7 +100,14 @@ class CurrencyViewModel @Inject constructor(
     fun persistSelectedCurrency() {
         val code = _selectedCurrency.value?.code ?: return
         viewModelScope.launch {
-            prefs.edit { putString(KEY_CURRENCY, code) }
+            _isSaving.value = true
+            try {
+                prefs.edit { putString(KEY_CURRENCY, code) }
+            } catch (_: Exception) {
+                // ignore write failures here
+            } finally {
+                _isSaving.value = false
+            }
         }
     }
 
