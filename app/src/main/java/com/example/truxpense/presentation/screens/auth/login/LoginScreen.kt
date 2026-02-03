@@ -1,30 +1,18 @@
 package com.example.truxpense.presentation.screens.auth.login
 
-import android.graphics.Color.rgb
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,19 +81,12 @@ fun LoginScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .clearFocusOnTap()
-                .then(if (state.showTncDialog) Modifier.blur(16.dp) else Modifier)
                 .blockTouchesWhen(state.isLoading)
         ) {
             LoginContent(
                 state = state,
                 otpLockSeconds = otpLockSeconds,
                 onEvent = viewModel::onEvent
-            )
-        }
-
-        if (state.showTncDialog) {
-            TncDialog(
-                onDismiss = { viewModel.onEvent(LoginEvent.ShowTncDialog(false)) }
             )
         }
     }
@@ -138,7 +119,6 @@ private fun LoginTopBar(
         val backTint = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onBackground
         IconButton(
             onClick = { if (enabled) onBack() },
-            modifier = Modifier.padding(vertical = 20.dp)
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.back_icon),
@@ -207,10 +187,11 @@ private fun LoginContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         LoginHeader()
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(26.dp))
 
         // Email Input with integrated error display
-        val lockMsg = if (otpLockSeconds > 0) "Locked: Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null
+        val lockMsg =
+            if (otpLockSeconds > 0) "Locked: Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null
         AuthTextField(
             bgColor = MaterialTheme.colorScheme.background,
             label = "Email Address",
@@ -224,12 +205,7 @@ private fun LoginContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TncCheckbox(
-            checked = state.agreeTnc,
-            onCheckedChange = { onEvent(LoginEvent.AgreeTncChanged(it)) },
-            onShowTnc = { onEvent(LoginEvent.ShowTncDialog(true)) },
-            enabled = !state.isLoading && otpLockSeconds == 0
-        )
+        // T&C checkbox removed from Login screen
     }
 }
 
@@ -257,110 +233,7 @@ private fun LoginHeader() {
     }
 }
 
-@Composable
-private fun TncCheckbox(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    onShowTnc: () -> Unit,
-    enabled: Boolean
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            modifier = Modifier
-                .padding(start = 4.dp, end = 12.dp)
-                .size(20.dp),
-            colors = CheckboxDefaults.colors(
-                uncheckedColor = MaterialTheme.colorScheme.outline,
-                checkmarkColor = MaterialTheme.colorScheme.background,
-                checkedColor = MaterialTheme.colorScheme.primary,
-                disabledUncheckedColor = MaterialTheme.colorScheme.outline
-            )
-        )
-
-        val isDarkTheme = !isSystemInDarkTheme()
-        val tncColor = if (isDarkTheme) {
-            Color(rgb(59, 120, 194))
-        } else {
-            Color(rgb(127, 169, 217))
-        }
-
-        val annotatedString = buildAnnotatedString {
-            append("I agree to the ")
-            pushStringAnnotation(tag = "TNC", annotation = "tnc")
-            withStyle(
-                style = SpanStyle(
-                    color = tncColor,
-                    fontWeight = FontWeight.Medium,
-                    textDecoration = TextDecoration.Underline
-                )
-            ) {
-                append("Terms and Conditions")
-            }
-            pop()
-        }
-
-        Text(
-            text = annotatedString,
-            style = MaterialTheme.typography.bodySmall.copy(
-                color = MaterialTheme.colorScheme.onSurface
-            ),
-            modifier = Modifier.clickable(enabled = enabled) { onShowTnc() }
-        )
-    }
-}
-
-@Composable
-private fun TncDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Terms and Conditions") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                Text("TruXpense reads only bank transaction messages to help you track your expenses automatically.")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "What we access:",
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text("• Bank transaction SMS messages")
-                Text("• App usage data for improvements")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "What we don't access:",
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text("• Personal messages")
-                Text("• OTPs from other apps")
-                Text("• Contacts or call logs")
-                Text("• Any other unrelated personal data")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    "By continuing, you agree to allow TruXpense to access the data listed above for the purpose of automatically categorizing and tracking your expenses.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
-        }
-    )
-}
+// Terms & Conditions UI removed from LoginScreen.kt
 
 private fun formatLockTime(seconds: Int): String {
     val minutes = seconds / 60

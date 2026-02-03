@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.utils.InputValidators
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 import java.text.Normalizer
 import java.util.*
@@ -43,6 +44,7 @@ fun CurrencyScreen(
 ) {
     val available = viewModel.available
     val selected by viewModel.selectedCurrency.collectAsState()
+    val isSaving by viewModel.isSaving.collectAsState()
 
     // Clear in-memory selection when the screen leaves composition (navigated away or closed)
     DisposableEffect(viewModel) {
@@ -57,7 +59,7 @@ fun CurrencyScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, end = 8.dp),
+                    .padding(top = 12.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -79,6 +81,7 @@ fun CurrencyScreen(
             selected = selected,
             onSelect = { item -> viewModel.selectCurrency(item) },
             onContinue = onContinue, onSkip = onSkip,
+            isSaving = isSaving,
             onClearSelection = { viewModel.clearSelection() }
         )
     }
@@ -92,6 +95,7 @@ private fun CurrencyScreenInner(
     onSelect: (CurrencyItem) -> Unit,
     onContinue: () -> Unit,
     onSkip: () -> Unit,
+    isSaving: Boolean = false,
     onClearSelection: () -> Unit,
     initialQueryText: String = "",
     initialExpanded: Boolean = false
@@ -130,6 +134,7 @@ private fun CurrencyScreenInner(
         }
     }
 
+    // Enable Continue only when a currency is explicitly selected
     val continueEnabled = remember(selected) { selected != null }
 
     Column(
@@ -168,9 +173,11 @@ private fun CurrencyScreenInner(
                 error = errorMessage,
                 value = query,
                 onValueChange = { value ->
+                    // Use centralized filter to remove digits/control chars and cap length
+                    val sanitized = InputValidators.filterCurrencyInput(value)
                     // user typing should clear any previous selection so only explicit selection allows continue
                     onClearSelection()
-                    query = value
+                    query = sanitized
                     expanded = true
                     // clear error when user types or searches
                     if (!errorMessage.isNullOrEmpty()) errorMessage = null
@@ -313,7 +320,8 @@ private fun CurrencyScreenInner(
                     enabled = continueEnabled,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .height(48.dp),
+                    isLoading = isSaving
                 )
 
                 TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {

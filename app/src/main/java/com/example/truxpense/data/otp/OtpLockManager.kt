@@ -50,16 +50,17 @@ class OtpLockManager @Inject constructor(
     }
 
     /**
-     * Register a failure for an email. Returns true if this failure caused a lock.
+     * Register a failure for an email. Returns Pair(locked, attemptsLeft).
+     * attemptsLeft is the number of attempts remaining before lock (0 when locked).
      * Uses a sliding window: failures outside the window reset the counter.
      */
-    suspend fun registerFailure(email: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun registerFailure(email: String): Pair<Boolean, Int> = withContext(Dispatchers.IO) {
         val e = normalizeEmail(email)
         val now = System.currentTimeMillis()
 
         // Read lock & last-failure in the same IO context
         val lockUntil = prefs.otpLockUntilFor(e).first()
-        if (lockUntil > now) return@withContext true // already locked
+        if (lockUntil > now) return@withContext Pair(true, 0) // already locked
 
         val lastFailTs = prefs.otpLastFailFor(e).first()
         if (lastFailTs == 0L || (now - lastFailTs) > failureWindowMs) {
@@ -73,10 +74,11 @@ class OtpLockManager @Inject constructor(
         if (newCount >= maxAttempts) {
             val until = now + lockDurationMs
             prefs.setOtpLockUntilFor(e, until)
-            return@withContext true
+            return@withContext Pair(true, 0)
         }
 
-        return@withContext false
+        val attemptsLeft = maxAttempts - newCount
+        return@withContext Pair(false, attemptsLeft)
     }
 
     suspend fun resetFailures(email: String) = withContext(Dispatchers.IO) {

@@ -33,7 +33,8 @@ fun UsernameScreen(
     val username by viewModel.username.collectAsState(initial = "")
     val usernameError by viewModel.error.collectAsState(initial = null)
     val isSaving by viewModel.isSaving.collectAsState(initial = false)
-    val enabled = username.isNotBlank() && !isSaving
+    // Keep Continue disabled when username is empty (trimmed) and while saving
+    val enabled = username.trim().isNotEmpty() && !isSaving
 
     // When on the username screen, pressing system back should exit the app.
     val activity = LocalContext.current as? Activity
@@ -55,6 +56,7 @@ fun UsernameScreen(
                 onUsernameChange = { viewModel.onUsernameChanged(it) },
                 onComplete = { if (enabled) viewModel.saveAndComplete { onComplete?.invoke() } },
                 enabled = enabled,
+                isSaving = isSaving,
                 showActions = false,
                 error = usernameError,
                 onSkip = onSkip
@@ -69,6 +71,7 @@ fun UsernameContent(
     onUsernameChange: (String) -> Unit,
     onComplete: () -> Unit = {},
     enabled: Boolean = false,
+    isSaving: Boolean = false,
     showActions: Boolean = false,
     error: String? = null,
     onSkip: (() -> Unit)?
@@ -127,7 +130,8 @@ fun UsernameContent(
                 enabled = enabled,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(48.dp),
+                isLoading = isSaving
             )
 
             if (onSkip != null) {
