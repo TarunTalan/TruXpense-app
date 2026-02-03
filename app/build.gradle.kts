@@ -1,14 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
     namespace = "com.example.truxpense"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.truxpense"
@@ -18,6 +20,36 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val webClientId: String? = (project.findProperty("googleWebClientId") as? String)
+        if (!webClientId.isNullOrBlank()) {
+            resValue("string", "default_web_client_id", webClientId)
+        } else {
+            resValue("string", "default_web_client_id", "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com")
+        }
+
+        // Backend base URL: prefer a project property `backendBaseUrl` (set in gradle.properties locally),
+        // otherwise prefer an untracked local file 'gradle-local.properties' at project root, and finally
+        // fall back to the development default.
+        var backendBaseUrl: String? = (project.findProperty("backendBaseUrl") as? String)
+        if (backendBaseUrl.isNullOrBlank()) {
+            val localFile = rootProject.file("gradle-local.properties")
+            if (localFile.exists()) {
+                val props = Properties()
+                localFile.inputStream().use { stream ->
+                    props.load(stream)
+                }
+                backendBaseUrl = props.getProperty("backendBaseUrl")
+            }
+        }
+
+        if (!backendBaseUrl.isNullOrBlank()) {
+            // Ensure base URL ends with a trailing slash required by Retrofit
+            if (!backendBaseUrl.endsWith("/")) backendBaseUrl += "/"
+            resValue("string", "backend_base_url", backendBaseUrl)
+        } else {
+            resValue("string", "backend_base_url", "")
+        }
     }
 
     buildTypes {
@@ -29,16 +61,22 @@ android {
             )
         }
     }
+
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17  // Updated for Kotlin 2.1.0
+        targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"  // Updated
     }
+
     buildFeatures {
         compose = true
     }
+
+
+    // Remove composeOptions - handled by kotlin-compose plugin now
 }
 
 dependencies {
@@ -50,6 +88,43 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.navigation.compose)
+
+    implementation(libs.play.services.auth)
+
+    // Hilt
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+
+    // Networking & JSON
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.gson)
+    implementation(libs.okhttp.logging)
+
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
+    // Direct coordinate fallback to ensure Tasks.await is available
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // Secure storage
+    implementation(libs.androidx.security.crypto)
+
+    // Splashscreen
+    implementation(libs.core.splashscreen)
+
+    // DataStore
+    implementation(libs.datastore.preferences)
+
+    // Google Fonts
+    implementation(libs.google.fonts.compose)
+
+    // Hilt Navigation Compose
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

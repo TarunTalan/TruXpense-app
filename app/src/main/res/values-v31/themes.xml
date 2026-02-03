@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Splash theme for Android 12+ (API 31+) -->
+    <style name="Theme.TruXpense.Splash" parent="Theme.TruXpense">
+        <item name="android:windowBackground">?android:colorBackground</item>
+        <item name="android:windowSplashScreenBackground">@color/white</item>
+        <!-- use a transparent small drawable so the system splash doesn't show the app logo prominently -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/transparent_splash_icon</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/white</item>
+    </style>
+
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.TruXpense" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/black</item>
+    </style>
+
+    <!-- Splash launch theme (dark) shown by the system before Compose loads -->
+    <style name="Theme.TruXpense.Splash" parent="Theme.TruXpense">
+        <item name="android:windowBackground">@color/black</item>
+    </style>
+
+</resources>
