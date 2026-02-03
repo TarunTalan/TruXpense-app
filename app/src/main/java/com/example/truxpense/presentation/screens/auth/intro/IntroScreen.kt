@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.auth.intro
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -81,8 +82,14 @@ fun IntroScreen(
     val intentSenderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
         onResult = { result ->
-            // forward the resulting Intent to ViewModel for processing
-            viewModel.handleOneTapResult(context, result.data)
+            // If user completed flow successfully, forward the resulting Intent to ViewModel.
+            if (result.resultCode == Activity.RESULT_OK) {
+                viewModel.handleOneTapResult(context, result.data)
+            } else {
+                // User cancelled or closed the One Tap UI — clear pending intent and stop loading without error
+                viewModel.cancelOneTapSignIn()
+            }
+            // Clear the pending intent in all cases
             viewModel.clearSignInIntentSender()
         }
     )

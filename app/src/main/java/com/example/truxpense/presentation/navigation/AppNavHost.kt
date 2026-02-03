@@ -16,7 +16,6 @@ import com.example.truxpense.presentation.screens.auth.login.LoginScreen
 import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
 import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
 import com.example.truxpense.presentation.screens.home.HomeScreen
-import com.example.truxpense.presentation.screens.onboarding.complete.CompleteSetupScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.presentation.screens.onboarding.loading.LoadingScreen
@@ -287,22 +286,7 @@ fun AppNavHost(
 
                 LoadingScreen(
                     onFinished = {
-                        // Save onboarding step before navigating
-                        splashViewModel.saveOnboardingStep("complete_setup")
-                        navController.safeNavigate(Screen.CompleteSetup)
-                    }
-                )
-            }
-        }
-
-        // ==================== COMPLETE SETUP SCREEN ====================
-        composable(Screen.CompleteSetup) {
-            Box(modifier = Modifier.padding(contentPadding)) {
-                val splashViewModel: SplashViewModel = hiltViewModel()
-
-                CompleteSetupScreen(
-                    onFinished = {
-                        // Mark onboarding as complete and clear the step
+                        // Mark onboarding as complete and navigate to Home
                         splashViewModel.markOnboardingComplete()
                         navController.safeNavigate(Screen.Home) {
                             popUpTo(Screen.Splash) { inclusive = true }
@@ -344,7 +328,7 @@ fun determineAppStage(
         // Fully onboarded user
         onboardingComplete -> AppStage.HOME
 
-        // If any onboarding step is saved (username/currency/sms/loading/complete_setup), remain in onboarding
+        // If any onboarding step is saved (username/currency/sms/loading), remain in onboarding
         !onboardingStep.isNullOrBlank() && onboardingStep != "completed" -> AppStage.ONBOARDING
 
         // User started signup or has token but no username
@@ -368,33 +352,11 @@ fun determineOnboardingScreen(
     username: String?
 ): String {
     return when (onboardingStep) {
-        "username" -> {
-            Screen.Username
-        }
-
-        "currency" -> {
-            Screen.Currency
-        }
-
-        "sms_permission", "loading", "complete_setup" -> {
-            Screen.Home
-        }
-
-        "completed" -> {
-            // Onboarding was completed, go to home
-            Screen.Home
-        }
-
-        else -> {
-            // No saved step or unknown step - start from beginning
-            // Also restart if username is blank (safety check)
-            if (username.isNullOrBlank()) {
-                Screen.Username
-            } else {
-                // Username exists but step is unclear, resume at currency
-                Screen.Currency
-            }
-        }
+        "username" -> Screen.Username
+        "currency" -> Screen.Currency
+        // If user had reached SMS permission or loading, resume to Home
+        "sms_permission", "loading" -> Screen.Home
+        else -> if (username.isNullOrBlank()) Screen.Username else Screen.Currency
     }
 }
 

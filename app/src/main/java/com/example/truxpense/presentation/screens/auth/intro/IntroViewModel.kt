@@ -70,6 +70,11 @@ class IntroViewModel @Inject constructor(
         _state.value = _state.value.copy(signInIntentSender = null)
     }
 
+    // New: cancel One Tap (user cancelled the flow) — clear sender and stop loading without setting an error
+    fun cancelOneTapSignIn() {
+        _state.value = _state.value.copy(signInIntentSender = null, isLoading = false)
+    }
+
     // Clear any error shown in the UI (used after showing a toast)
     fun clearError() {
         _state.value = _state.value.copy(error = null)

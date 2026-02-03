@@ -66,7 +66,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             TruXpenseTheme(darkTheme = isSystemInDarkTheme()) {
                 val navController = rememberNavController()
-                Scaffold(modifier = androidx.compose.ui.Modifier.fillMaxSize()) { innerPadding: PaddingValues ->
+                Scaffold(
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background
+                ) { innerPadding: PaddingValues ->
                     val layoutDirection = LocalLayoutDirection.current
 
                     val contentPadding = PaddingValues(
