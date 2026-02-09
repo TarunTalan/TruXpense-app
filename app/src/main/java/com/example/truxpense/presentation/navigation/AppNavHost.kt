@@ -28,9 +28,9 @@ import kotlinx.coroutines.flow.first
 // App lifecycle stages used by splash routing
 // Make public for use in SplashNavigator
 enum class AppStage {
-    AUTH,        // User needs to login/signup
-    ONBOARDING,  // User authenticated but needs to complete onboarding
-    HOME         // User fully onboarded, go to home
+    AUTH,
+    ONBOARDING,
+    HOME
 }
 
 @Composable
@@ -62,14 +62,16 @@ fun AppNavHost(
                 // Handle navigation from IntroViewModel (OAuth flows)
                 LaunchedEffect(introState.navigateToHome, introState.navigateToUsername) {
                     when {
-                        introState.navigateToHome -> {
-                            navController.safeNavigate(Screen.Home) {
+                        introState.navigateToUsername -> {
+                            // New Google user or user needing onboarding -> go to username screen
+                            navController.safeNavigate(Screen.Username) {
                                 popUpTo(Screen.Splash) { inclusive = true }
                             }
                         }
 
-                        introState.navigateToUsername -> {
-                            navController.safeNavigate(Screen.Username) {
+                        introState.navigateToHome -> {
+                            // Existing Google user with complete profile -> go directly to Home
+                            navController.safeNavigate(Screen.Home) {
                                 popUpTo(Screen.Splash) { inclusive = true }
                             }
                         }
@@ -164,7 +166,16 @@ fun AppNavHost(
                 LaunchedEffect(otpVerifiedTrigger) {
                     if (!otpVerifiedTrigger) return@LaunchedEffect
 
-                    val destination = determinePostOtpDestination(splashViewModel)
+                    val destination = when (authContext.flow) {
+                        AuthFlowType.SIGNUP -> {
+                            // After signup OTP, always go into onboarding username screen
+                            Screen.Username
+                        }
+                        AuthFlowType.LOGIN, null -> {
+                            // For login (or unknown), preserve existing behavior based on username
+                            determinePostOtpDestination(splashViewModel)
+                        }
+                    }
 
                     navController.safeNavigate(destination) {
                         popUpTo(Screen.Splash) { inclusive = true }

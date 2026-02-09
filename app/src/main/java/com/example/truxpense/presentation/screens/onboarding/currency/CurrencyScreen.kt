@@ -220,16 +220,18 @@ private fun CurrencyScreenInner(
                         }
                     } else {
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium)
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(MaterialTheme.shapes.medium)
                                 .padding(horizontal = 8.dp, vertical = 12.dp)
                         ) {
-                            // Compute preferred codes: device locale currency and USD
+                            // Compute preferred codes: device locale currency, USD, and INR
                             val deviceCurrencyCode = try {
                                 Currency.getInstance(Locale.getDefault()).currencyCode
                             } catch (_: Exception) {
                                 null
                             }
-                            val preferredCodes = listOfNotNull(deviceCurrencyCode, "USD").distinct()
+                            val preferredCodes = listOfNotNull(deviceCurrencyCode, "USD", "INR").distinct()
 
                             itemsIndexed(filtered) { index, item ->
                                 val isPressed = pressedCode == item.code
