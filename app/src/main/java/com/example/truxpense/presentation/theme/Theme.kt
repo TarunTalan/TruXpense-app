@@ -22,7 +22,10 @@ private val DarkColorScheme = darkColorScheme(
     error = Color(rgb(224, 122, 122)),
     outline = Color(rgb(110, 119, 129,)),
     onPrimaryContainer = Color(rgb(110, 119, 129)),
-    primaryContainer = Color(rgb(58, 63, 69,))
+    primaryContainer = Color(rgb(58, 63, 69,)),
+    surfaceVariant = Color(rgb(179, 116, 26, )),
+    surfaceContainer = Color(rgb(58, 63, 69,)),
+    onSurfaceVariant = Color(rgb(217, 222, 227)),
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -39,7 +42,10 @@ private val LightColorScheme = lightColorScheme(
     error = Color(rgb(214, 69, 69)),
     outline = Color(rgb(154, 163, 171)),
     onPrimaryContainer = Color(rgb(255, 255, 255,)),
-    primaryContainer = Color(rgb(238, 241, 243,))
+    primaryContainer = Color(rgb(238, 241, 243,)),
+    surfaceVariant = Color(rgb(255, 244, 229, )),
+    surfaceContainer = Color(rgb(247, 249, 250)),
+    onSurfaceVariant = Color(rgb(110, 119, 129)),
 
 )
 
