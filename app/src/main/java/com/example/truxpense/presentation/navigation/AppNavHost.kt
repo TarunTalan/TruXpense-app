@@ -15,7 +15,7 @@ import com.example.truxpense.presentation.screens.auth.intro.IntroViewModel
 import com.example.truxpense.presentation.screens.auth.login.LoginScreen
 import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
 import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
-import com.example.truxpense.presentation.screens.home.HomeScreen
+import com.example.truxpense.presentation.screens.dashboard.home.HomeScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.presentation.screens.onboarding.loading.LoadingScreen
@@ -37,7 +37,7 @@ enum class AppStage {
 fun AppNavHost(
     navController: NavHostController,
     startDestination: String = Screen.Splash,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
     onSplashEnter: () -> Unit = {}
 ) {
     NavHost(
@@ -164,7 +164,10 @@ fun AppNavHost(
                 LaunchedEffect(otpVerifiedTrigger) {
                     if (!otpVerifiedTrigger) return@LaunchedEffect
 
-                    val destination = determinePostOtpDestination(splashViewModel)
+                    val destination = determinePostOtpDestination(
+                        splashViewModel = splashViewModel,
+                        authFlow = authContext.flow
+                    )
 
                     navController.safeNavigate(destination) {
                         popUpTo(Screen.Splash) { inclusive = true }
@@ -298,7 +301,7 @@ fun AppNavHost(
 
         // ==================== HOME SCREEN ====================
         composable(Screen.Home) {
-            Box(modifier = Modifier.padding(contentPadding)) {
+            Box(modifier = Modifier.padding(horizontal = 6.dp)) {
                 HomeScreen(
                     onLogout = {
                         navController.safeNavigate(Screen.Intro) {
@@ -395,23 +398,33 @@ private fun retrieveAuthContext(navController: NavHostController): AuthContext {
     return AuthContext(email, flow)
 }
 
-/**
+/*
  * Determine destination after OTP verification
+ * For SIGNUP: Always navigate to Username screen (whether username exists or not)
+ * For LOGIN: Check onboarding completion and navigate accordingly
  */
 private suspend fun determinePostOtpDestination(
-    splashViewModel: SplashViewModel
+    splashViewModel: SplashViewModel,
+    authFlow: AuthFlowType?
 ): String {
-    val persistedUsername = try {
-        splashViewModel.username.first()
-    } catch (_: Exception) {
-        null
+    // For signup, always go to Username screen
+    if (authFlow == AuthFlowType.SIGNUP) {
+        return Screen.Username
     }
 
-    return if (!persistedUsername.isNullOrBlank()) {
-        Screen.Home
-    } else {
-        Screen.Username
+    // For login, check onboarding completion
+    val onboardingComplete = try {
+        splashViewModel.onboardingComplete.first()
+    } catch (_: Exception) {
+        false
     }
+
+    if (onboardingComplete) {
+        return Screen.Home
+    }
+
+    // If onboarding not complete, resume from Username screen
+    return Screen.Username
 }
 
 /**

@@ -20,6 +20,7 @@ navigationCompose = "2.8.5"
 datastore = "1.1.1"
 coreSplash = "1.2.0"
 hiltNavigationCompose = "1.2.0"
+uiGraphics = "1.10.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -52,6 +53,7 @@ datastore-preferences = { group = "androidx.datastore", name = "datastore-prefer
 google-fonts-compose = { group = "androidx.compose.ui", name = "ui-text-google-fonts", version = "1.7.5" }
 core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplash" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

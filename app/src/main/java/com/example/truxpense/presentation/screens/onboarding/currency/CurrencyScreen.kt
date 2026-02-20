@@ -59,7 +59,7 @@ fun CurrencyScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp, end = 8.dp),
+                    .padding(top = 20.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -119,7 +119,7 @@ private fun CurrencyScreenInner(
 
     fun String.normalize(): String = Normalizer.normalize(this, Normalizer.Form.NFKD)
         .replace(Regex("\\p{M}+"), "")
-        .lowercase(Locale.getDefault())
+        .lowercase(Locale.ROOT)
 
     val filtered = remember(query, available) {
         val q = query.trim()
@@ -223,13 +223,8 @@ private fun CurrencyScreenInner(
                             modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium)
                                 .padding(horizontal = 8.dp, vertical = 12.dp)
                         ) {
-                            // Compute preferred codes: device locale currency and USD
-                            val deviceCurrencyCode = try {
-                                Currency.getInstance(Locale.getDefault()).currencyCode
-                            } catch (_: Exception) {
-                                null
-                            }
-                            val preferredCodes = listOfNotNull(deviceCurrencyCode, "USD").distinct()
+                            // Preferred codes: always show INR then USD at the top
+                            val preferredCodes = listOf("INR", "USD").distinct()
 
                             itemsIndexed(filtered) { index, item ->
                                 val isPressed = pressedCode == item.code

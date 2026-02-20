@@ -101,7 +101,7 @@ class IntroViewModel @Inject constructor(
                     val resp = result.getOrNull()!!
                     // wait for token to be persisted
                     try {
-                        if (!resp.accessToken.isNullOrBlank()) {
+                        if (resp.accessToken.isNotBlank()) {
                             prefs.accessToken.first { it == resp.accessToken }
                         } else {
                             prefs.accessToken.first { !it.isNullOrBlank() }
@@ -113,7 +113,7 @@ class IntroViewModel @Inject constructor(
                         // New user -> go to onboarding/username flow. If server already returned a username,
                         // persist it so onboarding can prefill the username field.
                         try {
-                            val uname = resp.user?.username
+                            val uname = resp.user.username
                             if (!uname.isNullOrBlank()) {
                                 prefs.saveUsername(uname)
                             }
@@ -123,15 +123,29 @@ class IntroViewModel @Inject constructor(
                         _state.value = _state.value.copy(navigateToUsername = true, authToken = resp.accessToken)
 
                     } else {
-                        // Existing user -> navigate directly to home
+                        // Existing user -> check if onboarding is complete
                         try {
-                            val uname = resp.user?.username
+                            val uname = resp.user.username
                             if (!uname.isNullOrBlank()) {
                                 prefs.saveUsername(uname)
                             }
                         } catch (_: Exception) { }
 
-                        _state.value = _state.value.copy(navigateToHome = true, authToken = resp.accessToken)
+                        // Check onboarding completion status
+                        val onboardingComplete = try {
+                            prefs.onboardingComplete.first()
+                        } catch (_: Exception) {
+                            false
+                        }
+
+                        if (onboardingComplete) {
+                            // Onboarding complete -> go to home
+                            _state.value = _state.value.copy(navigateToHome = true, authToken = resp.accessToken)
+                        } else {
+                            // Onboarding not complete -> continue onboarding flow
+                            // Username already saved from server, so go to Currency screen
+                            _state.value = _state.value.copy(navigateToUsername = true, authToken = resp.accessToken)
+                        }
                     }
 
                 } else {

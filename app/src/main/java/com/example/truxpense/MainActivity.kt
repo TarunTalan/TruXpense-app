@@ -10,10 +10,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -66,34 +65,38 @@ class MainActivity : ComponentActivity() {
         setContent {
             TruXpenseTheme(darkTheme = isSystemInDarkTheme()) {
                 val navController = rememberNavController()
+
                 Scaffold(
                     modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.background
                 ) { innerPadding: PaddingValues ->
                     val layoutDirection = LocalLayoutDirection.current
 
                     val contentPadding = PaddingValues(
-                        start = innerPadding.calculateLeftPadding(layoutDirection) + 10.dp,
-                        top = 10.dp ,
-                        end = innerPadding.calculateRightPadding(layoutDirection) + 10.dp,
+                        start = innerPadding.calculateLeftPadding(layoutDirection) + 16.dp,
+                        top = 10.dp,
+                        end = innerPadding.calculateRightPadding(layoutDirection) + 16.dp,
                         bottom = innerPadding.calculateBottomPadding() + 10.dp
                     )
 
-                    Box(modifier = androidx.compose.ui.Modifier.padding(contentPadding)) {
-                        // Observe logout events; on logout navigate to Intro screen and clear backstack
-                        LaunchedEffect(sessionManager) {
-                            sessionManager.logoutEvents.collect {
-                                navController.safeNavigate(Screen.Intro) {
-                                    popUpTo(Screen.Splash) { inclusive = true }
-                                }
+                    // Observe logout events; on logout navigate to Intro screen and clear backstack
+                    LaunchedEffect(sessionManager) {
+                        sessionManager.logoutEvents.collect {
+                            navController.safeNavigate(Screen.Intro) {
+                                popUpTo(Screen.Splash) { inclusive = true }
                             }
                         }
+                    }
 
-                        AppNavHost(navController = navController, startDestination = Screen.Splash, contentPadding = contentPadding, onSplashEnter = {
+                    AppNavHost(
+                        navController = navController,
+                        startDestination = Screen.Splash,
+                        contentPadding = contentPadding,
+                        onSplashEnter = {
                             Log.d("MainActivity", "onSplashEnter received — dismissing system splash")
                             keepSplashOn = false
-                        })
-                    }
+                        }
+                    )
                 }
             }
         }

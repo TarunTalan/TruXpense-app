@@ -204,11 +204,12 @@ private fun IntroPageContent(
         // We modulate the animation amplitude by how centered the page is (so offscreen pages don't animate strongly).
         val visibilityFactor = (1f - clamped).coerceAtLeast(0f).coerceAtMost(1f)
         val infiniteTransition = rememberInfiniteTransition()
+        // Reduced amplitude for a more subtle vertical motion (was ±8f).
         val bobDp by infiniteTransition.animateFloat(
-            initialValue = -8f,
-            targetValue = 8f,
+            initialValue = -4f,
+            targetValue = 4f,
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+                animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             )
         )
