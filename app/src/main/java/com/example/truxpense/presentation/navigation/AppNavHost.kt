@@ -2,6 +2,7 @@ package com.example.truxpense.presentation.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,6 +16,8 @@ import com.example.truxpense.presentation.screens.auth.intro.IntroViewModel
 import com.example.truxpense.presentation.screens.auth.login.LoginScreen
 import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
 import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
+import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreen
+import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
 import com.example.truxpense.presentation.screens.dashboard.home.HomeScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
@@ -301,13 +304,32 @@ fun AppNavHost(
 
         // ==================== HOME SCREEN ====================
         composable(Screen.Home) {
-            Box(modifier = Modifier.padding(horizontal = 6.dp)) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 HomeScreen(
                     onLogout = {
                         navController.safeNavigate(Screen.Intro) {
                             popUpTo(Screen.Home) { inclusive = true }
                         }
-                    }
+                    },
+                    onNavigateToAddExpense = { navController.safeNavigate(Screen.AddExpense) },
+                    onNavigateToAddBudget = { navController.safeNavigate(Screen.AddBudget) }
+                )
+            }
+        }
+
+        // ==================== ADD EXPENSE SCREEN ====================
+        composable(Screen.AddExpense) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AddExpenseScreen(onBack = { navController.popBackStack() }, onSave = { navController.popBackStack() }, onCancel = { navController.popBackStack() })
+            }
+        }
+
+        // ==================== ADD BUDGET SCREEN ====================
+        composable(Screen.AddBudget) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AddBudgetScreen(
+                    onBack = { navController.popBackStack() },
+                    onSave = { navController.popBackStack() }
                 )
             }
         }
