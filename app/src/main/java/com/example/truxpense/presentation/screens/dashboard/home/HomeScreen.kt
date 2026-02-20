@@ -10,7 +10,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -40,11 +39,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetsEmptyScreen
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onLogout: (() -> Unit)? = null) {
+fun HomeScreen(
+    onLogout: (() -> Unit)? = null,
+    onNavigateToAddExpense: (() -> Unit)? = null,
+    onNavigateToAddBudget: (() -> Unit)? = null
+) {
     val vm = hiltViewModel<HomeViewModel>()
     val username by vm.username.collectAsState(initial = null)
 
@@ -60,6 +65,7 @@ fun HomeScreen(onLogout: (() -> Unit)? = null) {
         topBar = {
             DashboardTopBar(username = username)
         },
+        // No scaffold-level FAB: HomeTabScreenContent supplies a styled FAB so remove duplicate
         bottomBar = {
             DashboardBottomBar(
                 items = items,
@@ -90,14 +96,14 @@ fun HomeScreen(onLogout: (() -> Unit)? = null) {
                     username = username,
                     vm = vm,
                     onLogout = onLogout,
-                    onAddExpense = { vm.setExpenseCount(vm.expenseCount.value + 1) }
+                    onAddExpense = { onNavigateToAddExpense?.invoke() }
                 )
             }
             composable(BottomNavBarMenu.Transactions.route) {
                 TransactionsTab()
             }
             composable(BottomNavBarMenu.Budget.route) {
-                BudgetTab()
+                BudgetTab(onNavigateToAddBudget = { onNavigateToAddBudget?.invoke() })
             }
             composable(BottomNavBarMenu.Analytics.route) {
                 AnalyticsTab()
@@ -234,6 +240,12 @@ fun SmsPermissionBanner(
     var showRationaleDialog by remember { mutableStateOf(false) }
     var showPermanentlyDeniedDialog by remember { mutableStateOf(false) }
 
+    // Dialog close helpers (avoids inline state assignments which some analyzers flag)
+    fun closeRationale() { showRationaleDialog = false }
+    fun openRationale() { showRationaleDialog = true }
+    fun closePermanentlyDenied() { showPermanentlyDeniedDialog = false }
+    fun openPermanentlyDenied() { showPermanentlyDeniedDialog = true }
+
     val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted ->
         if (granted) {
             onGranted?.invoke()
@@ -241,9 +253,9 @@ fun SmsPermissionBanner(
             val shouldShowRationale =
                 activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, permission) } ?: false
             if (shouldShowRationale) {
-                showRationaleDialog = true
+                openRationale()
             } else {
-                showPermanentlyDeniedDialog = true
+                openPermanentlyDenied()
             }
         }
     }
@@ -321,29 +333,29 @@ fun SmsPermissionBanner(
 
     if (showRationaleDialog) {
         AlertDialog(
-            onDismissRequest = { showRationaleDialog = false },
+            onDismissRequest = { closeRationale() },
             title = { Text("Why we need SMS access") },
             text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.") },
             confirmButton = {
                 Button(onClick = {
-                    showRationaleDialog = false
+                    closeRationale()
                     permissionLauncher.launch(permission)
                 }) { Text("Grant") }
             },
             dismissButton = {
-                TextButton(onClick = { showRationaleDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { closeRationale() }) { Text("Cancel") }
             }
         )
     }
 
     if (showPermanentlyDeniedDialog) {
         AlertDialog(
-            onDismissRequest = { showPermanentlyDeniedDialog = false },
+            onDismissRequest = { closePermanentlyDenied() },
             title = { Text("Permission blocked") },
             text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.") },
             confirmButton = {
                 Button(onClick = {
-                    showPermanentlyDeniedDialog = false
+                    closePermanentlyDenied()
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", context.packageName, null)
                     }
@@ -351,7 +363,7 @@ fun SmsPermissionBanner(
                 }) { Text("Open settings") }
             },
             dismissButton = {
-                TextButton(onClick = { showPermanentlyDeniedDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { closePermanentlyDenied() }) { Text("Cancel") }
             }
         )
     }
@@ -385,24 +397,30 @@ private fun TransactionsTab() {
 }
 
 @Composable
-private fun BudgetTab() {
-    Box(
+private fun BudgetTab(onNavigateToAddBudget: (() -> Unit)? = null) {
+    val vm: BudgetViewModel = hiltViewModel()
+    val budgets by vm.budgets.collectAsState()
+
+    if (budgets.isEmpty()) {
+        BudgetsEmptyScreen(onAddBudget = { onNavigateToAddBudget?.invoke() })
+        return
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
+        verticalArrangement = Arrangement.Top
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Budget",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Set and track your budgets here",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Text(text = "Budgets", style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(12.dp))
+        budgets.forEach { b ->
+            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), colors = CardDefaults.cardColors()) {
+                Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = b.category, style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "₹${b.amount}", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }

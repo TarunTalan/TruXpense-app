@@ -617,7 +617,7 @@ fun HomeTabScreenContent(
                 .padding(20.dp),
             shape = MaterialTheme.shapes.medium,
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            contentColor = MaterialTheme.colorScheme.background
         ) {
             Icon(Icons.Default.Add, contentDescription = "Add expense")
         }
