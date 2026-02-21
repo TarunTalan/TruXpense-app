@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,46 +34,36 @@ fun AddBudgetScreen(
     onBack: () -> Unit = {},
     onSave: () -> Unit = {},
 ) {
-    // Use BudgetViewModel for categories and addBudget
-    val vm: BudgetViewModel = hiltViewModel()
-    val categories by vm.categories.collectAsState()
+    // Reusable top bar with a back button so other screens can use same styling
+    @Composable
+    fun ScreenTopBarWithBack(title: String, onBack: () -> Unit) {
+        TopAppBar(
+            title = { Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground) },
+            navigationIcon = {
+                IconButton(onClick = { onBack() }) {
+                    Icon(painterResource(id = R.drawable.back_icon), contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onBackground
+            )
+        )
+    }
 
-    var amountInput by remember { mutableStateOf("") }
-    var query by remember { mutableStateOf("") }
+    val vm: AddBudgetViewModel = hiltViewModel()
+    val categories by vm.categories.collectAsState()
+    val amountInput by vm.amountInput.collectAsState()
+    val query by vm.query.collectAsState()
     var expanded by remember { mutableStateOf(false) }
     var pressedItem by remember { mutableStateOf<String?>(null) }
-    var selected by remember { mutableStateOf<String?>(null) }
+    val selected by vm.selectedCategory.collectAsState()
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Add Expense", style = TextStyle(
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 16.sp
-                        )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { onBack() }) {
-                        Icon(
-                            painterResource(id = R.drawable.back_icon),
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
-            )
-        },
+        topBar = { ScreenTopBarWithBack(title = "Add Budget", onBack = onBack) },
         bottomBar = {
             if (!expanded) {
                 Column(
@@ -85,10 +74,7 @@ fun AddBudgetScreen(
 
                     Button(
                         onClick = {
-                            val cat = selected ?: return@Button
-                            val amt = amountInput.toDoubleOrNull() ?: 0.0
-                            vm.addBudget(cat, amt)
-                            onSave()
+                            vm.createBudget(onSave)
                         },
                         enabled = formValid,
                         modifier = Modifier
@@ -97,7 +83,8 @@ fun AddBudgetScreen(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(0.5f)
+                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(0.5f),
+                            disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(0.4f)
                         )
                     ) {
                         Text(
@@ -156,8 +143,8 @@ fun AddBudgetScreen(
                             error = null,
                             value = query.ifEmpty { selected ?: "" },
                             onValueChange = { v ->
-                                selected = null
-                                query = v
+                                vm.setSelected(null)
+                                vm.setQuery(v)
                                 expanded = true
                             },
                             contentPadding = 12,
@@ -249,8 +236,8 @@ fun AddBudgetScreen(
                                         .fillMaxWidth()
                                         .clip(MaterialTheme.shapes.medium)
                                         .clickable(enabled = true, onClickLabel = null, role = null) {
-                                            selected = item
-                                            query = item
+                                            vm.setSelected(item)
+                                            vm.setQuery(item)
                                             expanded = false
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
@@ -298,7 +285,7 @@ fun AddBudgetScreen(
                         // Amount text field (reused component extracted from this screen)
                         NumberField(
                             value = amountInput,
-                            onValueChange = { amountInput = it },
+                            onValueChange = { vm.setAmountInput(it) },
                             leadingIcon = {
                                 Text(
                                     text = "₹",
@@ -307,7 +294,8 @@ fun AddBudgetScreen(
                                 )
                             },
                             placeholder = "0",
-                            borderColor = MaterialTheme.colorScheme.onSecondary,
+                            bgColor = MaterialTheme.colorScheme.background,
+                            contentPadding = 12,
                             modifier = Modifier.fillMaxWidth()
                         )
 
@@ -369,7 +357,6 @@ private fun SectionCard(
     }
 }
 
-// ── Preview ───────────────────────────────────────────────────────────────────
 @Preview(
     showBackground = true,
     widthDp = 360,

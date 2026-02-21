@@ -18,6 +18,8 @@ import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
 import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
 import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategory
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.home.HomeScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
@@ -312,7 +314,14 @@ fun AppNavHost(
                         }
                     },
                     onNavigateToAddExpense = { navController.safeNavigate(Screen.AddExpense) },
-                    onNavigateToAddBudget = { navController.safeNavigate(Screen.AddBudget) }
+                    onNavigateToAddBudget = { navController.safeNavigate(Screen.AddBudget) },
+                    onNavigateToBudgetDetail = { selectedCat: BudgetCategory ->
+                        // store selected budget details on the current backStackEntry so BudgetDetail can read them
+                        navController.currentBackStackEntry?.savedStateHandle?.set("selected_budget_name", selectedCat.name)
+                        navController.currentBackStackEntry?.savedStateHandle?.set("selected_budget_limit", selectedCat.total.toDouble())
+                        navController.currentBackStackEntry?.savedStateHandle?.set("selected_budget_spent", selectedCat.spent.toDouble())
+                        navController.safeNavigate(Screen.BudgetDetail)
+                    }
                 )
             }
         }
@@ -330,6 +339,30 @@ fun AppNavHost(
                 AddBudgetScreen(
                     onBack = { navController.popBackStack() },
                     onSave = { navController.popBackStack() }
+                )
+            }
+        }
+
+        // ==================== BUDGET DETAIL SCREEN ====================
+        composable(Screen.BudgetDetail) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Read selected budget details from previous backStackEntry SavedStateHandle
+                val prevEntry = navController.previousBackStackEntry
+                val selectedName = prevEntry?.savedStateHandle?.get<String>("selected_budget_name")
+                val selectedLimit = prevEntry?.savedStateHandle?.get<Double>("selected_budget_limit")
+                val selectedSpent = prevEntry?.savedStateHandle?.get<Double>("selected_budget_spent")
+
+                // Remove the temporary keys immediately so the source entry won't pick them up
+                // when we later popBack — this avoids brief UI changes on return.
+                prevEntry?.savedStateHandle?.remove<String>("selected_budget_name")
+                prevEntry?.savedStateHandle?.remove<Double>("selected_budget_limit")
+                prevEntry?.savedStateHandle?.remove<Double>("selected_budget_spent")
+
+                BudgetDetailScreen(
+                    budgetName = selectedName ?: "Budget",
+                    monthlyLimit = selectedLimit ?: 0.0,
+                    spent = selectedSpent ?: 0.0,
+                    onBack = { navController.popBackStack() }
                 )
             }
         }

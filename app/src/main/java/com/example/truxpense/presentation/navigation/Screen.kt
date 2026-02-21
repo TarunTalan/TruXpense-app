@@ -13,4 +13,5 @@ object Screen {
     const val Currency = "currency"
     const val AddExpense = "add_expense"
     const val AddBudget = "add_budget"
+    const val BudgetDetail = "budget_detail"
 }

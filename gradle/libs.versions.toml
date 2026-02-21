@@ -13,7 +13,8 @@ retrofit = "2.11.0"
 gson = "2.11.0"
 okhttp = "4.12.0"
 securityCrypto = "1.1.0-alpha06"
-coroutines = "1.10.2"
+# Use 1.7.3 for coroutines across the project to avoid layoutlib ServiceLoader conflicts
+coroutines = "1.7.3"
 coroutinesPlayServices = "1.7.3"
 hilt = "2.54"  # Updated for Kotlin 2.1.0
 navigationCompose = "2.8.5"
@@ -47,7 +48,6 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
-kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
