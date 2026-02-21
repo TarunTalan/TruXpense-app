@@ -1,0 +1,114 @@
+package com.example.truxpense.presentation.screens.dashboard.analytic
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.home.SmsPermissionBanner
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AnalyticsTopBar() {
+    TopAppBar(
+        title = {
+            Text(
+                text     = "Analytics",
+                style    = MaterialTheme.typography.titleLarge,
+                maxLines = 1
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor    = MaterialTheme.colorScheme.background,
+            titleContentColor = MaterialTheme.colorScheme.onBackground
+        )
+    )
+}
+
+@Composable
+fun AnalyticsEmptyScreen(
+    modifier: Modifier = Modifier,
+    onAddExpense: () -> Unit = {},
+    hasSmsPermission: Boolean = true,
+    onSmsGranted: (() -> Unit)? = null
+) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar         = { AnalyticsTopBar() }
+    ) { innerPadding ->
+
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp),
+        ) {
+
+            // ── Centered body ─────────────────────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter            = painterResource(id = R.drawable.analytic_illustration),
+                    contentDescription = "Analytics illustration",
+                    contentScale       = ContentScale.Fit,
+                    modifier           = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.45f)
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text       = "Not enough data yet",
+                    style      = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = MaterialTheme.colorScheme.onBackground,
+                    textAlign  = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    text      = "We'll show you spending insights once we have more transactions. This usually happens after a few days of use.",
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // ── Bottom action ─────────────────────────────────────────────
+            OutlinedButton(
+                onClick  = onAddExpense,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape    = MaterialTheme.shapes.medium
+            ) {
+                Text("+ Add transaction")
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+fun AnalyticsEmptyScreenPreview() {
+    MaterialTheme {
+        AnalyticsEmptyScreen(hasSmsPermission = false)
+    }
+}

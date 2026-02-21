@@ -85,6 +85,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // Sample UI lists (replace with real data later) — expose as StateFlows
+    private val _topCategories = MutableStateFlow(listOf(
+        HomeSpendingCategory("Food", 2400.0, 0.72f),
+        HomeSpendingCategory("Clothes", 4500.0, 0.45f)
+    ))
+    val topCategories: StateFlow<List<HomeSpendingCategory>> = _topCategories
+
+    private val _recentTx = MutableStateFlow(listOf(
+        HomeTransactionItem("1", "Grocery at BigMart", "Food", 540.0, "INR"),
+        HomeTransactionItem("2", "Coffee", "Food", 120.0, "INR"),
+        HomeTransactionItem("3", "Electricity Bill", "Bills", 2400.0, "INR")
+    ))
+    val recentTransactions: StateFlow<List<HomeTransactionItem>> = _recentTx
+
     fun logout(onComplete: (() -> Unit)? = null) {
         viewModelScope.launch {
             try {

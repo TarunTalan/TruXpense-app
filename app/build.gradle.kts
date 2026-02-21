@@ -8,6 +8,14 @@ plugins {
     alias(libs.plugins.kotlin.kapt)
 }
 
+// Force consistent coroutines version to avoid layoutlib ServiceLoader conflicts
+configurations.all {
+    resolutionStrategy {
+        // Match the play-services coroutines artifact used in the project
+        force("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3", "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    }
+}
+
 android {
     namespace = "com.example.truxpense"
     compileSdk = 36
@@ -75,6 +83,12 @@ android {
         compose = true
     }
 
+    // Exclude kotlinx.coroutines service provider from packaged resources to reduce layoutlib conflicts in preview
+    packaging {
+        resources {
+            excludes += "META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory"
+        }
+    }
 
     // Remove composeOptions - handled by kotlin-compose plugin now
 }
@@ -108,8 +122,7 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.play.services)
-    // Direct coordinate fallback to ensure Tasks.await is available
+    // Use the versioned play-services coroutine artifact only once (direct coordinate kept as fallback)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Secure storage

@@ -2,28 +2,29 @@ package com.example.truxpense.presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
 import android.content.res.Configuration
-
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 
 @Composable
 fun NumberField(
@@ -33,18 +34,26 @@ fun NumberField(
     placeholder: String = "Enter amount",
     leadingSymbol: String = "₹",
     leadingIcon: (@Composable (() -> Unit))? = null,
-    textStyle: TextStyle = TextStyle(
-        color = MaterialTheme.colorScheme.onBackground,
-        fontSize = 15.sp
-    ),
-    backgroundColor: Color = MaterialTheme.colorScheme.background,
+    textStyle: TextStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onBackground),
+    bgColor: Color = MaterialTheme.colorScheme.background,
     borderColor: Color = MaterialTheme.colorScheme.outline,
     focusedBorderColor: Color = MaterialTheme.colorScheme.primary,
-    shape: Shape = RoundedCornerShape(10.dp)
+    shape: Shape = MaterialTheme.shapes.medium,
+    contentPadding: Int = 0,
+    error: String? = null
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocusedState = interactionSource.collectIsFocusedAsState()
-    val isFocused = isFocusedState.value
+    // Use focus change like AuthTextField so border behavior matches exactly
+    var isFocused by remember { mutableStateOf(false) }
+
+    // Choose border color: error has priority, otherwise primary when focused, else provided borderColor
+    val effectiveBorderColor = when {
+        !error.isNullOrEmpty() -> MaterialTheme.colorScheme.error
+        isFocused -> focusedBorderColor
+        else -> borderColor
+    }
+
+    // Border width: make error and focused states more prominent (2.dp), otherwise 1.dp
+    val borderWidth = if (!error.isNullOrEmpty() || isFocused) 2.dp else 1.dp
 
     BasicTextField(
         value = value,
@@ -52,22 +61,24 @@ fun NumberField(
         singleLine = true,
         textStyle = textStyle,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        interactionSource = interactionSource,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) focusedBorderColor else borderColor,
-                shape = shape
-            )
-            .background(backgroundColor, shape)
             .clip(shape)
-            .padding(8.dp),
+            .background(bgColor)
+            .onFocusChanged { isFocused = it.isFocused }
+            .border(
+                width = borderWidth,
+                color = effectiveBorderColor,
+                shape = shape
+            ),
         decorationBox = { innerTextField ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = contentPadding.dp)
             ) {
                 if (leadingIcon != null) {
                     leadingIcon()
@@ -75,7 +86,9 @@ fun NumberField(
                     Text(
                         text = leadingSymbol,
                         color = if (value.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onBackground,
-                        fontSize = 15.sp
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = if (value.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onBackground
+                        )
                     )
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -83,8 +96,10 @@ fun NumberField(
                     if (value.isEmpty()) {
                         Text(
                             text = placeholder,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 15.sp
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier
                         )
                     }
                     innerTextField()
@@ -111,5 +126,35 @@ fun NumberFieldPreviewDark() {
         NumberField(value = "", onValueChange = {})
         Spacer(Modifier.height(12.dp))
         NumberField(value = "123456", onValueChange = {}, leadingIcon = { Text(text = "₹") })
+    }
+}
+
+@Preview(showBackground = true, widthDp = 720, name = "Field Comparison")
+@Composable
+fun FieldComparisonPreview() {
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text(text = "AuthTextField", modifier = Modifier.padding(bottom = 4.dp))
+        AuthTextField(
+            bgColor = MaterialTheme.colorScheme.background,
+            label = null,
+            placeholder = "placeholder",
+            error = null,
+            bottomLabel = null,
+            value = "",
+            onValueChange = {},
+            contentPadding = 12,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(text = "NumberField", modifier = Modifier.padding(bottom = 4.dp))
+        NumberField(
+            value = "",
+            onValueChange = {},
+            placeholder = "0",
+            leadingIcon = { Text(text = "₹") },
+            bgColor = MaterialTheme.colorScheme.background,
+            contentPadding = 12,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

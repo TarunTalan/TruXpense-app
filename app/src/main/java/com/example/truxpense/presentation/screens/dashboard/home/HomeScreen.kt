@@ -39,8 +39,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
-import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
-import com.example.truxpense.presentation.screens.dashboard.budget.BudgetsEmptyScreen
+import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsEmptyScreen
+import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsScreen
+import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsViewModel
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategory
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetScreen
+import com.example.truxpense.presentation.screens.dashboard.components.AppTopBar
+import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,7 +53,8 @@ import com.example.truxpense.presentation.screens.dashboard.budget.BudgetsEmptyS
 fun HomeScreen(
     onLogout: (() -> Unit)? = null,
     onNavigateToAddExpense: (() -> Unit)? = null,
-    onNavigateToAddBudget: (() -> Unit)? = null
+    onNavigateToAddBudget: (() -> Unit)? = null,
+    onNavigateToBudgetDetail: ((BudgetCategory) -> Unit)? = null
 ) {
     val vm = hiltViewModel<HomeViewModel>()
     val username by vm.username.collectAsState(initial = null)
@@ -62,9 +68,6 @@ fun HomeScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = {
-            DashboardTopBar(username = username)
-        },
         // No scaffold-level FAB: HomeTabScreenContent supplies a styled FAB so remove duplicate
         bottomBar = {
             DashboardBottomBar(
@@ -103,10 +106,15 @@ fun HomeScreen(
                 TransactionsTab()
             }
             composable(BottomNavBarMenu.Budget.route) {
-                BudgetTab(onNavigateToAddBudget = { onNavigateToAddBudget?.invoke() })
+                BudgetTab(
+                    onNavigateToAddBudget = { onNavigateToAddBudget?.invoke() },
+                    onNavigateToBudgetDetail = { cat: BudgetCategory -> onNavigateToBudgetDetail?.invoke(cat) }
+                )
             }
             composable(BottomNavBarMenu.Analytics.route) {
-                AnalyticsTab()
+                AnalyticsTab(
+                    onAddExpense = { onNavigateToAddExpense?.invoke() }
+                )
             }
             composable(BottomNavBarMenu.Settings.route) {
                 SettingsTab()
@@ -115,45 +123,9 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardTopBar(username: String?) {
-    TopAppBar(
-        title = {
-            Text(
-                text = if (username.isNullOrBlank()) "Hi, there!" else "Hi, $username",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(end = 10.dp)
-            )
-        },
-        actions = {
-            val isDark = isSystemInDarkTheme()
-            IconButton(onClick = { /* TODO: Handle profile click */ }) {
-                Icon(
-                    painter = painterResource(id = if (isDark) R.drawable.profile_dark_icon else R.drawable.profile_icon),
-                    contentDescription = "Profile",
-                    tint = Color.Unspecified
-                )
-            }
-            IconButton(onClick = { /* TODO: Handle notifications click */ }) {
-                Icon(
-                    painter = painterResource(id = R.drawable.notifications_icon),
-                    contentDescription = "Notifications",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground
-        ),
-        windowInsets = WindowInsets.statusBars,
-        modifier = Modifier
-            .fillMaxWidth()
-    )
+    AppTopBar(username = username, showBack = false)
 }
 
 @Composable
@@ -373,102 +345,138 @@ fun SmsPermissionBanner(
 // ==================== TAB SCREENS ====================
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TransactionsTab() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Transactions",
-                style = MaterialTheme.typography.headlineMedium
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text(text = "Transactions") },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "View and manage your transactions here",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
+        )
 
-@Composable
-private fun BudgetTab(onNavigateToAddBudget: (() -> Unit)? = null) {
-    val vm: BudgetViewModel = hiltViewModel()
-    val budgets by vm.budgets.collectAsState()
-
-    if (budgets.isEmpty()) {
-        BudgetsEmptyScreen(onAddBudget = { onNavigateToAddBudget?.invoke() })
-        return
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 10.dp),
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text(text = "Budgets", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(12.dp))
-        budgets.forEach { b ->
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), colors = CardDefaults.cardColors()) {
-                Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = b.category, style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "₹${b.amount}", style = MaterialTheme.typography.bodyMedium)
-                }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Transactions",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "View and manage your transactions here",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AnalyticsTab() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Analytics",
-                style = MaterialTheme.typography.headlineMedium
+private fun BudgetTab(
+    onNavigateToAddBudget: (() -> Unit)? = null,
+    onNavigateToBudgetDetail: ((BudgetCategory) -> Unit)? = null
+) {
+    // Delegate to the repository-backed BudgetScreen (shows only real budgets).
+    BudgetScreen(onAddBudget = { onNavigateToAddBudget?.invoke() }, onNavigateToDetail = { cat -> onNavigateToBudgetDetail?.invoke(cat) })
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AnalyticsTab(
+    onAddExpense: (() -> Unit)? = null
+) {
+    // Collect analytics and transactions state to determine whether to show data
+    val analyticsVm: AnalyticsViewModel = hiltViewModel()
+    val categories by analyticsVm.categories.collectAsState()
+    val totalSpent by analyticsVm.totalSpent.collectAsState()
+    val totalBudget by analyticsVm.totalBudget.collectAsState()
+
+    val homeVm: HomeViewModel = hiltViewModel()
+    val recentTx by homeVm.recentTransactions.collectAsState()
+    val hasSmsPermission by homeVm.hasSmsPermission.collectAsState()
+
+    // Show empty analytics when there are no transactions
+    val hasTransactions = remember(recentTx) { recentTx.isNotEmpty() }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text(text = "Analytics") },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "View your spending analytics here",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            if (!hasTransactions) {
+                AnalyticsEmptyScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    onAddExpense = { onAddExpense?.invoke() },
+                    hasSmsPermission = hasSmsPermission,
+                    onSmsGranted = { homeVm.onSmsPermissionResult(true); homeVm.refreshSmsPermission() }
+                )
+            } else {
+                // Delegate to AnalyticsScreen which will also fallback to sample data for previews
+                AnalyticsScreen(
+                    totalSpent = totalSpent,
+                    totalBudget = totalBudget,
+                    categories = categories
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SettingsTab() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
+private fun EmptyAnalytics() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Settings",
+                text = "No analytics yet",
                 style = MaterialTheme.typography.headlineMedium
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Manage your app settings here",
+                text = "Add budgets or transactions to view analytics",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsTab() {
+    val vm: com.example.truxpense.presentation.screens.dashboard.settings.SettingsViewModel = hiltViewModel()
+    val username by vm.username.collectAsState(initial = null)
+    val smsEnabled by vm.smsEnabled.collectAsState()
+    val notificationsEnabled by vm.notificationsEnabled.collectAsState()
+
+    // Render the SettingsScreen composable and wire events to ViewModel
+    SettingsScreen(
+        username = username ?: "",
+        phone = "",
+        smsEnabled = smsEnabled,
+        notificationsEnabled = notificationsEnabled,
+        onSmsToggle = { enabled -> vm.setSmsEnabled(enabled) },
+        onNotificationsToggle = { enabled -> vm.setNotificationsEnabled(enabled) },
+        onLogout = { vm.logout() }
+    )
 }
 
 @Composable

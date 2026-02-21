@@ -5,11 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,29 +23,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 
 
-private val ColorSurface = Color(0xFF1E2128)
 private val ColorDivider = Color(0xFF2A2E38)
 private val ColorTextPrimary = Color(0xFFF0F2F5)
 private val ColorTextSecondary = Color(0xFF7A8599)
-private val ColorTextMuted = Color(0xFF4A5568)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(
-    amount: String = "₹5000",
-    category: String = "Food",
-    merchant: String = "Swiggy",
-    account: String = "HDFC Bank",
-    notes: String = "",
-    onNotesChange: (String) -> Unit = {},
     onSave: () -> Unit = {},
     onCancel: () -> Unit = {},
     onBack: () -> Unit = {},
     onDatePick: () -> Unit = {},
 ) {
+    val vm: AddExpenseViewModel = hiltViewModel()
+    val amount by vm.amount.collectAsState()
+    val category by vm.category.collectAsState()
+    val merchant by vm.merchant.collectAsState()
+    val account by vm.account.collectAsState()
+    val notes by vm.notes.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -164,7 +165,7 @@ fun AddExpenseScreen(
                 Spacer(Modifier.height(10.dp))
                 BasicTextField(
                     value = notes,
-                    onValueChange = onNotesChange,
+                    onValueChange = { vm.setNotes(it) },
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(
                         color = ColorTextPrimary,
@@ -201,7 +202,7 @@ fun AddExpenseScreen(
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
-                        ) { onSave() }
+                        ) { vm.save(onSave) }
                 ) {
                     Text(
                         text = "Save expense",
