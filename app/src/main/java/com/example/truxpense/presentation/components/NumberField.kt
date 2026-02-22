@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import android.content.res.Configuration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 
@@ -96,7 +97,8 @@ fun NumberField(
                     if (value.isEmpty()) {
                         Text(
                             text = placeholder,
-                            style = MaterialTheme.typography.labelMedium.copy(
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelLarge.copy(
                                 color = MaterialTheme.colorScheme.onSurface
                             ),
                             modifier = Modifier

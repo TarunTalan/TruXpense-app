@@ -65,8 +65,7 @@ val sampleTransactions = listOf(
         account = "HDFC Bank",
         date = "12 Feb 2026",
         time = "8:45 PM"
-    ),
-    BudgetTransaction(
+    ), BudgetTransaction(
         id = "2",
         amount = 450.0,
         type = "Expense",

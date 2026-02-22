@@ -62,7 +62,7 @@ fun SplashNavigator(
                 }
 
                 val destination = when (stage) {
-                    AppStage.HOME -> Screen.Home
+                    AppStage.HOME -> Screen.Dashboard.Root
                     AppStage.ONBOARDING -> determineOnboardingScreen(
                         onboardingStep = onboardingStep,
                         username = username

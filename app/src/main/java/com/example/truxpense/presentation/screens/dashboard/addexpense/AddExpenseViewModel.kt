@@ -3,39 +3,99 @@ package com.example.truxpense.presentation.screens.dashboard.addexpense
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+
 @HiltViewModel
 class AddExpenseViewModel @Inject constructor() : ViewModel() {
-    private val _amount = MutableStateFlow("₹5000")
-    val amount: StateFlow<String> = _amount
 
-    private val _category = MutableStateFlow("Food")
-    val category: StateFlow<String> = _category
+    // ── 1. Raw inputs ─────────────────────────────────────────────────────────
 
-    private val _merchant = MutableStateFlow("Swiggy")
-    val merchant: StateFlow<String> = _merchant
+    /** Digits-only string from the amount field. */
+    private val _rawAmount = MutableStateFlow("")
+    val rawAmount: StateFlow<String> = _rawAmount.asStateFlow()
 
-    private val _account = MutableStateFlow("HDFC Bank")
-    val account: StateFlow<String> = _account
+    private val _merchant = MutableStateFlow("")
+    val merchant: StateFlow<String> = _merchant.asStateFlow()
 
     private val _notes = MutableStateFlow("")
-    val notes: StateFlow<String> = _notes
+    val notes: StateFlow<String> = _notes.asStateFlow()
 
-    fun setNotes(v: String) { _notes.value = v }
-    fun setAmount(v: String) { _amount.value = v }
-    fun setCategory(v: String) { _category.value = v }
-    fun setMerchant(v: String) { _merchant.value = v }
-    fun setAccount(v: String) { _account.value = v }
+    // ── 2. Derived display ────────────────────────────────────────────────────
+
+    /** "₹0", "₹1,200" etc. — composable never formats numbers itself. */
+    val formattedAmount: StateFlow<String> = _rawAmount.map { raw ->
+        val num = raw.toDoubleOrNull()
+        if (num == null || raw.isEmpty()) "₹0"
+        else "₹${"%,.0f".format(num)}"
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "₹0")
+
+    // ── 3. Selections & dropdown open/close ───────────────────────────────────
+
+    val categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Groceries", "Other")
+    val accountList = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI")
+
+    private val _selectedCategory = MutableStateFlow<String?>(null)
+    val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
+
+    private val _categoryExpanded = MutableStateFlow(false)
+    val categoryExpanded: StateFlow<Boolean> = _categoryExpanded.asStateFlow()
+
+    private val _selectedAccount = MutableStateFlow<String?>(null)
+    val selectedAccount: StateFlow<String?> = _selectedAccount.asStateFlow()
+
+    private val _accountExpanded = MutableStateFlow(false)
+    val accountExpanded: StateFlow<Boolean> = _accountExpanded.asStateFlow()
+
+    private val _selectedDate = MutableStateFlow<String?>(null)
+    val selectedDate: StateFlow<String?> = _selectedDate.asStateFlow()
+
+    // ── 4. Form validity ──────────────────────────────────────────────────────
+
+    val isFormValid: StateFlow<Boolean> = combine(_rawAmount, _selectedCategory) { amt, cat ->
+        amt.isNotBlank() && amt.toDoubleOrNull() != null && cat != null
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    fun setRawAmount(v: String) {
+        _rawAmount.value = v.filter { it.isDigit() || it == '.' }
+    }
+
+    fun setMerchant(v: String) {
+        _merchant.value = v
+    }
+
+    fun setNotes(v: String) {
+        _notes.value = v
+    }
+
+    fun selectCategory(cat: String) {
+        _selectedCategory.value = cat; _categoryExpanded.value = false
+    }
+
+    fun setCategoryExpanded(open: Boolean) {
+        _categoryExpanded.value = open
+    }
+
+    fun selectAccount(acc: String) {
+        _selectedAccount.value = acc; _accountExpanded.value = false
+    }
+
+    fun setAccountExpanded(open: Boolean) {
+        _accountExpanded.value = open
+    }
+
+    fun setDate(date: String) {
+        _selectedDate.value = date
+    }
 
     fun save(onSaved: () -> Unit) {
         viewModelScope.launch {
-            // TODO: persist expense via repository
+            // TODO: persist via repository
             onSaved()
         }
     }
 }
-

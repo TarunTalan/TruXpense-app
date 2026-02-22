@@ -4,11 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 // UI model used by Budget screens
 data class BudgetCategory(
-    val id: Int,
-    val name: String,
-    val spent: Int,
-    val total: Int,
-    val barColor: Color
+    val id: Int, val name: String, val spent: Int, val total: Int, val barColor: Color
 )
 
 fun budgetColorForCategory(category: String): Color {
