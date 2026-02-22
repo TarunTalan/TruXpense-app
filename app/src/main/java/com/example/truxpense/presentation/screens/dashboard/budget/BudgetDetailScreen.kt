@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
-import com.example.truxpense.util.progressColor
 import com.example.truxpense.util.currencyFormat
+import com.example.truxpense.util.progressColor
 
 
 // use util currency formatter where needed; keep small helper for previews
@@ -69,62 +69,78 @@ fun BudgetDetailScreen(
     var selectedTab by remember { mutableStateOf(PeriodTab.WEEK) }
 
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = 800),
-        label = "budget_progress"
+        targetValue = progress, animationSpec = tween(durationMillis = 800), label = "budget_progress"
     )
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
+        containerColor = MaterialTheme.colorScheme.background, topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = budgetNameFinal,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
+                Text(
+                    text = budgetNameFinal,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }, navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        painter = painterResource(R.drawable.back_icon),
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
+                }
+            }, actions = {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
                         Icon(
-                            painter = painterResource(R.drawable.back_icon),
-                            contentDescription = "Back",
+                            Icons.Default.MoreVert,
+                            contentDescription = "More options",
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
-                },
-                actions = {
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More options",tint = MaterialTheme.colorScheme.onBackground)
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Edit budget", color = MaterialTheme.colorScheme.onBackground) },
-                                onClick = { menuExpanded = false; onEdit() }
+                    DropdownMenu(
+                        expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            leadingIcon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.edit),
+                                contentDescription = "Edit",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
-                            DropdownMenuItem(
-                                text = { Text("Delete budget", color = MaterialTheme.colorScheme.error) },
-                                onClick = { menuExpanded = false; onDelete() }
+                        },
+                            text = { Text("Edit budget", color = MaterialTheme.colorScheme.onBackground) },
+                            onClick = { menuExpanded = false; onEdit() })
+                        DropdownMenuItem(
+                            leadingIcon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.delete),
+                                contentDescription = "Delete",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.error
                             )
-                            DropdownMenuItem(
-                                text = { Text("Archive budget",color = MaterialTheme.colorScheme.onBackground) },
-                                onClick = { menuExpanded = false; onArchive() }
+                        },
+                            text = { Text("Delete budget", color = MaterialTheme.colorScheme.error) },
+                            onClick = { menuExpanded = false; onDelete() })
+                        DropdownMenuItem(
+                            leadingIcon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.archive),
+                                contentDescription = "Archive",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
-                        }
+                        },
+                            text = { Text("Archive budget", color = MaterialTheme.colorScheme.onBackground) },
+                            onClick = { menuExpanded = false; onArchive() })
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                }
+            }, colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background
             )
-        }
-    ) { innerPadding ->
+            )
+        }) { innerPadding ->
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -132,8 +148,7 @@ fun BudgetDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-
-            // ── Monthly Budget Card ───────────────────────────────────────
+            // Monthly budget card
             item {
                 MonthlyBudgetCard(
                     limit = monthlyLimitFinal,
@@ -144,23 +159,20 @@ fun BudgetDetailScreen(
                 )
             }
 
-            // ── Week / Month toggle ───────────────────────────────────────
+            // Week / Month toggle
             item {
                 PeriodToggle(
-                    selected = selectedTab,
-                    onSelect = { selectedTab = it }
-                )
+                    selected = selectedTab, onSelect = { selectedTab = it })
             }
 
-            // ── Spending trend chart ──────────────────────────────────────
+            // Spending trend chart
             item {
                 SpendingTrendCard(
-                    points = spendPoints,
-                    periodTab = selectedTab
+                    points = spendPoints, periodTab = selectedTab
                 )
             }
 
-            // ── Transactions header ───────────────────────────────────────
+            // Transactions header
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -181,7 +193,7 @@ fun BudgetDetailScreen(
                 }
             }
 
-            // ── Transaction rows ──────────────────────────────────────────
+            // Transaction rows
             items(transactions, key = { it.id }) { tx ->
                 TransactionCard(tx = tx)
             }
@@ -191,23 +203,17 @@ fun BudgetDetailScreen(
     }
 }
 
-// ─── Monthly Budget Card ──────────────────────────────────────────────────────
+// Monthly budget card
 
 @Composable
 private fun MonthlyBudgetCard(
-    limit: Double,
-    spent: Double,
-    left: Double,
-    animatedProgress: Float,
-    progress: Float
+    limit: Double, spent: Double, left: Double, animatedProgress: Float, progress: Float
 ) {
     val barColor = progressColor(progress, MaterialTheme.colorScheme.error)
 
-    // ── Total Budget Card ──────────────────────────────────────────
+    // Total budget card
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -255,35 +261,25 @@ private fun MonthlyBudgetCard(
 
 }
 
-// ─── Period Toggle ────────────────────────────────────────────────────────────
+// Period toggle
 
 @Composable
 private fun PeriodToggle(
-    selected: PeriodTab,
-    onSelect: (PeriodTab) -> Unit
+    selected: PeriodTab, onSelect: (PeriodTab) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .wrapContentWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = Modifier.wrapContentWidth().background(
+                color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(8.dp)
+            ).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         PeriodTab.entries.forEach { tab ->
             val isSelected = tab == selected
             Box(
-                modifier = Modifier
-                    .background(
-                        color = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                    .clickable { onSelect(tab) }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
+                modifier = Modifier.background(
+                    color = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                    shape = RoundedCornerShape(6.dp)
+                ).clickable { onSelect(tab) }.padding(horizontal = 16.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center) {
                 Text(
                     text = tab.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.labelMedium,
@@ -296,12 +292,11 @@ private fun PeriodToggle(
     }
 }
 
-// ─── Spending Trend Card ──────────────────────────────────────────────────────
+// Spending trend card
 
 @Composable
 private fun SpendingTrendCard(
-    points: List<SpendPoint>,
-    periodTab: PeriodTab
+    points: List<SpendPoint>, periodTab: PeriodTab
 ) {
     var weekOffset by remember { mutableIntStateOf(0) }
     val rangeLabel = if (periodTab == PeriodTab.WEEK) "1–7 Feb" else "February 2026"
@@ -314,12 +309,10 @@ private fun SpendingTrendCard(
         Column(modifier = Modifier.padding(16.dp)) {
             // Date range nav
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(
-                    onClick = { weekOffset-- },
-                    modifier = Modifier.size(28.dp)
+                    onClick = { weekOffset-- }, modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -333,8 +326,7 @@ private fun SpendingTrendCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(
-                    onClick = { weekOffset++ },
-                    modifier = Modifier.size(28.dp)
+                    onClick = { weekOffset++ }, modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
@@ -355,19 +347,17 @@ private fun SpendingTrendCard(
 
             // Chart
             TrendLineChart(
-                points = points,
-                modifier = Modifier.fillMaxWidth().height(110.dp)
+                points = points, modifier = Modifier.fillMaxWidth().height(110.dp)
             )
         }
     }
 }
 
-// ─── Trend Line Chart ─────────────────────────────────────────────────────────
+// Trend line chart
 
 @Composable
 private fun TrendLineChart(
-    points: List<SpendPoint>,
-    modifier: Modifier = Modifier
+    points: List<SpendPoint>, modifier: Modifier = Modifier
 ) {
     if (points.isEmpty()) return
 
@@ -400,11 +390,8 @@ private fun TrendLineChart(
             close()
         }
         drawPath(
-            fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(fillColor, Color.Transparent),
-                startY = 0f,
-                endY = chartH
+            fillPath, brush = Brush.verticalGradient(
+                colors = listOf(fillColor, Color.Transparent), startY = 0f, endY = chartH
             )
         )
 
@@ -414,9 +401,7 @@ private fun TrendLineChart(
             pts.drop(1).forEach { lineTo(it.x, it.y) }
         }
         drawPath(
-            linePath,
-            color = lineColor,
-            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+            linePath, color = lineColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
         )
 
         // Dots + tooltip labels for max & min
@@ -445,7 +430,8 @@ private fun TrendLineChart(
                         textAlign = android.graphics.Paint.Align.CENTER
                         isFakeBoldText = true
                     }
-                    val label = runCatching { currencyFormat("INR").format(points[i].amount) }.getOrDefault("₹${points[i].amount}")
+                    val label =
+                        runCatching { currencyFormat("INR").format(points[i].amount) }.getOrDefault("₹${points[i].amount}")
                     val yPos = pt.y - 10.dp.toPx()
                     drawText(label, pt.x, yPos, paint)
                 }
@@ -454,7 +440,7 @@ private fun TrendLineChart(
     }
 }
 
-// ─── Transaction Card ─────────────────────────────────────────────────────────
+// Transaction card
 
 @Composable
 private fun TransactionCard(tx: BudgetTransaction) {
@@ -485,14 +471,13 @@ private fun TransactionCard(tx: BudgetTransaction) {
                 }
                 if (tx.addedFrom.isNotBlank()) {
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
+                        shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary
                     ) {
                         Text(
                             text = tx.addedFrom,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            color = MaterialTheme.colorScheme.background,
                             fontSize = 9.sp
                         )
                     }
@@ -555,8 +540,7 @@ private fun TransactionDetailRow(label: String, value: String) {
     }
 }
 
-
-// ─── Preview ─────────────────────────────────────────────────────────────────
+// Preview
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable

@@ -1,17 +1,78 @@
 package com.example.truxpense.presentation.navigation
 
+
+/**
+ * Centralised route constants for the entire app.
+ *
+ * Auth / Onboarding routes are plain strings.
+ * Dashboard routes are nested inside the [Dashboard] object so every
+ * sub-graph's routes are grouped, discoverable, and impossible to typo.
+ *
+ * Rule: composable(route) calls must always reference these constants —
+ *       never a raw string literal anywhere in the nav graph.
+ */
 object Screen {
+
+    // ── Auth ──────────────────────────────────────────────────────────────────
     const val Splash = "splash"
-    const val Intro = "intro"
     const val Login = "login"
+    const val Intro = "intro"
     const val Signup = "signup"
     const val Otp = "otp"
+
+    // ── Onboarding ────────────────────────────────────────────────────────────
     const val Username = "username"
+    const val Currency = "currency"
     const val SmsPermission = "sms_permission"
     const val Loading = "loading"
-    const val Home = "home"
-    const val Currency = "currency"
-    const val AddExpense = "add_expense"
-    const val AddBudget = "add_budget"
-    const val BudgetDetail = "budget_detail"
+
+    object Dashboard {
+
+        /** Registered in the *outer* AppNavHost as the Home destination. */
+        const val Root = "dashboard"
+
+        // ── Home tab ─────────────────────────────────────────────────────────
+        object Home {
+            const val Root = "home"
+            const val AddExpense = "home/add_expense"
+            const val AddExpenseResult = "home/add_expense/result"
+        }
+
+        // ── Transactions tab ──────────────────────────────────────────────────
+        object Transactions {
+            const val Root = "transactions"
+            const val AddExpense = "transactions/add_expense"
+        }
+
+        // ── Budget tab ────────────────────────────────────────────────────────
+        object Budget {
+            const val Root = "budget"
+            const val Add = "budget/add"
+
+
+            const val Detail = "budget/detail/{budgetName}/{monthlyLimit}/{spent}"
+
+            fun detailRoute(
+                budgetName: String,
+                monthlyLimit: Double,
+                spent: Double,
+            ): String = "budget/detail/${budgetName.encodeForRoute()}/$monthlyLimit/$spent"
+
+            /** Percent-encode chars that would break URL segment parsing. */
+            private fun String.encodeForRoute(): String =
+                java.net.URLEncoder.encode(this, "UTF-8")
+        }
+
+        // ── Analytics tab ─────────────────────────────────────────────────────
+        object Analytics {
+            const val Root = "analytics"
+            const val AddExpense = "analytics/add_expense"
+        }
+
+        // ── Settings tab ──────────────────────────────────────────────────────
+        object Settings {
+            const val Root = "settings"
+        }
+    }
+
 }

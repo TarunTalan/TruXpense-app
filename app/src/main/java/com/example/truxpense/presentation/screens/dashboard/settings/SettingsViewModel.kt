@@ -1,8 +1,8 @@
 package com.example.truxpense.presentation.screens.dashboard.settings
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.Manifest
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,6 +22,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val username: Flow<String?> = prefs.username
+    val phone: Flow<String?> = prefs.phone
 
     private val _smsEnabled = MutableStateFlow(
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
@@ -39,6 +40,10 @@ class SettingsViewModel @Inject constructor(
         _notificationsEnabled.value = enabled
     }
 
+    fun savePhone(number: String) {
+        viewModelScope.launch { prefs.savePhone(number) }
+    }
+
     fun logout(onComplete: (() -> Unit)? = null) {
         viewModelScope.launch {
             prefs.clear()
@@ -46,4 +51,3 @@ class SettingsViewModel @Inject constructor(
         }
     }
 }
-

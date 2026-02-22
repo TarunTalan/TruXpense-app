@@ -213,6 +213,27 @@ class AuthRepository @Inject constructor(
             username?.takeIf { it.isNotBlank() }?.let {
                 prefs.saveUsername(it)
             }
+
+            // Extract phoneNumber from nested user object if present and persist it
+            try {
+                val userField: Field = body.javaClass.getDeclaredField("user")
+                userField.isAccessible = true
+                val user = userField.get(body) ?: return
+
+                val phoneField: Field = try {
+                    user.javaClass.getDeclaredField("phoneNumber")
+                } catch (e: NoSuchFieldException) {
+                    // fallback to other field name if API uses a different key
+                    user.javaClass.getDeclaredField("phone")
+                }
+                phoneField.isAccessible = true
+                val phoneValue = phoneField.get(user) as? String
+                phoneValue?.takeIf { it.isNotBlank() }?.let { prefs.savePhone(it) }
+
+            } catch (_: Exception) {
+                // ignore extraction errors — don't block login
+            }
+
         } catch (_: Exception) {
             // Log error but don't fail the operation
         }

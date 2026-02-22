@@ -11,68 +11,36 @@ import com.example.truxpense.data.prefs.AuthPreferences
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// ViewModel for home screen managing logout and SMS permission state
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val prefs: AuthPreferences,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
-    // Expose stored username Flow from preferences so UI can collect and display it
+    // Auth / user
+
     val username: Flow<String?> = prefs.username
 
-    // SMS permission state (true when READ_SMS is granted)
+    // SMS permission
+
     private val _hasSmsPermission = MutableStateFlow(
-        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
     )
-    val hasSmsPermission: StateFlow<Boolean> = _hasSmsPermission
+    val hasSmsPermission: StateFlow<Boolean> = _hasSmsPermission.asStateFlow()
 
-    // Simple expense count state (0 means no expenses yet). UI can observe to show empty state.
-    private val _expenseCount = MutableStateFlow(0)
-    val expenseCount: StateFlow<Int> = _expenseCount
-
-    // Monthly spend amount in major currency units (e.g., rupees/dollars). Default 0.0
-    private val _monthlySpend = MutableStateFlow(0.0)
-    val monthlySpend: StateFlow<Double> = _monthlySpend
-
-    // Helper to set monthly spend (call after calculating from transactions)
-    fun setMonthlySpend(amount: Double) {
-        _monthlySpend.value = amount
-    }
-
-    // Budget state: total budget limit and amount left
-    private val _budgetLimit = MutableStateFlow(0.0)
-    val budgetLimit: StateFlow<Double> = _budgetLimit
-
-    private val _budgetLeft = MutableStateFlow(0.0)
-    val budgetLeft: StateFlow<Double> = _budgetLeft
-
-    // Helpers to set budget values (call after calculating budget usage)
-    fun setBudgetLimit(limit: Double) { _budgetLimit.value = limit }
-    fun setBudgetLeft(left: Double) { _budgetLeft.value = left }
-    fun setBudget(limit: Double, left: Double) {
-        _budgetLimit.value = limit
-        _budgetLeft.value = left
-    }
-
-    // Helper to set expense count (call this from repo or after loading transactions)
-    fun setExpenseCount(count: Int) {
-        _expenseCount.value = count
-    }
-
-    // One-shot events to request permission from UI (not strictly required but available)
     private val _requestSmsPermission = MutableSharedFlow<Unit>(replay = 0)
-    val requestSmsPermission = _requestSmsPermission // consumers can collect to trigger launcher
+    val requestSmsPermission = _requestSmsPermission
 
     fun refreshSmsPermission() {
-        _hasSmsPermission.value = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+        _hasSmsPermission.value = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     fun onSmsPermissionResult(granted: Boolean) {
@@ -80,40 +48,96 @@ class HomeViewModel @Inject constructor(
     }
 
     fun emitRequestSmsPermission() {
-        viewModelScope.launch {
-            _requestSmsPermission.emit(Unit)
-        }
+        viewModelScope.launch { _requestSmsPermission.emit(Unit) }
     }
 
-    // Sample UI lists (replace with real data later) — expose as StateFlows
-    private val _topCategories = MutableStateFlow(listOf(
-        HomeSpendingCategory("Food", 2400.0, 0.72f),
-        HomeSpendingCategory("Clothes", 4500.0, 0.45f)
-    ))
-    val topCategories: StateFlow<List<HomeSpendingCategory>> = _topCategories
+    // Expense / spend data
 
-    private val _recentTx = MutableStateFlow(listOf(
-        HomeTransactionItem("1", "Grocery at BigMart", "Food", 540.0, "INR"),
-        HomeTransactionItem("2", "Coffee", "Food", 120.0, "INR"),
-        HomeTransactionItem("3", "Electricity Bill", "Bills", 2400.0, "INR")
-    ))
-    val recentTransactions: StateFlow<List<HomeTransactionItem>> = _recentTx
+    private val _expenseCount = MutableStateFlow(0)
+    val expenseCount: StateFlow<Int> = _expenseCount.asStateFlow()
+
+    private val _monthlySpend = MutableStateFlow(0.0)
+    val monthlySpend: StateFlow<Double> = _monthlySpend.asStateFlow()
+
+    private val _budgetLimit = MutableStateFlow(0.0)
+    val budgetLimit: StateFlow<Double> = _budgetLimit.asStateFlow()
+
+    private val _budgetLeft = MutableStateFlow(0.0)
+    val budgetLeft: StateFlow<Double> = _budgetLeft.asStateFlow()
+
+    // Derived values (budget consumption)
+
+    /**
+     * Amount consumed = limit − left, clamped to ≥ 0.
+     * Replaces `val budgetUsed = (budgetLimit - budgetLeft).coerceAtLeast(0.0)` in the screen.
+     */
+    val budgetUsed: StateFlow<Double> =
+        combine(_budgetLimit, _budgetLeft) { limit, left -> (limit - left).coerceAtLeast(0.0) }.stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                0.0
+            )
+
+
+    val budgetProgress: StateFlow<Float> = combine(_budgetLimit, budgetUsed) { limit, used ->
+        if (limit > 0) (used / limit).toFloat().coerceIn(0f, 1f) else 0f
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+
+    // Setters (called from repository layer or tests)
+
+    fun setExpenseCount(count: Int) {
+        _expenseCount.value = count
+    }
+
+    fun setBudgetLimit(limit: Double) {
+        _budgetLimit.value = limit
+    }
+
+    fun setBudgetLeft(left: Double) {
+        _budgetLeft.value = left
+    }
+
+    fun setBudget(limit: Double, left: Double) {
+        _budgetLimit.value = limit
+        _budgetLeft.value = left
+    }
+
+    // Add a transaction (called from AddExpense flow)
+    fun addTransaction(tx: HomeTransactionItem) {
+        _expenseCount.value += 1
+        _monthlySpend.value += tx.amount
+        _recentTx.value = _recentTx.value.toMutableList().apply { add(0, tx) }
+    }
+
+    // UI lists
+
+    private val _topCategories = MutableStateFlow(
+        listOf(
+            HomeSpendingCategory("Food", 2_400.0, 0.72f),
+            HomeSpendingCategory("Clothes", 4_500.0, 0.45f),
+        )
+    )
+    val topCategories: StateFlow<List<HomeSpendingCategory>> = _topCategories.asStateFlow()
+
+    private val _recentTx = MutableStateFlow<List<HomeTransactionItem>>(emptyList())
+    val recentTransactions: StateFlow<List<HomeTransactionItem>> = _recentTx.asStateFlow()
+
+    // Logout
 
     fun logout(onComplete: (() -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                // clear all saved preferences (tokens, username, onboarding flags)
                 prefs.clear()
-
-                // Attempt to sign out from Google Identity (One Tap) if configured. Ignore failures.
                 try {
-                    val clientId = try { context.getString(R.string.default_web_client_id) } catch (_: Exception) { null }
-                    if (!clientId.isNullOrBlank() && !clientId.startsWith("REPLACE_WITH")) {
-                        val oneTapClient = Identity.getSignInClient(context)
-                        oneTapClient.signOut().addOnCompleteListener { /* no-op */ }
+                    val clientId = try {
+                        context.getString(R.string.default_web_client_id)
+                    } catch (_: Exception) {
+                        null
                     }
-                } catch (_: Throwable) {
-                    // ignore sign-out errors; logout still proceeds
+                    if (!clientId.isNullOrBlank() && !clientId.startsWith("REPLACE_WITH")) {
+                        Identity.getSignInClient(context).signOut()
+                    }
+                } catch (_: Throwable) { /* ignore */
                 }
             } finally {
                 onComplete?.invoke()

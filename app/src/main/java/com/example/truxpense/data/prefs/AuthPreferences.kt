@@ -27,6 +27,7 @@ class AuthPreferences @Inject constructor(
 
         // User
         private val USERNAME = stringPreferencesKey("username")
+        private val PHONE = stringPreferencesKey("phone")
 
         // Onboarding flags
         private val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
@@ -57,6 +58,13 @@ class AuthPreferences @Inject constructor(
     }
 
     val username: Flow<String?> = dataStore.data.map { prefs -> prefs[USERNAME] }
+
+    // Phone
+    suspend fun savePhone(phone: String) {
+        dataStore.edit { prefs -> prefs[PHONE] = phone }
+    }
+
+    val phone: Flow<String?> = dataStore.data.map { prefs -> prefs[PHONE] }
 
     // Onboarding
     suspend fun setOnboardingComplete(value: Boolean) {

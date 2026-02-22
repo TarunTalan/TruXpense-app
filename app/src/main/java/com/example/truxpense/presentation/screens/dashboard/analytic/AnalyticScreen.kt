@@ -30,27 +30,24 @@ import com.example.truxpense.R
 
 
 data class CategorySpend(
-    val name: String,
-    val amount: Double,
-    val color: Color
+    val name: String, val amount: Double, val color: Color
 )
 
 data class TrendPoint(
-    val label: String,
-    val amount: Double
+    val label: String, val amount: Double
 )
 
 enum class PeriodMode { MONTH, WEEK }
 enum class TrendRange { WEEKLY, MONTHLY, YEARLY }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers
 
 private fun formatINR(amount: Double): String {
     val abs = kotlin.math.abs(amount)
     return "₹${"%,.0f".format(abs)}"
 }
 
-// ─── Sample Data ─────────────────────────────────────────────────────────────
+// Sample data
 
 val sampleCategories = listOf(
     CategorySpend("Food", 4250.0, Color(0xFFE53935)),
@@ -71,7 +68,7 @@ val sampleTrendPointsWeek = listOf(
     TrendPoint("Sun", 350.0),
 )
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
+// Screen
 
 @Composable
 fun AnalyticsScreen(
@@ -92,17 +89,15 @@ fun AnalyticsScreen(
 
     val periodLabel = if (periodMode == PeriodMode.MONTH) "February 2026" else "This week"
     val trendPoints = if (periodMode == PeriodMode.MONTH) {
-        if (vmTrendMonth.isNotEmpty()) vmTrendMonth else sampleTrendPointsMonth
+        vmTrendMonth.ifEmpty { sampleTrendPointsMonth }
     } else {
-        if (vmTrendWeek.isNotEmpty()) vmTrendWeek else sampleTrendPointsWeek
+        vmTrendWeek.ifEmpty { sampleTrendPointsWeek }
     }
     val trendTitle = if (periodMode == PeriodMode.MONTH) "Spending trend this month" else "Spending trend"
-    val insightText = if (periodMode == PeriodMode.MONTH)
-        "Your spending increased during the second half of the month."
-    else
-        "Your spending increased during the first half of the week."
+    val insightText = if (periodMode == PeriodMode.MONTH) "Your spending increased during the second half of the month."
+    else "Your spending increased during the first half of the week."
 
-    val categoriesToUse = if (vmCategories.isNotEmpty()) vmCategories else categories
+    val categoriesToUse = vmCategories.ifEmpty { categories }
     val donutTotal = categoriesToUse.sumOf { it.amount }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
@@ -113,7 +108,7 @@ fun AnalyticsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // ── Summary Card ──────────────────────────────────────────────
+            // Summary card
             item {
                 SummaryCard(
                     totalSpent = totalSpent,
@@ -123,7 +118,7 @@ fun AnalyticsScreen(
                 )
             }
 
-            // ── Period Selector + Date Nav ─────────────────────────────────
+            // Period selector + date nav
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -135,8 +130,7 @@ fun AnalyticsScreen(
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.clickable { periodExpanded = true }
-                        ) {
+                            modifier = Modifier.clickable { periodExpanded = true }) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -154,19 +148,24 @@ fun AnalyticsScreen(
                             }
                         }
                         DropdownMenu(
-                            expanded = periodExpanded,
-                            onDismissRequest = { periodExpanded = false }
-                        ) {
+                            expanded = periodExpanded, onDismissRequest = { periodExpanded = false }) {
                             listOf(PeriodMode.WEEK, PeriodMode.MONTH).forEach { mode ->
                                 DropdownMenuItem(
+                                    leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.edit),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
                                     text = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                    onClick = { periodMode = mode; periodExpanded = false }
-                                )
+                                    onClick = { periodMode = mode; periodExpanded = false })
                             }
                         }
                     }
 
-                    // ── Date nav
+                    // Date nav
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -186,21 +185,19 @@ fun AnalyticsScreen(
                 }
             }
 
-            // ── Donut Chart ───────────────────────────────────────────────
+            // Donut chart
             item {
                 DonutChartCard(
-                    categories = categoriesToUse,
-                    total = donutTotal,
-                    periodMode = periodMode
+                    categories = categoriesToUse, total = donutTotal, periodMode = periodMode
                 )
             }
 
-            // ── Labels ───────────────────────────────────────────────────
+            // Labels
             item {
                 LabelsCard(categories = categoriesToUse)
             }
 
-            // ── Spending Trend ────────────────────────────────────────────
+            // Spending trend
             item {
                 SpendingTrendCard(
                     title = trendTitle,
@@ -216,14 +213,11 @@ fun AnalyticsScreen(
     }
 }
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
+// Summary card
 
 @Composable
 private fun SummaryCard(
-    totalSpent: Double,
-    totalBudget: Double,
-    changePercent: Int,
-    periodMode: PeriodMode
+    totalSpent: Double, totalBudget: Double, changePercent: Int, periodMode: PeriodMode
 ) {
     val monthName = if (periodMode == PeriodMode.MONTH) "February" else "this week"
     Card(
@@ -263,18 +257,15 @@ private fun SummaryCard(
     }
 }
 
-// ─── Donut Chart Card ─────────────────────────────────────────────────────────
+// Donut chart card
 
 @Suppress("UNUSED_PARAMETER")
 @Composable
 private fun DonutChartCard(
-    categories: List<CategorySpend>,
-    total: Double,
-    periodMode: PeriodMode
+    categories: List<CategorySpend>, total: Double, periodMode: PeriodMode
 ) {
     val insights = listOf(
-        "• Food accounts for your highest spending this month.",
-        "• You stayed within budget for transport."
+        "• Food accounts for your highest spending this month.", "• You stayed within budget for transport."
     )
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -282,12 +273,10 @@ private fun DonutChartCard(
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                modifier = Modifier.size(200.dp),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.size(200.dp), contentAlignment = Alignment.Center
             ) {
                 DonutChart(categories = categories, total = total)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -322,17 +311,14 @@ private fun DonutChartCard(
 
 @Composable
 private fun DonutChart(
-    categories: List<CategorySpend>,
-    total: Double
+    categories: List<CategorySpend>, total: Double
 ) {
     val sweeps = categories.map { ((it.amount / total) * 360f).toFloat() }
 
     // Animate each sweep
     val animatedSweeps = sweeps.map { target ->
         animateFloatAsState(
-            targetValue = target,
-            animationSpec = tween(durationMillis = 900),
-            label = "donut_sweep"
+            targetValue = target, animationSpec = tween(durationMillis = 900), label = "donut_sweep"
         ).value
     }
 
@@ -358,7 +344,7 @@ private fun DonutChart(
     }
 }
 
-// ─── Labels Card ─────────────────────────────────────────────────────────────
+// Labels card
 
 @Composable
 private fun LabelsCard(categories: List<CategorySpend>) {
@@ -385,14 +371,11 @@ private fun LabelsCard(categories: List<CategorySpend>) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .background(cat.color, CircleShape)
+                            modifier = Modifier.size(10.dp).background(cat.color, CircleShape)
                         )
 
                         Text(
-                            text = cat.name,
-                            style = MaterialTheme.typography.bodyMedium
+                            text = cat.name, style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     Text(
@@ -401,14 +384,17 @@ private fun LabelsCard(categories: List<CategorySpend>) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (index < categories.lastIndex)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                if (index < categories.lastIndex) HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(
+                        alpha = 0.5f
+                    )
+                )
             }
         }
     }
 }
 
-// ─── Spending Trend Card ──────────────────────────────────────────────────────
+// Spending trend card
 
 @Composable
 private fun SpendingTrendCard(
@@ -442,8 +428,7 @@ private fun SpendingTrendCard(
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { rangeMenuExpanded = true }
-                    ) {
+                        modifier = Modifier.clickable { rangeMenuExpanded = true }) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -456,14 +441,19 @@ private fun SpendingTrendCard(
                         }
                     }
                     DropdownMenu(
-                        expanded = rangeMenuExpanded,
-                        onDismissRequest = { rangeMenuExpanded = false }
-                    ) {
+                        expanded = rangeMenuExpanded, onDismissRequest = { rangeMenuExpanded = false }) {
                         TrendRange.entries.forEach { r ->
                             DropdownMenuItem(
+                                leadingIcon = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.upward_arrow),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
                                 text = { Text(r.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                onClick = { onRangeChange(r); rangeMenuExpanded = false }
-                            )
+                                onClick = { onRangeChange(r); rangeMenuExpanded = false })
                         }
                     }
                 }
@@ -473,8 +463,7 @@ private fun SpendingTrendCard(
 
             // Chart
             TrendLineChart(
-                points = points,
-                modifier = Modifier.fillMaxWidth().height(120.dp)
+                points = points, modifier = Modifier.fillMaxWidth().height(120.dp)
             )
 
             Spacer(Modifier.height(10.dp))
@@ -492,12 +481,11 @@ private fun SpendingTrendCard(
     }
 }
 
-// ─── Trend Line Chart ─────────────────────────────────────────────────────────
+// Trend line chart
 
 @Composable
 private fun TrendLineChart(
-    points: List<TrendPoint>,
-    modifier: Modifier = Modifier
+    points: List<TrendPoint>, modifier: Modifier = Modifier
 ) {
     if (points.size < 2) return
 
@@ -527,10 +515,8 @@ private fun TrendLineChart(
             close()
         }
         drawPath(
-            fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(lineColor.copy(alpha = 0.18f), Color.Transparent),
-                startY = 0f, endY = chartH
+            fillPath, brush = Brush.verticalGradient(
+                colors = listOf(lineColor.copy(alpha = 0.18f), Color.Transparent), startY = 0f, endY = chartH
             )
         )
 
@@ -573,11 +559,9 @@ private fun TrendLineChart(
             val boxT = pt.y - (-fm.ascent) - pad - 14.dp.toPx()
             val boxB = pt.y - 14.dp.toPx() + fm.descent + pad
             nativeCanvas.drawRoundRect(
-                boxL, boxT, boxR, boxB, 4.dp.toPx(), 4.dp.toPx(),
-                android.graphics.Paint().apply {
+                boxL, boxT, boxR, boxB, 4.dp.toPx(), 4.dp.toPx(), android.graphics.Paint().apply {
                     color = android.graphics.Color.argb(230, 245, 245, 245)
-                }
-            )
+                })
             nativeCanvas.drawText(label, pt.x, pt.y - 16.dp.toPx(), paint)
 
             // Day label below dot
@@ -601,7 +585,7 @@ private fun TrendLineChart(
     }
 }
 
-// ─── Preview ─────────────────────────────────────────────────────────────────
+// Preview
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable

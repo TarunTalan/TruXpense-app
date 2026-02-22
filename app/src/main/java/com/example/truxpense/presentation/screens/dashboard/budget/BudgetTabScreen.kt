@@ -7,7 +7,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,74 +18,41 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.SpendingCategoryCard
-import java.text.NumberFormat
-import java.util.*
-import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.util.currencyFormat
+import com.example.truxpense.util.toCurrency
 
-
-val months = listOf(
-    "January 2026",
-    "February 2026",
-    "March 2026"
-)
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-// Match HomeTabScreen's currency formatter so both screens display amounts the same way
-private fun currencyFormat(currencyCode: String?): NumberFormat =
-    runCatching {
-        val locale = Locale.Builder().setLanguage("en").setRegion("IN").build()
-        NumberFormat.getCurrencyInstance(locale).apply {
-            currency = Currency.getInstance(currencyCode ?: "INR")
-        }
-    }.getOrElse { NumberFormat.getCurrencyInstance() }
-
-private fun Double.toCurrency(fmt: NumberFormat) = runCatching { fmt.format(this) }.getOrDefault("$this")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BudgetTopBar() {
-    TopAppBar(
-        title = {
-            Text(
-                text = "Budgets",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1
-            )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground
-        ),
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-@Composable
-fun BudgetScreen(
-    previewBudgets: List<BudgetCategory>? = null,
+fun BudgetTab(
     vm: BudgetViewModel = hiltViewModel(),
-    onAddBudget: () -> Unit = {},
-    currencyCode: String? = "INR",
-    onNavigateToDetail: ((BudgetCategory) -> Unit)? = null
+    onNavigateToAddBudget: () -> Unit = {},
+    onNavigateToBudgetDetail: (BudgetCategory) -> Unit = {},
+    // Named param kept for design-time preview override
+    previewBudgets: List<BudgetCategory>? = null,
+    currencyCode: String = "INR",
 ) {
-    var monthIndex by remember { mutableIntStateOf(1) }
-    // selected budget category to preview at top (used only when onNavigateToDetail is null)
-    var selectedCategory by remember { mutableStateOf<BudgetCategory?>(null) }
-
-    // Observe UI categories provided by ViewModel
-    val displayedBudgets by vm.categories.collectAsState()
+    val displayItems by vm.categoryDisplayItems.collectAsState()
     val totalBudget by vm.totalBudget.collectAsState()
     val totalSpent by vm.totalSpent.collectAsState()
+    val currentMonth by vm.currentMonth.collectAsState()
+    val canGoBack by vm.canGoBack.collectAsState()
+    val canGoForward by vm.canGoForward.collectAsState()
 
-    // Allow preview override for design previews
-    val budgetsToShow = previewBudgets ?: displayedBudgets
+    val budgetsToShow = previewBudgets?.mapIndexed { i, cat ->
+        BudgetCategoryDisplay(
+            category = cat,
+            amountText = "${cat.spent} / ${cat.total}",
+            progress = if (cat.total > 0) cat.spent.toFloat() / cat.total else 0f,
+        )
+    } ?: displayItems
 
-    // If there are no real budgets, show the empty state with CTA
     if (budgetsToShow.isEmpty()) {
-        BudgetsEmptyScreen(onAddBudget = onAddBudget)
+        BudgetsEmptyScreen(onAddBudget = onNavigateToAddBudget)
         return
     }
 
@@ -90,140 +60,154 @@ fun BudgetScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { BudgetTopBar() },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Budgets",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                ),
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddBudget,
+                onClick = onNavigateToAddBudget,
                 shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.background,
-                elevation = FloatingActionButtonDefaults.elevation(8.dp)
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add budget")
             }
-        }
+        },
     ) { innerPadding ->
-
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 10.dp), // match HomeTabScreen horizontal spacing
-            contentPadding = PaddingValues(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
+                .padding(horizontal = DashboardDimens.screenPaddingH),
+            contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxxl),
+            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
 
-
-            // ── Month Selector ─────────────────────────────────────────────
+            // Month navigator
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { if (monthIndex > 0) monthIndex-- },
-                        enabled = monthIndex > 0
-                    ) {
-                        Icon(
-                            painter = painterResource(id= R.drawable.left_arrow),
-                            contentDescription = "Previous month",
-                            tint = if (monthIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
-                        )
-                    }
-
-                    Text(
-                        text = months[monthIndex],
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-
-                    IconButton(
-                        onClick = { if (monthIndex < months.lastIndex) monthIndex++ },
-                        enabled = monthIndex < months.lastIndex
-                    ) {
-                        Icon(
-                            painter = painterResource(id= R.drawable.right_arrow),
-                            contentDescription = "Next month",
-                            tint = if (monthIndex < months.lastIndex) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
-                        )
-                    }
-                }
-            }
-
-            // ── Total Budget Card ──────────────────────────────────────────
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "Total budget",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = totalBudget.toDouble().toCurrency(fmt),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = "${totalSpent.toDouble().toCurrency(fmt)} spent",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // ── Budget Category Items ──────────────────────────────────────
-            items(budgetsToShow, key = { it.id }) { category ->
-                val amountText = "${category.spent.toDouble().toCurrency(fmt)} / ${category.total.toDouble().toCurrency(fmt)}"
-                val progress = if (category.total > 0) (category.spent.toFloat() / category.total.toFloat()).coerceIn(0f, 1f) else 0f
-                SpendingCategoryCard(
-                    name = category.name,
-                    amountText = amountText,
-                    progress = progress,
-                    titleColor = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            // if navigation callback provided, navigate to detail screen
-                            if (onNavigateToDetail != null) {
-                                onNavigateToDetail.invoke(category)
-                            } else {
-                                // toggle selection preview when no navigation provided
-                                selectedCategory = if (selectedCategory?.id == category.id) null else category
-                            }
-                        }
+                MonthNavigatorRow(
+                    currentMonth = currentMonth,
+                    canGoBack = canGoBack,
+                    canGoForward = canGoForward,
+                    onPrevious = { vm.previousMonth() },
+                    onNext = { vm.nextMonth() },
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
+            }
+
+            // Total budget summary
+            item {
+                TotalBudgetCard(
+                    totalBudget = totalBudget.toDouble().toCurrency(fmt),
+                    totalSpent = totalSpent.toDouble().toCurrency(fmt),
+                )
+            }
+
+            // Per-category rows
+            items(budgetsToShow, key = { it.category.id }) { display ->
+                SpendingCategoryCard(
+                    name = display.category.name,
+                    amountText = display.amountText,
+                    progress = display.progress,
+                    titleColor = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.fillMaxWidth().clickable { onNavigateToBudgetDetail(display.category) },
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)
+                )
             }
         }
     }
 }
 
+// Month navigator row
+@Composable
+private fun MonthNavigatorRow(
+    currentMonth: String,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = DashboardDimens.spaceSm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onPrevious, enabled = canGoBack) {
+            Icon(
+                painter = painterResource(R.drawable.left_arrow),
+                contentDescription = "Previous month",
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = if (canGoBack) 1f else 0.38f),
+            )
+        }
+        Text(
+            text = currentMonth,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        IconButton(onClick = onNext, enabled = canGoForward) {
+            Icon(
+                painter = painterResource(R.drawable.right_arrow),
+                contentDescription = "Next month",
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = if (canGoForward) 1f else 0.38f),
+            )
+        }
+    }
+}
 
+// Total budget card
+@Composable
+private fun TotalBudgetCard(
+    totalBudget: String,
+    totalSpent: String,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(0.dp),
+    ) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
+            Text(
+                text = "Total budget",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
+            Text(
+                text = totalBudget,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.tertiary,
+                fontWeight = FontWeight.Black,
+            )
+            Spacer(Modifier.height(DashboardDimens.spaceSm))
+            Text(
+                text = "$totalSpent spent",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
+// Preview
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun BudgetScreenPreview() {
     val sample = listOf(
-        BudgetCategory(id = 1, name = "Food", spent = 1200, total = 3000, barColor = Color(0xFFEF4444)),
-        BudgetCategory(id = 2, name = "Shopping", spent = 500, total = 2000, barColor = Color(0xFFF59E0B))
+        BudgetCategory(id = 1, name = "Food", spent = 1_200, total = 3_000, barColor = Color(0xFFEF4444)),
+        BudgetCategory(id = 2, name = "Shopping", spent = 500, total = 2_000, barColor = Color(0xFFF59E0B)),
     )
-
-    MaterialTheme {
-        BudgetScreen(previewBudgets = sample, currencyCode = "INR")
-    }
- }
+    MaterialTheme { BudgetTab(previewBudgets = sample) }
+}

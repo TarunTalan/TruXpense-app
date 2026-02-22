@@ -1,8 +1,6 @@
 package com.example.truxpense.presentation.screens.dashboard.budget
 
-
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,19 +12,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.components.CategoryDropdown
 import com.example.truxpense.presentation.components.NumberField
-import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,226 +32,146 @@ fun AddBudgetScreen(
     onBack: () -> Unit = {},
     onSave: () -> Unit = {},
 ) {
-    // Reusable top bar with a back button so other screens can use same styling
-    @Composable
-    fun ScreenTopBarWithBack(title: String, onBack: () -> Unit) {
-        TopAppBar(
-            title = { Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground) },
-            navigationIcon = {
-                IconButton(onClick = { onBack() }) {
-                    Icon(painterResource(id = R.drawable.back_icon), contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background,
-                titleContentColor = MaterialTheme.colorScheme.onBackground
-            )
-        )
-    }
+    val viewModel: AddBudgetViewModel = hiltViewModel()
 
-    val vm: AddBudgetViewModel = hiltViewModel()
-    val categories by vm.categories.collectAsState()
-    val amountInput by vm.amountInput.collectAsState()
-    val query by vm.query.collectAsState()
+    val amountInput by viewModel.amountInput.collectAsState()
+    val selected by viewModel.selectedCategory.collectAsState()
+    val categories by viewModel.categories.collectAsState(initial = emptyList())
+    val isFormValid by viewModel.isFormValid.collectAsState()
+
+    // Pure UI state — dropdown open/close is presentational only, not business logic
     var expanded by remember { mutableStateOf(false) }
-    var pressedItem by remember { mutableStateOf<String?>(null) }
-    val selected by vm.selectedCategory.collectAsState()
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    val dismissDropdown = {
+        expanded = false
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
+
     Scaffold(
-        topBar = { ScreenTopBarWithBack(title = "Add Budget", onBack = onBack) },
+        topBar = {
+            ScreenTopBarWithBack(title = "Add Budget", onBack = onBack)
+        },
         bottomBar = {
             if (!expanded) {
                 Column(
-                    modifier = Modifier.padding(top = 10.dp, start = 16.dp, end = 16.dp, bottom = 34.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(
+                        top = DashboardDimens.spaceMdL,
+                        start = DashboardDimens.screenPaddingH,
+                        end = DashboardDimens.screenPaddingH,
+                        bottom = DashboardDimens.spaceXxxl,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
                 ) {
-                    val formValid = amountInput.isNotBlank() && selected != null
-
                     Button(
-                        onClick = {
-                            vm.createBudget(onSave)
-                        },
-                        enabled = formValid,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        onClick = { viewModel.createBudget(onSave) },
+                        enabled = isFormValid,
+                        modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
+                        shape = RoundedCornerShape(DashboardDimens.cornerCard),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             disabledContainerColor = MaterialTheme.colorScheme.primary.copy(0.5f),
-                            disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(0.4f)
-                        )
+                            disabledContentColor = MaterialTheme.colorScheme.background.copy(0.4f),
+                        ),
                     ) {
                         Text(
                             text = "Create budget",
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
+                            color = MaterialTheme.colorScheme.background,
+                            fontSize = DashboardDimens.textXxl,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
             }
-        }
+        },
     ) { contentPadding ->
+
         val bottomPad = if (expanded) 0.dp else contentPadding.calculateBottomPadding()
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .clearFocusOnTap()
-                .padding(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = contentPadding.calculateTopPadding(),
-                    bottom = bottomPad
-                ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize().clearFocusOnTap().padding(
+                start = DashboardDimens.screenPaddingH,
+                end = DashboardDimens.screenPaddingH,
+                top = contentPadding.calculateTopPadding(),
+                bottom = bottomPad,
+            ),
+            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
 
-            // Category Section (selectable dropdown, mirrors CurrencyScreen behavior)
-            SectionCard {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Category",
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.height(8.dp))
+            // Category selector
+            CategoryDropdown(
+                selected = selected,
+                categories = categories,
+                onSelect = { viewModel.setSelected(it) },
+                iconForCategory = { viewModel.iconForCategory(it) },
+                expanded = expanded,
+                onExpandedChange = { expanded = it },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                    // Make the whole input tappable to open dropdown (wrap AuthTextField in clickable Box)
-                    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(MaterialTheme.shapes.medium)
-                            .clickable {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                                expanded = true
-                            }
-                    ) {
-                        AuthTextField(
-                            bgColor = MaterialTheme.colorScheme.background,
-                            label = null,
-                            placeholder = "Select or search category",
-                            error = null,
-                            value = query.ifEmpty { selected ?: "" },
-                            onValueChange = { v ->
-                                vm.setSelected(null)
-                                vm.setQuery(v)
-                                expanded = true
-                            },
-                            contentPadding = 12,
-                            trailing = {
-                                IconButton(onClick = {
-                                    keyboardController?.hide()
-                                    focusManager.clearFocus()
-                                    expanded = !expanded
-                                }) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.drop_down_icon),
-                                        contentDescription = if (expanded) "Close dropdown" else "Open dropdown",
-                                        modifier = Modifier.rotate(rotation)
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-
-            // Filtered results (computed once)
-            val filtered = remember(query, categories) {
-                val q = query.trim().lowercase()
-                if (q.isEmpty()) categories else categories.filter { it.lowercase().contains(q) }
-            }
-
-            // When expanded show a full-height dropdown similar to CurrencyScreen
-            BackHandler(enabled = expanded) {
-                expanded = false
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            }
+            // Dropdown list
+            BackHandler(enabled = expanded) { dismissDropdown() }
 
             if (expanded) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .background(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = MaterialTheme.shapes.medium
-                        )
-                        .padding(bottom = 10.dp)
+                    modifier = Modifier.fillMaxWidth().weight(1f).background(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.medium,
+                    ).padding(bottom = DashboardDimens.spaceMdL),
                 ) {
-                    if (filtered.isEmpty()) {
+                    if (categories.isEmpty()) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(MaterialTheme.shapes.medium),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text("No categories found", color = MaterialTheme.colorScheme.onBackground)
                         }
                     } else {
                         LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(MaterialTheme.shapes.medium)
-                                .padding(horizontal = 8.dp, vertical = 12.dp)
+                            modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium).padding(
+                                horizontal = DashboardDimens.listPaddingH,
+                                vertical = DashboardDimens.listPaddingV,
+                            ),
                         ) {
-                            itemsIndexed(filtered) { _, item ->
-                                val isPressed = pressedItem == item
+                            itemsIndexed(categories) { _, item ->
                                 val isSelected = selected == item
+                                val containerColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.primaryContainer
 
-                                // containerColor: selected visually overrides pressed
-                                val containerColor = when {
-                                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    isPressed -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.primaryContainer
-                                }
-
-                                val iconRes = when (item.trim().lowercase()) {
-                                    "food" -> R.drawable.food
-                                    "transport" -> R.drawable.transport
-                                    "bills" -> R.drawable.bills
-                                    "shopping" -> R.drawable.shopping
-                                    "travel" -> R.drawable.category_icon
-                                    "health" -> R.drawable.health
-                                    "education" -> R.drawable.category_icon
-                                    "entertainment" -> R.drawable.entertainment
-                                    "groceries" -> R.drawable.groceries
-                                    else -> R.drawable.category_icon
-                                }
+                                // Icon resolved by VM — no when-block in the composable
+                                val iconRes = viewModel.iconForCategory(item)
 
                                 ListItem(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .clickable(enabled = true, onClickLabel = null, role = null) {
-                                            vm.setSelected(item)
-                                            vm.setQuery(item)
-                                            expanded = false
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                        },
+                                    modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable {
+                                        viewModel.setSelected(item)
+                                        // no search/query handling — simple dropdown-only
+                                        dismissDropdown()
+                                    },
                                     colors = ListItemDefaults.colors(containerColor = containerColor),
                                     trailingContent = {
-                                        Icon(
-                                            painter = painterResource(id = iconRes),
-                                            contentDescription = "$item icon",
-                                            tint = MaterialTheme.colorScheme.onBackground,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        // Show icon at trailing for all categories except 'Other'/'Others'
+                                        val trimmed = item.trim().lowercase()
+                                        if (trimmed != "other" && trimmed != "others") {
+                                            Icon(
+                                                painter = painterResource(iconRes),
+                                                contentDescription = "$item icon",
+                                                tint = MaterialTheme.colorScheme.onBackground,
+                                                modifier = Modifier.size(DashboardDimens.iconMd),
+                                            )
+                                        } else {
+                                            Spacer(modifier = Modifier.width(DashboardDimens.iconMd))
+                                        }
                                     },
                                     headlineContent = {
-                                        Text(text = item, color = MaterialTheme.colorScheme.onBackground)
-                                    }
+                                        Text(
+                                            text = item,
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            style = MaterialTheme.typography.labelLarge
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -261,77 +179,74 @@ fun AddBudgetScreen(
                 }
             }
 
-            // If dropdown is expanded, hide the rest of the content so dropdown covers full area
+            // Budget limit section (hidden while dropdown is open)
             if (!expanded) {
-                // ── Monthly Budget Limit Section ──────────────────────────────────
                 SectionCard {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
                         Text(
                             text = "Monthly Budget limit",
                             color = MaterialTheme.colorScheme.onBackground,
-                            fontSize = 15.sp,
+                            fontSize = DashboardDimens.textXl,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(DashboardDimens.spaceLg))
 
-                        // Amount input label
                         Text(
                             text = "Enter amount",
                             color = MaterialTheme.colorScheme.secondary,
-                            fontSize = 12.sp,
+                            fontSize = DashboardDimens.textMd,
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(DashboardDimens.spaceXs))
 
-                        // Amount text field (reused component extracted from this screen)
                         NumberField(
                             value = amountInput,
-                            onValueChange = { vm.setAmountInput(it) },
+                            onValueChange = { viewModel.setAmountInput(it) },
                             leadingIcon = {
                                 Text(
                                     text = "₹",
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 15.sp,
+                                    fontSize = DashboardDimens.textXl,
                                 )
                             },
                             placeholder = "0",
                             bgColor = MaterialTheme.colorScheme.background,
-                            contentPadding = 12,
-                            modifier = Modifier.fillMaxWidth()
+                            contentPadding = DashboardDimens.cardPaddingComp.value.toInt(),
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(DashboardDimens.spaceXs))
                         Text(
                             text = "This resets every month",
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 12.sp,
+                            fontSize = DashboardDimens.textMd,
                         )
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+
+                Spacer(Modifier.height(DashboardDimens.spaceLg))
+
                 Column {
-                    // Budget period
                     Text(
                         text = "Budget period",
                         color = MaterialTheme.colorScheme.secondary,
-                        fontSize = 12.sp,
+                        fontSize = DashboardDimens.textMd,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(DashboardDimens.spaceMd))
                     Text(
                         text = "Monthly (resets on the 1st)",
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 14.sp,
+                        fontSize = DashboardDimens.textLg,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(DashboardDimens.spaceLg))
 
-                //  Helper text
                 Text(
-                    text = "Budget help you stay of your spending. You can edit or remove them anytime.",
+                    text = "Budgets help you stay on top of your spending. You can edit or remove them anytime.",
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
+                    fontSize = DashboardDimens.textMd,
+                    lineHeight = DashboardDimens.lineHeightHelper,
                 )
 
                 Spacer(Modifier.weight(1f))
@@ -341,29 +256,51 @@ fun AddBudgetScreen(
 }
 
 
-//  Section Card
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScreenTopBarWithBack(title: String, onBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(R.drawable.back_icon),
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+            titleContentColor = MaterialTheme.colorScheme.onBackground,
+        ),
+    )
+}
+
+// Section card shell
+
 @Composable
 private fun SectionCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerCard))
+            .background(MaterialTheme.colorScheme.primaryContainer),
     ) {
         content()
     }
 }
 
-@Preview(
-    showBackground = true,
-    widthDp = 360,
-    heightDp = 800,
-    backgroundColor = 0xFFFFFFFF,
-)
+// Preview
+@Preview(showBackground = true, widthDp = 360, heightDp = 800, backgroundColor = 0xFFFFFFFF)
 @Composable
 fun AddBudgetScreenPreview() {
-    AddBudgetScreen()
+    MaterialTheme { AddBudgetScreen() }
 }
