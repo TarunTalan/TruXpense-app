@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategoryDisplay
 import com.example.truxpense.presentation.screens.dashboard.home.HomeSpendingCategory
 import com.example.truxpense.util.progressColor
 import com.example.truxpense.util.toCurrency
@@ -105,6 +106,23 @@ fun SpendingCategoryCard(
         progress = progress,
         modifier = modifier,
         errorColor = errorColor,
+        titleColor = titleColor
+    )
+}
+
+// New overload: accept BudgetCategoryDisplay (from BudgetViewModel)
+@Composable
+fun SpendingCategoryCard(
+    display: BudgetCategoryDisplay,
+    modifier: Modifier = Modifier,
+    titleColor: Color? = null
+) {
+    SpendingCategoryCard(
+        name = display.category.name,
+        amountText = display.amountText,
+        progress = display.progress,
+        modifier = modifier,
+        errorColor = display.category.barColor,
         titleColor = titleColor
     )
 }

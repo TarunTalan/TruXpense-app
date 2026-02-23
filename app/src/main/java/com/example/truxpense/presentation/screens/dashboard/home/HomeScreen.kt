@@ -14,7 +14,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,7 +32,6 @@ import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
 import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreen
-import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreenResultant
 import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsViewModel
@@ -45,7 +43,7 @@ import com.example.truxpense.presentation.screens.dashboard.components.Dashboard
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
-import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsEmptyScreen
+import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
 
 // Dashboard shell: owns the NavController and tab routing
 
@@ -131,6 +129,13 @@ fun DashboardScreen(
                         onAddExpense = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
                         },
+                        onNavigateToBudget = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                                popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                     )
                 }
             }
@@ -138,39 +143,27 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Home.AddExpense) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
-                    onSave = { tx: HomeTransactionItem ->
-                        // save tx into savedStateHandle and navigate to result screen
-                        dashboardNavController.currentBackStackEntry?.savedStateHandle?.set<HomeTransactionItem>("new_tx", tx)
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpenseResult)
+                    onSave = { _ ->
+                        // The AddExpenseViewModel already persisted the transaction to the shared repository.
+                        // Just navigate to the Home tab so the user returns to dashboard (no duplicate add).
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                            popUpTo(Screen.Dashboard.Root) { inclusive = false }
+                        }
                     },
                     onCancel = { dashboardNavController.popBackStack() },
-                )
-            }
-
-            // Result screen — shows confirmation + details, then routes back to Home and informs HomeViewModel
-            composable(Screen.Dashboard.Home.AddExpenseResult) {
-                val homeVm: HomeViewModel = hiltViewModel()
-                val saved = dashboardNavController.previousBackStackEntry?.savedStateHandle
-                val tx: HomeTransactionItem? = saved?.get<HomeTransactionItem>("new_tx")
-                AddExpenseScreenResultant(
-                     tx = tx,
-                     onDone = {
-                        if (tx != null) homeVm.addTransaction(tx)
-                        // remove saved data
-                        saved?.remove<HomeTransactionItem>("new_tx")
-                        // pop back to home root
-                        dashboardNavController.popBackStack(Screen.Dashboard.Home.Root, inclusive = false)
-                    }
                 )
             }
 
             // Transactions tab
             composable(Screen.Dashboard.Transactions.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
-                    TransactionsTab(
-                        onAddExpense = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.AddExpense)
-                        },
+                    // Use the full TransactionsScreen and feed it the recent transactions from HomeViewModel
+                    val homeVm: HomeViewModel = hiltViewModel()
+                    val recentTx by homeVm.recentTransactions.collectAsState()
+
+                    TransactionsScreen(
+                        onBack = { /* no-op for root */ },
+                        recentHome = recentTx,
                     )
                 }
             }
@@ -178,7 +171,12 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Transactions.AddExpense) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
-                    onSave = { _: HomeTransactionItem -> dashboardNavController.popBackStack() },
+                    onSave = { _ ->
+                        // repo already updated by AddExpenseViewModel; navigate to Home tab
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                            popUpTo(Screen.Dashboard.Root) { inclusive = false }
+                        }
+                    },
                     onCancel = { dashboardNavController.popBackStack() },
                 )
             }
@@ -249,7 +247,12 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Analytics.AddExpense) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
-                    onSave = { _: HomeTransactionItem -> dashboardNavController.popBackStack() },
+                    onSave = { _ ->
+                        // repo already updated by AddExpenseViewModel; navigate to Home tab
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                            popUpTo(Screen.Dashboard.Root) { inclusive = false }
+                        }
+                    },
                     onCancel = { dashboardNavController.popBackStack() },
                 )
             }
@@ -264,28 +267,6 @@ fun DashboardScreen(
     }
 
     SmsPermissionDialogHandler(vm = vm)
-}
-
-
-@Composable
-private fun TransactionsTab(onAddExpense: () -> Unit = {}) {
-    val homeVm: HomeViewModel = hiltViewModel()
-    val recentTx by homeVm.recentTransactions.collectAsState()
-
-    if (recentTx.isEmpty()) {
-        TransactionsEmptyScreen(
-            modifier = Modifier.fillMaxSize(),
-            onAddTransaction = onAddExpense,
-        )
-    } else {
-        // Real transactions list goes here once the Transactions feature is built
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = "Transactions",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-        }
-    }
 }
 
 

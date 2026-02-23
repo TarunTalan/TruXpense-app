@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.budget.Budget
 import com.example.truxpense.data.budget.BudgetRepository
+import com.example.truxpense.data.repository.dashboard.RepositoryProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -22,14 +23,18 @@ class BudgetViewModel @Inject constructor() : ViewModel() {
         initialValue = emptyList(),
     )
 
-    // UI categories with progress computed
+    private val expenseRepo = RepositoryProvider.expenseRepository
 
-    val categories: StateFlow<List<BudgetCategory>> = repoBudgets.map { list ->
-        list.mapIndexed { index, b ->
+    // UI categories with progress computed — now `spent` is derived from the expense repository
+
+    val categories: StateFlow<List<BudgetCategory>> = combine(repoBudgets, expenseRepo.transactions) { budgets, txs ->
+        val spentByCategory = txs.groupBy { it.category }.mapValues { entry -> entry.value.sumOf { it.amount }.toInt() }
+        budgets.mapIndexed { index, b ->
+            val spent = spentByCategory[b.category] ?: 0
             BudgetCategory(
                 id = 1000 + index,
                 name = b.category,
-                spent = 0,             // TODO: wire to transactions repository
+                spent = spent,
                 total = b.amount.toInt(),
                 barColor = budgetColorForCategory(b.category),
             )
@@ -51,11 +56,11 @@ class BudgetViewModel @Inject constructor() : ViewModel() {
 
     // Aggregated totals
 
-    val totalBudget: StateFlow<Int> =
-        categories.map { it.sumOf { c -> c.total } }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    val totalBudget: StateFlow<Int> = categories.map { it.sumOf { c -> c.total } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    val totalSpent: StateFlow<Int> =
-        categories.map { it.sumOf { c -> c.spent } }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    val totalSpent: StateFlow<Int> = categories.map { it.sumOf { c -> c.spent } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     // Month navigator (was `var monthIndex by remember` in BudgetScreen) ───
 
@@ -65,11 +70,9 @@ class BudgetViewModel @Inject constructor() : ViewModel() {
     val currentMonth: StateFlow<String> = _monthIndex.map { budgetMonths.getOrElse(it) { budgetMonths.first() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, budgetMonths[1])
 
-    val canGoBack: StateFlow<Boolean> =
-        _monthIndex.map { it > 0 }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val canGoBack: StateFlow<Boolean> = _monthIndex.map { it > 0 }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    val canGoForward: StateFlow<Boolean> =
-        _monthIndex.map { it < budgetMonths.lastIndex }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val canGoForward: StateFlow<Boolean> = _monthIndex.map { it < budgetMonths.lastIndex }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun previousMonth() {
         if (_monthIndex.value > 0) _monthIndex.value--
@@ -105,10 +108,7 @@ class BudgetViewModel @Inject constructor() : ViewModel() {
     private fun computeProgress(cat: BudgetCategory): Float =
         if (cat.total > 0) (cat.spent.toFloat() / cat.total.toFloat()).coerceIn(0f, 1f) else 0f
 
-    /**
-     * Returns "₹X,XXX / ₹X,XXX" — formatted by a shared util so every screen
-     * uses the same currency formatting without duplicating a NumberFormat factory.
-     */
+
     private fun formatBudgetAmounts(cat: BudgetCategory): String {
         val fmt = runCatching {
             val locale = java.util.Locale.Builder().setLanguage("en").setRegion("IN").build()

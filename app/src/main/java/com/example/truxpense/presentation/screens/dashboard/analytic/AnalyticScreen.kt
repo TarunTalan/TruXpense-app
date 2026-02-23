@@ -27,6 +27,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.budget.budgetColorForCategory
+import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
+import com.example.truxpense.presentation.screens.dashboard.home.HomeViewModel
 
 
 data class CategorySpend(
@@ -47,7 +50,7 @@ private fun formatINR(amount: Double): String {
     return "₹${"%,.0f".format(abs)}"
 }
 
-// Sample data
+// Sample data (kept for previews)
 
 val sampleCategories = listOf(
     CategorySpend("Food", 4250.0, Color(0xFFE53935)),
@@ -72,6 +75,7 @@ val sampleTrendPointsWeek = listOf(
 
 @Composable
 fun AnalyticsScreen(
+    // keep parameters for preview usage
     totalSpent: Double = 12_450.0,
     totalBudget: Double = 20_000.0,
     changePercent: Int = 8,
@@ -81,23 +85,53 @@ fun AnalyticsScreen(
     var periodExpanded by remember { mutableStateOf(false) }
     var trendRange by remember { mutableStateOf(TrendRange.MONTHLY) }
 
-    // Observe view model when available (fallback to samples for preview)
-    val vm: AnalyticsViewModel = hiltViewModel()
-    val vmCategories by vm.categories.collectAsState()
-    val vmTrendMonth by vm.trendMonth.collectAsState()
-    val vmTrendWeek by vm.trendWeek.collectAsState()
+    // Read actual data from HomeViewModel (shared dashboard state)
+    val homeVm: HomeViewModel = hiltViewModel()
+    val recentTx by homeVm.recentTransactions.collectAsState()
+    val budgetLimit by homeVm.budgetLimit.collectAsState()
+
+    // Compute aggregates from recent transactions
+    val computedCategories = remember(recentTx) {
+        recentTx.groupBy { it.category }.map { (cat, items) ->
+            val amt = items.sumOf { it.amount }
+            CategorySpend(cat, amt, budgetColorForCategory(cat))
+        }.sortedByDescending { it.amount }
+    }
+
+    val computedTotalSpent = remember(recentTx) { recentTx.sumOf { it.amount } }
+    val computedTotalBudget = budgetLimit
+
+    // Build simple trend points by splitting the recent transactions into buckets.
+    fun buildTrendPoints(
+        trans: List<HomeTransactionItem>, buckets: Int, labelsProvider: (Int) -> String
+    ): List<TrendPoint> {
+        if (trans.isEmpty()) return emptyList()
+        val per = (trans.size + buckets - 1) / buckets
+        return trans.chunked(per)
+            .mapIndexed { idx, chunk -> TrendPoint(labelsProvider(idx), chunk.sumOf { it.amount }) }
+    }
+
+    val vmTrendMonth = remember(recentTx) {
+        if (recentTx.isEmpty()) sampleTrendPointsMonth
+        else buildTrendPoints(recentTx, 5) { i -> "${(i + 1) * 7}" }
+    }
+
+    val vmTrendWeek = remember(recentTx) {
+        if (recentTx.isEmpty()) sampleTrendPointsWeek
+        else buildTrendPoints(recentTx, 7) { i ->
+            listOf(
+                "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+            )[i.coerceAtMost(6)]
+        }
+    }
 
     val periodLabel = if (periodMode == PeriodMode.MONTH) "February 2026" else "This week"
-    val trendPoints = if (periodMode == PeriodMode.MONTH) {
-        vmTrendMonth.ifEmpty { sampleTrendPointsMonth }
-    } else {
-        vmTrendWeek.ifEmpty { sampleTrendPointsWeek }
-    }
+    val trendPoints = if (periodMode == PeriodMode.MONTH) vmTrendMonth else vmTrendWeek
     val trendTitle = if (periodMode == PeriodMode.MONTH) "Spending trend this month" else "Spending trend"
     val insightText = if (periodMode == PeriodMode.MONTH) "Your spending increased during the second half of the month."
     else "Your spending increased during the first half of the week."
 
-    val categoriesToUse = vmCategories.ifEmpty { categories }
+    val categoriesToUse = if (computedCategories.isEmpty()) categories else computedCategories
     val donutTotal = categoriesToUse.sumOf { it.amount }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
@@ -108,11 +142,11 @@ fun AnalyticsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // Summary card
+            // Summary card — show computed totals if available
             item {
                 SummaryCard(
-                    totalSpent = totalSpent,
-                    totalBudget = totalBudget,
+                    totalSpent = if (computedTotalSpent > 0.0) computedTotalSpent else totalSpent,
+                    totalBudget = if (computedTotalBudget > 0.0) computedTotalBudget else totalBudget,
                     changePercent = changePercent,
                     periodMode = periodMode
                 )
@@ -152,13 +186,13 @@ fun AnalyticsScreen(
                             listOf(PeriodMode.WEEK, PeriodMode.MONTH).forEach { mode ->
                                 DropdownMenuItem(
                                     leadingIcon = {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.edit),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.edit),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
                                     text = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
                                     onClick = { periodMode = mode; periodExpanded = false })
                             }
@@ -445,13 +479,13 @@ private fun SpendingTrendCard(
                         TrendRange.entries.forEach { r ->
                             DropdownMenuItem(
                                 leadingIcon = {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.upward_arrow),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.upward_arrow),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
                                 text = { Text(r.name.lowercase().replaceFirstChar { it.uppercase() }) },
                                 onClick = { onRangeChange(r); rangeMenuExpanded = false })
                         }

@@ -7,7 +7,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.R
+import com.example.truxpense.data.budget.BudgetRepository
 import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.repository.dashboard.RepositoryProvider
+import com.example.truxpense.data.repository.dashboard.Transaction
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -51,76 +54,64 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { _requestSmsPermission.emit(Unit) }
     }
 
-    // Expense / spend data
+    // Single repository source
+    private val repository = RepositoryProvider.expenseRepository
 
-    private val _expenseCount = MutableStateFlow(0)
-    val expenseCount: StateFlow<Int> = _expenseCount.asStateFlow()
-
-    private val _monthlySpend = MutableStateFlow(0.0)
-    val monthlySpend: StateFlow<Double> = _monthlySpend.asStateFlow()
-
-    private val _budgetLimit = MutableStateFlow(0.0)
-    val budgetLimit: StateFlow<Double> = _budgetLimit.asStateFlow()
-
-    private val _budgetLeft = MutableStateFlow(0.0)
-    val budgetLeft: StateFlow<Double> = _budgetLeft.asStateFlow()
-
-    // Derived values (budget consumption)
-
-    /**
-     * Amount consumed = limit − left, clamped to ≥ 0.
-     * Replaces `val budgetUsed = (budgetLimit - budgetLeft).coerceAtLeast(0.0)` in the screen.
-     */
-    val budgetUsed: StateFlow<Double> =
-        combine(_budgetLimit, _budgetLeft) { limit, left -> (limit - left).coerceAtLeast(0.0) }.stateIn(
-                viewModelScope,
-                SharingStarted.Eagerly,
-                0.0
+    // Recent transactions (top 4) derived from central repository
+    val recentTransactions: StateFlow<List<HomeTransactionItem>> = repository.transactions.map { list ->
+        list.sortedByDescending { it.timestamp }.take(4).map { t ->
+            HomeTransactionItem(
+                id = t.id, title = t.merchant, category = t.category, amount = t.amount, currencyCode = "INR"
             )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Total spent (all time / period can be refined later)
+    val monthlySpend: StateFlow<Double> = repository.transactions.map { list -> list.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val budgetProgress: StateFlow<Float> = combine(_budgetLimit, budgetUsed) { limit, used ->
+    // Expense count
+    val expenseCount: StateFlow<Int> =
+        repository.transactions.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // Budget derived from BudgetRepository
+    val budgetLimit: StateFlow<Double> = BudgetRepository.budgets.map { list -> list.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    // Budget left = limit - totalSpent (clamped, could be negative to indicate over-spend)
+    val budgetLeft: StateFlow<Double> = combine(budgetLimit, monthlySpend) { limit, spent ->
+        (limit - spent)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    // Budget progress derived as used / limit
+    val budgetProgress: StateFlow<Float> = combine(budgetLimit, budgetLeft) { limit, left ->
+        val used = (limit - left)
         if (limit > 0) (used / limit).toFloat().coerceIn(0f, 1f) else 0f
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
 
-    // Setters (called from repository layer or tests)
+    // Top categories computed from repository transactions
+    val topCategories: StateFlow<List<HomeSpendingCategory>> =
+        combine(repository.transactions, monthlySpend) { list, total ->
+            val grouped = list.groupBy { it.category }
+            grouped.entries.map { (cat, items) ->
+                val amt = items.sumOf { it.amount }
+                val progress = if (total > 0) (amt / total).toFloat() else 0f
+                HomeSpendingCategory(cat, amt, progress)
+            }.sortedByDescending { it.amount }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setExpenseCount(count: Int) {
-        _expenseCount.value = count
-    }
-
-    fun setBudgetLimit(limit: Double) {
-        _budgetLimit.value = limit
-    }
-
-    fun setBudgetLeft(left: Double) {
-        _budgetLeft.value = left
-    }
-
-    fun setBudget(limit: Double, left: Double) {
-        _budgetLimit.value = limit
-        _budgetLeft.value = left
-    }
-
-    // Add a transaction (called from AddExpense flow)
+    // Add a transaction — delegate to repository so all consumers see it
     fun addTransaction(tx: HomeTransactionItem) {
-        _expenseCount.value += 1
-        _monthlySpend.value += tx.amount
-        _recentTx.value = _recentTx.value.toMutableList().apply { add(0, tx) }
-    }
-
-    // UI lists
-
-    private val _topCategories = MutableStateFlow(
-        listOf(
-            HomeSpendingCategory("Food", 2_400.0, 0.72f),
-            HomeSpendingCategory("Clothes", 4_500.0, 0.45f),
+        val t = Transaction(
+            id = tx.id,
+            amount = tx.amount,
+            category = tx.category,
+            paymentMethod = "",
+            merchant = tx.title,
+            timestamp = System.currentTimeMillis(),
         )
-    )
-    val topCategories: StateFlow<List<HomeSpendingCategory>> = _topCategories.asStateFlow()
-
-    private val _recentTx = MutableStateFlow<List<HomeTransactionItem>>(emptyList())
-    val recentTransactions: StateFlow<List<HomeTransactionItem>> = _recentTx.asStateFlow()
+        repository.addExpense(t)
+    }
 
     // Logout
 
