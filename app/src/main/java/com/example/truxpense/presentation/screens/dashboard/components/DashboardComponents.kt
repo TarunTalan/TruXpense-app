@@ -25,19 +25,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
-
-// Public constants used by dashboard shell
-val BOTTOM_NAV_ICON_SIZE = 24.dp
-val BOTTOM_NAV_BAR_HEIGHT = 69.dp
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 
 @Composable
 fun DashboardTopBar(username: String?) {
-    AppTopBar(username = username, showBack = false)
+    val title = username?.let { "Hi, ${it.split(' ').firstOrNull() ?: it}" } ?: "Hi"
+    ScreenTopBar(title = title, showBack = false, showProfileIcons = true)
 }
 
 @Composable
@@ -52,12 +50,12 @@ fun DashboardBottomBar(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column {
-            HorizontalDivider(modifier = Modifier.fillMaxWidth().height(1.dp))
+            HorizontalDivider(modifier = Modifier.fillMaxWidth().height(DashboardDimens.dividerHeight))
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(68.dp),
+                    .height(DashboardDimens.bottomNavHeight),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -65,13 +63,11 @@ fun DashboardBottomBar(
                     val selected = isSelected(item)
                     val contentAlpha = if (selected) 1f else 0.6f
 
-                    // Each item has its own scale animation
                     val baseScale = if (item == BottomNavBarMenu.Analytics) 1.12f else 1f
                     val scaleAnim = remember { Animatable(baseScale) }
 
                     LaunchedEffect(selected) {
                         if (selected) {
-                            // shrink a little, bounce larger then settle
                             scaleAnim.animateTo(baseScale * 0.88f, tween(durationMillis = 80))
                             scaleAnim.animateTo(
                                 baseScale * 1.06f,
@@ -97,18 +93,18 @@ fun DashboardBottomBar(
                             .clickable(
                                 indication = null,
                                 interactionSource = remember { MutableInteractionSource() }) { onItemSelected(item) }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = DashboardDimens.spaceMd),
                     ) {
                         Icon(
                             painter = painterResource(if (selected) item.selectedIcon else item.icon),
                             contentDescription = item.label,
                             modifier = Modifier
-                                .size(BOTTOM_NAV_ICON_SIZE)
+                                .size(DashboardDimens.iconLg)
                                 .scale(scaleAnim.value),
                             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = contentAlpha)
                         )
 
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(DashboardDimens.spaceXs))
 
                         Text(
                             text = item.label,
@@ -131,13 +127,13 @@ fun PermissionEnableButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.height(28.dp),
+        modifier = modifier.height(DashboardDimens.buttonHeightSm),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = Color(0xFFF4A62A),
             contentColor = Color.White,
         ),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceSm),
     ) {
         Text(
             text = "Enable",
@@ -175,14 +171,13 @@ fun SmsPermissionBanner(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier
-            .fillMaxWidth()
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(top = 8.dp, bottom = 12.dp)
+                .padding(horizontal = DashboardDimens.spaceLg)
+                .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceLg)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -192,23 +187,21 @@ fun SmsPermissionBanner(
                     painter = painterResource(id = R.drawable.sms_icon),
                     contentDescription = "Sms Icon",
                     tint = Color(0xFFF4A62A),
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(DashboardDimens.iconMd)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(DashboardDimens.spaceMd))
                 Text(
                     text = "Enable SMS access",
-                    style = androidx.compose.ui.text.TextStyle(
-                        fontSize = 12.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        lineHeight = DashboardDimens.lineHeightBanner,
                         color = Color(0xFFF4A62A),
-                    )
+                    ),
                 )
             }
 
             PermissionEnableButton(
                 onClick = { permissionLauncher.launch(permission) },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceXs)
             )
         }
     }
@@ -248,6 +241,23 @@ fun SmsPermissionBanner(
                 TextButton(onClick = { showPermanentlyDeniedDialog = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+fun AddFab(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Add",
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.background,
+    ) {
+        Icon(imageVector = Icons.Filled.Add, contentDescription = contentDescription)
     }
 }
 

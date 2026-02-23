@@ -38,11 +38,11 @@ import com.example.truxpense.presentation.screens.dashboard.analytic.AnalyticsVi
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
-import com.example.truxpense.presentation.screens.dashboard.components.BOTTOM_NAV_BAR_HEIGHT
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
 
 // Dashboard shell: owns the NavController and tab routing
@@ -86,7 +86,7 @@ fun DashboardScreen(
         bottomBar = {
             // Keep a fixed-height spacer as layout anchor; overlay the real bar visually.
             Box(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.fillMaxWidth().height(BOTTOM_NAV_BAR_HEIGHT))
+                Spacer(Modifier.fillMaxWidth().height(DashboardDimens.bottomNavHeight))
 
                 AnimatedVisibility(visible = isTopLevelDestination, enter = fadeIn(), exit = ExitTransition.None) {
                     DashboardBottomBar(
@@ -136,6 +136,13 @@ fun DashboardScreen(
                                 restoreState = true
                             }
                         },
+                        onViewAll = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                                popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                     )
                 }
             }
@@ -150,20 +157,14 @@ fun DashboardScreen(
                             popUpTo(Screen.Dashboard.Root) { inclusive = false }
                         }
                     },
-                    onCancel = { dashboardNavController.popBackStack() },
                 )
             }
 
             // Transactions tab
             composable(Screen.Dashboard.Transactions.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
-                    // Use the full TransactionsScreen and feed it the recent transactions from HomeViewModel
-                    val homeVm: HomeViewModel = hiltViewModel()
-                    val recentTx by homeVm.recentTransactions.collectAsState()
-
                     TransactionsScreen(
-                        onBack = { /* no-op for root */ },
-                        recentHome = recentTx,
+                        // recentHome was removed from TransactionsScreen signature; it reads its own data from the repository
                     )
                 }
             }
@@ -177,7 +178,6 @@ fun DashboardScreen(
                             popUpTo(Screen.Dashboard.Root) { inclusive = false }
                         }
                     },
-                    onCancel = { dashboardNavController.popBackStack() },
                 )
             }
 
@@ -253,7 +253,6 @@ fun DashboardScreen(
                             popUpTo(Screen.Dashboard.Root) { inclusive = false }
                         }
                     },
-                    onCancel = { dashboardNavController.popBackStack() },
                 )
             }
 

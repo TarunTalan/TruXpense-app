@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import kotlinx.coroutines.delay
@@ -73,33 +74,10 @@ fun AddExpenseScreenResultant(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Add Expense",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(R.drawable.back_icon),
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { contentPadding ->
+            ScreenTopBar(title = "Add Expense", showBack = true, onBack = onBack)
+         },
+         snackbarHost = { SnackbarHost(snackbarHostState) },
+     ) { contentPadding ->
 
         Column(
             modifier = Modifier.fillMaxSize().padding(

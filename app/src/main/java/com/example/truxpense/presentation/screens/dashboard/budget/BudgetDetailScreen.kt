@@ -25,9 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.BudgetProgressBar
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.util.currencyFormat
 import com.example.truxpense.util.progressColor
 
@@ -73,79 +75,69 @@ fun BudgetDetailScreen(
     )
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background, topBar = {
-            TopAppBar(
-                title = {
-                Text(
-                    text = budgetNameFinal,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }, navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        painter = painterResource(R.drawable.back_icon),
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            }, actions = {
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "More options",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            leadingIcon = {
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            ScreenTopBar(
+                title = budgetNameFinal,
+                showBack = true,
+                onBack = onBack,
+                actions = {
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
                             Icon(
-                                painter = painterResource(id = R.drawable.edit),
-                                contentDescription = "Edit",
-                                modifier = Modifier.size(18.dp),
+                                Icons.Default.MoreVert,
+                                contentDescription = "More options",
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
-                        },
-                            text = { Text("Edit budget", color = MaterialTheme.colorScheme.onBackground) },
-                            onClick = { menuExpanded = false; onEdit() })
-                        DropdownMenuItem(
-                            leadingIcon = {
-                            Icon(
-                                painter = painterResource(id = R.drawable.delete),
-                                contentDescription = "Delete",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        },
-                            text = { Text("Delete budget", color = MaterialTheme.colorScheme.error) },
-                            onClick = { menuExpanded = false; onDelete() })
-                        DropdownMenuItem(
-                            leadingIcon = {
-                            Icon(
-                                painter = painterResource(id = R.drawable.archive),
-                                contentDescription = "Archive",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        },
-                            text = { Text("Archive budget", color = MaterialTheme.colorScheme.onBackground) },
-                            onClick = { menuExpanded = false; onArchive() })
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.edit),
+                                        contentDescription = "Edit",
+                                        modifier = Modifier.size(DashboardDimens.iconNav),
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                },
+                                text = { Text("Edit budget", color = MaterialTheme.colorScheme.onBackground) },
+                                onClick = { menuExpanded = false; onEdit() })
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.delete),
+                                        contentDescription = "Delete",
+                                        modifier = Modifier.size(DashboardDimens.iconNav),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                text = { Text("Delete budget", color = MaterialTheme.colorScheme.error) },
+                                onClick = { menuExpanded = false; onDelete() })
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.archive),
+                                        contentDescription = "Archive",
+                                        modifier = Modifier.size(DashboardDimens.iconNav),
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                },
+                                text = { Text("Archive budget", color = MaterialTheme.colorScheme.onBackground) },
+                                onClick = { menuExpanded = false; onArchive() })
+                        }
                     }
                 }
-            }, colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background
             )
-            )
-        }) { innerPadding ->
+        }
+    ) { innerPadding ->
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(
+                horizontal = DashboardDimens.screenPaddingH,
+                vertical = DashboardDimens.spaceLg
+            ),
+            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg)
         ) {
 
             // Monthly budget card
@@ -175,7 +167,7 @@ fun BudgetDetailScreen(
             // Transactions header
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = DashboardDimens.spaceXs),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -198,7 +190,7 @@ fun BudgetDetailScreen(
                 TransactionCard(tx = tx)
             }
 
-            item { Spacer(Modifier.height(16.dp)) }
+            item { Spacer(Modifier.height(DashboardDimens.spaceXl)) }
         }
     }
 }
@@ -213,40 +205,38 @@ private fun MonthlyBudgetCard(
 
     // Total budget card
     Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = DashboardDimens.spaceMd),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
             Text(
                 text = "Total budget",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
             Text(
                 text = formatINR(limit),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.tertiary,
                 fontWeight = FontWeight.Black
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceSm))
             Text(
                 text = "${formatINR(spent)} spent",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceMdL))
 
             // progress bar showing used portion
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier.fillMaxWidth().height(7.dp),
-                color = barColor,
-                trackColor = Color(0xFFD9DEE3),
-                strokeCap = ProgressIndicatorDefaults.LinearStrokeCap
+            BudgetProgressBar(
+                progress = animatedProgress,
+                modifier = Modifier.fillMaxWidth(),
+                errorColor = barColor,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceSm))
 
             // Remaining budget
             Text(
@@ -269,17 +259,19 @@ private fun PeriodToggle(
 ) {
     Row(
         modifier = Modifier.wrapContentWidth().background(
-                color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(8.dp)
-            ).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)
+            color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(DashboardDimens.cornerChip)
+        ).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs)
     ) {
         PeriodTab.entries.forEach { tab ->
             val isSelected = tab == selected
             Box(
                 modifier = Modifier.background(
                     color = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent,
-                    shape = RoundedCornerShape(6.dp)
-                ).clickable { onSelect(tab) }.padding(horizontal = 16.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center) {
+                    shape = RoundedCornerShape(DashboardDimens.cornerToggleInner)
+                ).clickable { onSelect(tab) }
+                    .padding(horizontal = DashboardDimens.spaceXl, vertical = DashboardDimens.spaceSm),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
                     text = tab.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.labelMedium,
@@ -306,18 +298,19 @@ private fun SpendingTrendCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             // Date range nav
             Row(
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd)
             ) {
                 IconButton(
-                    onClick = { weekOffset-- }, modifier = Modifier.size(28.dp)
+                    onClick = { weekOffset-- }, modifier = Modifier.size(DashboardDimens.iconButtonSm)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Previous",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(DashboardDimens.iconSm)
                     )
                 }
                 Text(
@@ -326,24 +319,24 @@ private fun SpendingTrendCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(
-                    onClick = { weekOffset++ }, modifier = Modifier.size(28.dp)
+                    onClick = { weekOffset++ }, modifier = Modifier.size(DashboardDimens.iconButtonSm)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "Next",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(DashboardDimens.iconSm)
                     )
                 }
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceXs))
             Text(
                 text = "Spending trend",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
 
             // Chart
             TrendLineChart(
@@ -401,7 +394,9 @@ private fun TrendLineChart(
             pts.drop(1).forEach { lineTo(it.x, it.y) }
         }
         drawPath(
-            linePath, color = lineColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+            linePath,
+            color = lineColor,
+            style = Stroke(width = DashboardDimens.chartLineStroke.toPx(), cap = StrokeCap.Round)
         )
 
         // Dots + tooltip labels for max & min
@@ -409,14 +404,14 @@ private fun TrendLineChart(
             val isHighlight = i == maxIdx || i == minIdx
             drawCircle(
                 color = if (isHighlight) dotColor else lineColor.copy(alpha = 0.5f),
-                radius = if (isHighlight) 5.dp.toPx() else 3.dp.toPx(),
+                radius = if (isHighlight) DashboardDimens.chartDotHighlight.toPx() else DashboardDimens.chartDotNormal.toPx(),
                 center = pt
             )
             // Day labels at bottom
             drawContext.canvas.nativeCanvas.apply {
                 val paint = android.graphics.Paint().apply {
                     color = android.graphics.Color.GRAY
-                    textSize = 10.dp.toPx()
+                    textSize = DashboardDimens.textSm.toPx()
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
                 drawText(points[i].dayLabel, pt.x, h, paint)
@@ -426,7 +421,7 @@ private fun TrendLineChart(
                 drawContext.canvas.nativeCanvas.apply {
                     val paint = android.graphics.Paint().apply {
                         color = android.graphics.Color.DKGRAY
-                        textSize = 10.dp.toPx()
+                        textSize = DashboardDimens.textSm.toPx()
                         textAlign = android.graphics.Paint.Align.CENTER
                         isFakeBoldText = true
                     }
@@ -449,7 +444,7 @@ private fun TransactionCard(tx: BudgetTransaction) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             // Amount + type
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -471,32 +466,36 @@ private fun TransactionCard(tx: BudgetTransaction) {
                 }
                 if (tx.addedFrom.isNotBlank()) {
                     Surface(
-                        shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary
+                        shape = RoundedCornerShape(DashboardDimens.cornerBadge),
+                        color = MaterialTheme.colorScheme.primary
                     ) {
                         Text(
                             text = tx.addedFrom,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(
+                                horizontal = DashboardDimens.spaceMd,
+                                vertical = DashboardDimens.spaceXs
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.background,
-                            fontSize = 9.sp
+                            fontSize = DashboardDimens.textXs
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
 
             // Details section header
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     painter = painterResource(id = R.drawable.transaction_detail),
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(DashboardDimens.iconXs),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(DashboardDimens.spaceSm))
                 Text(
                     text = "Transaction details",
                     style = MaterialTheme.typography.labelMedium,
@@ -504,7 +503,7 @@ private fun TransactionCard(tx: BudgetTransaction) {
                 )
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceMdL))
 
             // Detail rows
             TransactionDetailRow("Merchant", tx.merchant)
@@ -519,7 +518,7 @@ private fun TransactionCard(tx: BudgetTransaction) {
 @Composable
 private fun TransactionDetailRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = DashboardDimens.spaceSm),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

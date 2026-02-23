@@ -1,36 +1,35 @@
 package com.example.truxpense.presentation.screens.dashboard.components
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBar(
-    username: String? = null,
-    title: String? = null,
+fun ScreenTopBar(
+    title: String,
     showBack: Boolean = false,
-    onBack: (() -> Unit)? = null
+    onBack: (() -> Unit)? = null,
+    actions: (@Composable RowScope.() -> Unit)? = null,
+    showProfileIcons: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     TopAppBar(
         title = {
             Text(
-                text = title ?: if (username.isNullOrBlank()) "Hi, there!" else "Hi, $username",
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(end = 10.dp)
             )
         },
         navigationIcon = {
@@ -39,35 +38,37 @@ fun AppTopBar(
                     Icon(
                         painter = painterResource(id = R.drawable.back_icon),
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
             }
         },
         actions = {
-            if (!showBack) {
+            if (actions != null) {
+                actions()
+            } else if (showProfileIcons && !showBack) {
                 val isDark = isSystemInDarkTheme()
-                IconButton(onClick = { /* TODO: profile */ }) {
+                IconButton(onClick = { /* profile */ }) {
                     Icon(
                         painter = painterResource(id = if (isDark) R.drawable.profile_dark_icon else R.drawable.profile_icon),
                         contentDescription = "Profile",
-                        tint = Color.Unspecified
+                        tint = androidx.compose.ui.graphics.Color.Unspecified,
                     )
                 }
-                IconButton(onClick = { /* TODO: notifications */ }) {
+                IconButton(onClick = { /* notifications */ }) {
                     Icon(
                         painter = painterResource(id = R.drawable.notifications_icon),
                         contentDescription = "Notifications",
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground
+            titleContentColor = MaterialTheme.colorScheme.onBackground,
         ),
         windowInsets = WindowInsets.statusBars,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
     )
 }
