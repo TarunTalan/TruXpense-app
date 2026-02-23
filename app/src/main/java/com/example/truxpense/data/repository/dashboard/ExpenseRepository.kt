@@ -1,10 +1,14 @@
 package com.example.truxpense.data.repository.dashboard
 
-
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
+import com.example.truxpense.data.local.dao.ExpenseDao
+import com.example.truxpense.data.local.entity.ExpenseEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+
+// ── Domain model ─────────────────────────────────────────────────────────────
 
 data class Transaction(
     val id: String = UUID.randomUUID().toString(),
@@ -12,24 +16,58 @@ data class Transaction(
     val category: String,
     val paymentMethod: String,
     val merchant: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
 )
 
-class ExpenseRepository {
+// ── Repository ────────────────────────────────────────────────────────────────
 
-    private val _transactions =
-        MutableStateFlow<List<Transaction>>(emptyList())
-
-    val transactions: StateFlow<List<Transaction>> = _transactions
-
-    fun addExpense(transaction: Transaction) {
-        // Prevent inserting the same transaction twice (id collision / double save)
-        val exists = _transactions.value.any { it.id == transaction.id }
-        if (exists) return
-        _transactions.update { it + transaction }
+@Singleton
+class ExpenseRepository @Inject constructor(
+    private val expenseDao: ExpenseDao,
+) {
+    /** Cold Flow from Room — emits fresh list on every INSERT/DELETE. */
+    val transactions: Flow<List<Transaction>> = expenseDao.getAllExpenses().map { entities ->
+        entities.map { it.toDomain() }
     }
 
+    suspend fun addExpense(transaction: Transaction) {
+        expenseDao.insertExpense(transaction.toEntity())
+    }
+
+    suspend fun deleteExpense(id: String) {
+        expenseDao.deleteExpense(id)
+    }
+
+    suspend fun clearAll() {
+        expenseDao.clearAll()
+    }
+
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
+    private fun Transaction.toEntity() = ExpenseEntity(
+        id = id,
+        amount = amount,
+        category = category,
+        paymentMethod = paymentMethod,
+        merchant = merchant,
+        timestamp = timestamp,
+    )
+
+    private fun ExpenseEntity.toDomain() = Transaction(
+        id = id,
+        amount = amount,
+        category = category,
+        paymentMethod = paymentMethod,
+        merchant = merchant,
+        timestamp = timestamp,
+    )
 }
+
+// ── Legacy singleton shim ─────────────────────────────────────────────────────
+// Kept only as a compile-time safety net; real DI uses @Inject.
+// Remove once all call-sites use Hilt injection.
 object RepositoryProvider {
-    val expenseRepository = ExpenseRepository()
+    // This will throw at runtime if someone still calls it — intentional.
+    val expenseRepository: ExpenseRepository
+        get() = error("Use Hilt @Inject instead of RepositoryProvider")
 }

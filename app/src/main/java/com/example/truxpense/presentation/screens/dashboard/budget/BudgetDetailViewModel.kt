@@ -2,88 +2,110 @@ package com.example.truxpense.presentation.screens.dashboard.budget
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.truxpense.data.repository.dashboard.BudgetRepository
+import com.example.truxpense.data.repository.dashboard.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class BudgetDetailViewModel @Inject constructor() : ViewModel() {
-    private val _budgetName = MutableStateFlow("Food Budget")
-    val budgetName: StateFlow<String> = _budgetName.asStateFlow()
+class BudgetDetailViewModel @Inject constructor(
+    private val expenseRepository: ExpenseRepository,
+    private val budgetRepository: BudgetRepository,
+) : ViewModel() {
 
-    private val _monthlyLimit = MutableStateFlow(5000.0)
-    val monthlyLimit: StateFlow<Double> = _monthlyLimit.asStateFlow()
+    // ── Navigation args (set from screen once the nav arg is received) ────────
 
-    private val _spent = MutableStateFlow(4200.0)
-    val spent: StateFlow<Double> = _spent.asStateFlow()
+    private val _categoryName = MutableStateFlow("")
+    val budgetName: StateFlow<String> = _categoryName.asStateFlow()
 
-    private val _transactions: MutableStateFlow<List<BudgetTransaction>> = MutableStateFlow(sampleTransactions)
-    val transactions: StateFlow<List<BudgetTransaction>> = _transactions.asStateFlow()
+    // ── Live budget limit from Room ───────────────────────────────────────────
 
-    private val _spendPoints: MutableStateFlow<List<SpendPoint>> = MutableStateFlow(sampleSpendPoints)
-    val spendPoints: StateFlow<List<SpendPoint>> = _spendPoints.asStateFlow()
+    val monthlyLimit: StateFlow<Double> =
+        combine(_categoryName, budgetRepository.budgets) { cat, budgets ->
+            budgets.firstOrNull { it.category == cat }?.amount ?: 0.0
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
-    fun loadBudget(name: String, limit: Double, spentAmount: Double) {
-        viewModelScope.launch {
-            _budgetName.value = name
-            _monthlyLimit.value = limit
-            _spent.value = spentAmount
-            // in real implementation, load transactions and spendPoints from repository
-        }
+    // ── Live spent amount from Room (only matching category) ──────────────────
+
+    val spent: StateFlow<Double> =
+        combine(_categoryName, expenseRepository.transactions) { cat, txs ->
+            txs.filter { it.category == cat }.sumOf { it.amount }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+
+    // ── Budget progress ───────────────────────────────────────────────────────
+
+    val progress: StateFlow<Float> =
+        combine(monthlyLimit, spent) { limit, sp ->
+            if (limit > 0) (sp / limit).toFloat().coerceIn(0f, 1f) else 0f
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
+
+    val remaining: StateFlow<Double> =
+        combine(monthlyLimit, spent) { limit, sp -> limit - sp }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+
+    // ── Transactions for this category (for the detail list) ──────────────────
+
+    val transactions: StateFlow<List<BudgetTransaction>> =
+        combine(_categoryName, expenseRepository.transactions) { cat, txs ->
+            txs.filter { it.category == cat }
+                .sortedByDescending { it.timestamp }
+                .map { t ->
+                    BudgetTransaction(
+                        id        = t.id,
+                        amount    = t.amount,
+                        type      = "Expense",
+                        addedFrom = "ADDED MANUALLY",
+                        merchant  = t.merchant,
+                        category  = t.category,
+                        account   = t.paymentMethod.ifBlank { "—" },
+                        date      = formatDate(t.timestamp),
+                        time      = formatTime(t.timestamp),
+                    )
+                }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Spend chart points (one per day across last 7 days) ───────────────────
+
+    val spendPoints: StateFlow<List<SpendPoint>> =
+        combine(_categoryName, expenseRepository.transactions) { cat, txs ->
+            val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+            val cal = java.util.Calendar.getInstance()
+            // Zero-initialise all 7 buckets
+            val buckets = MutableList(7) { 0.0 }
+            val now = System.currentTimeMillis()
+            txs.filter { it.category == cat }
+                .filter { now - it.timestamp < 7L * 24 * 60 * 60 * 1_000 }
+                .forEach { t ->
+                    cal.timeInMillis = t.timestamp
+                    // Calendar.DAY_OF_WEEK: 1=Sun … 7=Sat  →  map to Mon=0 … Sun=6
+                    val dow = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+                    buckets[dow] += t.amount
+                }
+            buckets.mapIndexed { i, amt -> SpendPoint(days[i], amt) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Load (called from NavBackStackEntry / screen init) ────────────────────
+
+    fun loadBudget(categoryName: String) {
+        _categoryName.value = categoryName
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun formatDate(ts: Long): String {
+        val months = listOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = ts }
+        return "${cal.get(java.util.Calendar.DAY_OF_MONTH)} ${months[cal.get(java.util.Calendar.MONTH)]} ${cal.get(java.util.Calendar.YEAR)}"
+    }
+
+    private fun formatTime(ts: Long): String {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = ts }
+        val h   = cal.get(java.util.Calendar.HOUR_OF_DAY)
+        val m   = cal.get(java.util.Calendar.MINUTE)
+        val ampm = if (h < 12) "AM" else "PM"
+        val hour = if (h % 12 == 0) 12 else h % 12
+        return "${hour}:${m.toString().padStart(2, '0')} $ampm"
     }
 }
-
-// Models used by the detail screen (kept with the ViewModel)
-data class BudgetTransaction(
-    val id: String,
-    val amount: Double,
-    val type: String,          // "Expense" | "Income"
-    val addedFrom: String,
-    val merchant: String,
-    val category: String,
-    val account: String,
-    val date: String,
-    val time: String,
-)
-
-data class SpendPoint(val dayLabel: String, val amount: Double)
-
-enum class PeriodTab { WEEK, MONTH }
-
-// Sample data moved here so ViewModel owns it
-val sampleTransactions = listOf(
-    BudgetTransaction(
-        id = "1",
-        amount = 1200.0,
-        type = "Expense",
-        addedFrom = "ADDED FROM SMS",
-        merchant = "Swiggy",
-        category = "Food",
-        account = "HDFC Bank",
-        date = "12 Feb 2026",
-        time = "8:45 PM"
-    ), BudgetTransaction(
-        id = "2",
-        amount = 450.0,
-        type = "Expense",
-        addedFrom = "ADDED FROM SMS",
-        merchant = "Zomato",
-        category = "Food",
-        account = "SBI Bank",
-        date = "10 Feb 2026",
-        time = "1:15 PM"
-    )
-)
-
-val sampleSpendPoints = listOf(
-    SpendPoint("Mon", 300.0),
-    SpendPoint("Tue", 1200.0),
-    SpendPoint("Wed", 600.0),
-    SpendPoint("Thu", 900.0),
-    SpendPoint("Fri", 500.0),
-    SpendPoint("Sat", 800.0),
-    SpendPoint("Sun", 400.0),
-)

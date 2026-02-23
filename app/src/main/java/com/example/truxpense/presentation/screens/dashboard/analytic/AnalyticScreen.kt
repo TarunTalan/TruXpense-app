@@ -31,15 +31,6 @@ import com.example.truxpense.presentation.screens.dashboard.budget.budgetColorFo
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.screens.dashboard.home.HomeViewModel
 
-
-data class CategorySpend(
-    val name: String, val amount: Double, val color: Color
-)
-
-data class TrendPoint(
-    val label: String, val amount: Double
-)
-
 enum class PeriodMode { MONTH, WEEK }
 enum class TrendRange { WEEKLY, MONTHLY, YEARLY }
 
@@ -53,22 +44,22 @@ private fun formatINR(amount: Double): String {
 // Sample data (kept for previews)
 
 val sampleCategories = listOf(
-    CategorySpend("Food", 4250.0, Color(0xFFE53935)),
-    CategorySpend("Shopping", 2250.0, Color(0xFFFFA726)),
-    CategorySpend("Transport", 450.0, Color(0xFF1E88E5)),
-    CategorySpend("Bills", 340.0, Color(0xFF43A047)),
-    CategorySpend("Others", 250.0, Color(0xFFBDBDBD)),
+    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Food", 4250.0, Color(0xFFE53935)),
+    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Shopping", 2250.0, Color(0xFFFFA726)),
+    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Transport", 450.0, Color(0xFF1E88E5)),
+    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Bills", 340.0, Color(0xFF43A047)),
+    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Others", 250.0, Color(0xFFBDBDBD)),
 )
 
 val sampleTrendPointsMonth = listOf(
-    TrendPoint("1", 300.0), TrendPoint("7", 1200.0), TrendPoint("14", 800.0),
-    TrendPoint("21", 500.0), TrendPoint("28", 950.0),
+    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("1", 300.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("7", 1200.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("14", 800.0),
+    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("21", 500.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("28", 950.0),
 )
 
 val sampleTrendPointsWeek = listOf(
-    TrendPoint("Mon", 300.0), TrendPoint("Tue", 1200.0), TrendPoint("Wed", 600.0),
-    TrendPoint("Thu", 400.0), TrendPoint("Fri", 800.0), TrendPoint("Sat", 500.0),
-    TrendPoint("Sun", 350.0),
+    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Mon", 300.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Tue", 1200.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Wed", 600.0),
+    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Thu", 400.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Fri", 800.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Sat", 500.0),
+    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Sun", 350.0),
 )
 
 // Screen

@@ -1,16 +1,5 @@
 package com.example.truxpense.presentation.navigation
 
-
-/**
- * Centralised route constants for the entire app.
- *
- * Auth / Onboarding routes are plain strings.
- * Dashboard routes are nested inside the [Dashboard] object so every
- * sub-graph's routes are grouped, discoverable, and impossible to typo.
- *
- * Rule: composable(route) calls must always reference these constants —
- *       never a raw string literal anywhere in the nav graph.
- */
 object Screen {
 
     // ── Auth ──────────────────────────────────────────────────────────────────
