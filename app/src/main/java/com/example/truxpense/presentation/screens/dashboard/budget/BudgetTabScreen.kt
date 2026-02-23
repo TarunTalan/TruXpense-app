@@ -121,11 +121,10 @@ fun BudgetTab(
                     progress = display.progress,
                     titleColor = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.fillMaxWidth().clickable { onNavigateToBudgetDetail(display.category) },
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)
-                )
-            }
+                    errorColor = display.category.barColor,
+                 )
+
+             }
         }
     }
 }

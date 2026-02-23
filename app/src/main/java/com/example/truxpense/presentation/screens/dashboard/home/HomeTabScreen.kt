@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,30 +27,27 @@ import com.example.truxpense.util.currencyFormat
 import com.example.truxpense.util.formatAmountParts
 import com.example.truxpense.util.progressColor
 import com.example.truxpense.util.toCurrency
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 
-/**
- * Entry-point composable for the Home tab.
- *
- * Decides between empty state and content — no data logic here.
- */
+
 @Composable
 fun HomeTabScreen(
     username: String?,
     vm: HomeViewModel,
     onLogout: (() -> Unit)?,
     onAddExpense: (() -> Unit)? = null,
+    onNavigateToBudget: (() -> Unit)? = null,
 ) {
+    // Keep empty/content decision based on expenseCount (VM-driven)
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
 
     val expenseCount by vm.expenseCount.collectAsState()
     val monthlySpend by vm.monthlySpend.collectAsState()
-    val budgetLimit by vm.budgetLimit.collectAsState()
-    val budgetLeft by vm.budgetLeft.collectAsState()
-    val budgetProgress by vm.budgetProgress.collectAsState()   // ← from VM, was computed here
+    // val budgetLimit by vm.budgetLimit.collectAsState()
+    // val budgetLeft by vm.budgetLeft.collectAsState()
+    // val budgetProgress by vm.budgetProgress.collectAsState()   // ← from VM, was computed here
 
-    // CurrencyViewModel lives here (entry point), not inside the content composable,
-    // so the hiltViewModel() call is scoped correctly and not recreated on content rerenders.
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by remember {
         derivedStateOf { currencyVm.selectedCurrency.value?.code ?: "INR" }
@@ -67,15 +65,13 @@ fun HomeTabScreen(
 
     HomeTabContent(
         monthlySpend = monthlySpend,
-        budgetLimit = budgetLimit,
-        budgetLeft = budgetLeft,
-        budgetProgress = budgetProgress,
         hasSmsPermission = hasSmsPermission,
         onAddExpense = onAddExpense,
         onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
         username = username,
         currencyCode = currencyCode,
         vm = vm,
+        onNavigateToBudget = onNavigateToBudget,
     )
 }
 
@@ -83,19 +79,24 @@ fun HomeTabScreen(
 @Composable
 fun HomeTabContent(
     monthlySpend: Double,
-    budgetLimit: Double,
-    budgetLeft: Double,
-    budgetProgress: Float,
     hasSmsPermission: Boolean,
     onAddExpense: (() -> Unit)? = null,
     onSmsGranted: (() -> Unit)? = null,
     username: String?,
     currencyCode: String = "INR",
     vm: HomeViewModel = hiltViewModel(),
+    onNavigateToBudget: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
-    val topCategories by vm.topCategories.collectAsState()
-    val recentTx by vm.recentTransactions.collectAsState()
+    val topCategories by vm.topCategories.collectAsState(initial = emptyList())
+    val recentTx by vm.recentTransactions.collectAsState(initial = emptyList<HomeTransactionItem>())
+    // Budget VM for real budget data
+    val budgetVm: BudgetViewModel = hiltViewModel()
+    val budgetItems by budgetVm.categoryDisplayItems.collectAsState(initial = emptyList())
+    val totalBudget by budgetVm.totalBudget.collectAsState()
+    val totalSpentInBudgets by budgetVm.totalSpent.collectAsState()
+    // compute overall progress as Float (avoid using remember inside LazyColumn DSL)
+    val overallProgress: Float = if (totalBudget > 0) (totalSpentInBudgets.toFloat() / totalBudget.toFloat()).coerceIn(0f, 1f) else 0f
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -141,28 +142,31 @@ fun HomeTabContent(
                 }
             }
 
-            // Budget summary
-            item {
-                SectionCard(
-                    title = "Budget",
-                    trailingContent = {
-                        FilledTonalButton(
-                            onClick = {},
-                            modifier = Modifier.height(DashboardDimens.buttonHeightSm),
-                            contentPadding = PaddingValues(horizontal = DashboardDimens.spaceLg),
-                        ) {
-                            Text("Details", style = MaterialTheme.typography.labelMedium)
-                        }
-                    },
-                ) {
-                    Text(
-                        text = "${budgetLeft.toCurrency(fmt)} of ${budgetLimit.toCurrency(fmt)}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.height(DashboardDimens.spaceMdL))
-                    BudgetProgressBar(progress = budgetProgress)
+            // Budget summary — show only when user has created budgets
+            if (budgetItems.isNotEmpty()) {
+                // overall budget progress computed from BudgetViewModel totals
+                item {
+                    SectionCard(
+                        title = "Budget",
+                        trailingContent = {
+                            FilledTonalButton(
+                                onClick = { onNavigateToBudget?.invoke() },
+                                modifier = Modifier.height(DashboardDimens.buttonHeightSm),
+                                contentPadding = PaddingValues(horizontal = DashboardDimens.spaceLg),
+                            ) {
+                                Text("Details", style = MaterialTheme.typography.labelMedium)
+                            }
+                        },
+                    ) {
+                        Text(
+                            text = "${(totalBudget.toDouble() - totalSpentInBudgets.toDouble()).toCurrency(fmt)} of ${totalBudget.toDouble().toCurrency(fmt)}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(DashboardDimens.spaceMdL))
+                        BudgetProgressBar(progress = overallProgress)
+                    }
                 }
             }
 
@@ -446,9 +450,6 @@ fun HomeTabScreenPreview() {
     MaterialTheme {
         HomeTabContent(
             monthlySpend = 1_234.56,
-            budgetLimit = 10_000.0,
-            budgetLeft = 5_123.45,
-            budgetProgress = 0.49f,
             hasSmsPermission = false,
             onAddExpense = {},
             onSmsGranted = {},

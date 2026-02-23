@@ -15,9 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -78,14 +78,23 @@ fun AddExpenseScreen(
         onDatePick = onDatePick,
         onSave = { // build tx and forward to parent onSave
             val amt = vm.rawAmount.value.toDoubleOrNull() ?: 0.0
+            val merchantVal = vm.merchant.value.ifBlank { "Expense" }
+            val categoryVal = vm.selectedCategory.value ?: "Other"
+            val accountVal = vm.selectedAccount.value ?: ""
+            // Persist via ViewModel
+            vm.saveExpense(
+                amount = amt,
+                category = categoryVal,
+                paymentMethod = accountVal,
+                merchant = merchantVal
+            )
             val tx = HomeTransactionItem(
                 id = UUID.randomUUID().toString(),
-                title = vm.merchant.value.ifBlank { "Expense" },
-                category = vm.selectedCategory.value ?: "Other",
+                title = merchantVal,
+                category = categoryVal,
                 amount = amt,
                 currencyCode = "INR",
             )
-            vm.save {}
             onSave(tx)
         },
         onCancel = onCancel,
@@ -323,7 +332,8 @@ private fun DetailsCard(
     ) {
         Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
             // Row 1 — Category selector (inline, no label/bg/border)
-            Box(modifier = Modifier
+            Box(
+                modifier = Modifier
                 .fillMaxWidth()
                 .clickable(
                     indication = null,
@@ -333,7 +343,8 @@ private fun DetailsCard(
             ) {
                 // measure the anchor width so the dropdown can match the card width
                 val anchorWidthPx = remember { mutableStateOf(0) }
-                Box(modifier = Modifier
+                Box(
+                    modifier = Modifier
                     .fillMaxWidth()
                     .onGloballyPositioned { anchorWidthPx.value = it.size.width }
                     .clickable(
@@ -349,7 +360,8 @@ private fun DetailsCard(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val selTrim = selectedCategory?.trim().orEmpty()
-                            val showIcon = selTrim.isNotEmpty() && selTrim.lowercase() != "other" && selTrim.lowercase() != "others"
+                            val showIcon =
+                                selTrim.isNotEmpty() && selTrim.lowercase() != "other" && selTrim.lowercase() != "others"
                             if (showIcon) {
                                 Icon(
                                     painter = painterResource(iconForCategory(selectedCategory!!)),
@@ -391,8 +403,16 @@ private fun DetailsCard(
                                 val trimmed = item.trim().lowercase()
                                 DropdownMenuItem(
                                     text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                            Text(text = item, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.weight(1f))
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = item,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = MaterialTheme.colorScheme.onBackground,
+                                                modifier = Modifier.weight(1f)
+                                            )
                                         }
                                     },
                                     onClick = {
@@ -550,7 +570,6 @@ private fun DateRow(value: String?, onClick: () -> Unit) {
 }
 
 
-
 // ─── ③ Notes Card ────────────────────────────────────────────────────────────
 
 @Composable
@@ -678,7 +697,7 @@ fun AddExpenseScreenPreview() {
         selectedAccount = "Cash",
         accountExpanded = false,
         categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Groceries", "Other"),
-        accounts = listOf("HDFC Bank","SBI","ICICI Bank","Axis Bank","Cash","UPI"),
+        accounts = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI"),
         selectedDate = null,
         isFormValid = true,
         onRawChange = {},

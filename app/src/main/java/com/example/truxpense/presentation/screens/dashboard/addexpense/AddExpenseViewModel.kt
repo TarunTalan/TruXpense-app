@@ -2,6 +2,8 @@ package com.example.truxpense.presentation.screens.dashboard.addexpense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.truxpense.data.repository.dashboard.RepositoryProvider
+import com.example.truxpense.data.repository.dashboard.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -92,10 +94,22 @@ class AddExpenseViewModel @Inject constructor() : ViewModel() {
         _selectedDate.value = date
     }
 
-    fun save(onSaved: () -> Unit) {
-        viewModelScope.launch {
-            // TODO: persist via repository
-            onSaved()
-        }
+    private val repository = RepositoryProvider.expenseRepository
+
+    fun saveExpense(
+        amount: Double,
+        category: String,
+        paymentMethod: String,
+        merchant: String
+    ) {
+        repository.addExpense(
+            Transaction(
+                amount = amount,
+                category = category,
+                paymentMethod = paymentMethod,
+                merchant = merchant
+            )
+        )
     }
+
 }
