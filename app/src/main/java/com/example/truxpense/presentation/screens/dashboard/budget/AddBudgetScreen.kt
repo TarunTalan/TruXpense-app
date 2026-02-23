@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.components.CategoryDropdown
 import com.example.truxpense.presentation.components.NumberField
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
@@ -52,9 +53,7 @@ fun AddBudgetScreen(
     }
 
     Scaffold(
-        topBar = {
-            ScreenTopBarWithBack(title = "Add Budget", onBack = onBack)
-        },
+        topBar = { ScreenTopBar(title = "Add Budget", showBack = true, onBack = onBack) },
         bottomBar = {
             if (!expanded) {
                 Column(
@@ -255,33 +254,6 @@ fun AddBudgetScreen(
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ScreenTopBarWithBack(title: String, onBack: () -> Unit) {
-    TopAppBar(
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(
-                    painter = painterResource(R.drawable.back_icon),
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground,
-        ),
-    )
-}
 
 // Section card shell
 

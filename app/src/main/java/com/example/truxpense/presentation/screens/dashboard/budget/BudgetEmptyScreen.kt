@@ -19,23 +19,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetTopBar() {
-    TopAppBar(
-        title = {
-            Text(
-                text = "Budgets",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1
-            )
-        }, colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground
-        ), modifier = Modifier.fillMaxWidth()
-    )
+    ScreenTopBar(title = "Budgets", showBack = false)
 }
 
 @Composable

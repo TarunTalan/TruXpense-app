@@ -4,8 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,7 +18,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SpendingCategoryCard
+import com.example.truxpense.presentation.screens.dashboard.components.AddFab
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.util.currencyFormat
 import com.example.truxpense.util.toCurrency
@@ -43,7 +43,7 @@ fun BudgetTab(
     val canGoBack by vm.canGoBack.collectAsState()
     val canGoForward by vm.canGoForward.collectAsState()
 
-    val budgetsToShow = previewBudgets?.mapIndexed { i, cat ->
+    val budgetsToShow = previewBudgets?.mapIndexed { _, cat ->
         BudgetCategoryDisplay(
             category = cat,
             amountText = "${cat.spent} / ${cat.total}",
@@ -60,31 +60,9 @@ fun BudgetTab(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Budgets",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
-            )
-        },
+        topBar = { ScreenTopBar(title = "Budgets", showBack = false) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddBudget,
-                shape = MaterialTheme.shapes.medium,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.background,
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add budget")
-            }
+            AddFab(onClick = onNavigateToAddBudget)
         },
     ) { innerPadding ->
         LazyColumn(
@@ -122,9 +100,9 @@ fun BudgetTab(
                     titleColor = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.fillMaxWidth().clickable { onNavigateToBudgetDetail(display.category) },
                     errorColor = display.category.barColor,
-                 )
+                )
 
-             }
+            }
         }
     }
 }

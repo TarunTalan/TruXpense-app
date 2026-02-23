@@ -2,7 +2,10 @@ package com.example.truxpense.presentation.screens.dashboard.analytic
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,20 +16,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsTopBar() {
-    TopAppBar(
-        title = {
-            Text(
-                text = "Analytics", style = MaterialTheme.typography.titleLarge, maxLines = 1
-            )
-        }, colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground
-        )
-    )
+    ScreenTopBar(title = "Analytics", showBack = false)
 }
 
 @Composable

@@ -4,30 +4,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.truxpense.presentation.screens.dashboard.components.DashboardTopBar
-import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
-import com.example.truxpense.presentation.screens.dashboard.components.SpendingCategoryCard
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
+import com.example.truxpense.presentation.screens.dashboard.components.*
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.util.currencyFormat
 import com.example.truxpense.util.formatAmountParts
-import com.example.truxpense.util.progressColor
 import com.example.truxpense.util.toCurrency
-import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 
 
 @Composable
@@ -37,6 +30,7 @@ fun HomeTabScreen(
     onLogout: (() -> Unit)?,
     onAddExpense: (() -> Unit)? = null,
     onNavigateToBudget: (() -> Unit)? = null,
+    onViewAll: (() -> Unit)? = null,
 ) {
     // Keep empty/content decision based on expenseCount (VM-driven)
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
@@ -72,6 +66,7 @@ fun HomeTabScreen(
         currencyCode = currencyCode,
         vm = vm,
         onNavigateToBudget = onNavigateToBudget,
+        onViewAll = onViewAll,
     )
 }
 
@@ -86,6 +81,7 @@ fun HomeTabContent(
     currencyCode: String = "INR",
     vm: HomeViewModel = hiltViewModel(),
     onNavigateToBudget: (() -> Unit)? = null,
+    onViewAll: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
     val topCategories by vm.topCategories.collectAsState(initial = emptyList())
@@ -96,26 +92,23 @@ fun HomeTabContent(
     val totalBudget by budgetVm.totalBudget.collectAsState()
     val totalSpentInBudgets by budgetVm.totalSpent.collectAsState()
     // compute overall progress as Float (avoid using remember inside LazyColumn DSL)
-    val overallProgress: Float = if (totalBudget > 0) (totalSpentInBudgets.toFloat() / totalBudget.toFloat()).coerceIn(0f, 1f) else 0f
+    val overallProgress: Float =
+        if (totalBudget > 0) (totalSpentInBudgets.toFloat() / totalBudget.toFloat()).coerceIn(0f, 1f) else 0f
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { DashboardTopBar(username = username) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onAddExpense?.invoke() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add expense")
-            }
+            AddFab(onClick = { onAddExpense?.invoke() })
         },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(
-                horizontal = DashboardDimens.screenPaddingH,
-                vertical = DashboardDimens.spaceLg,
+                start = DashboardDimens.screenPaddingH,
+                end = DashboardDimens.screenPaddingH,
+                top = DashboardDimens.spaceLg,
+                bottom = DashboardDimens.spaceLg,
             ),
             verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
@@ -152,14 +145,16 @@ fun HomeTabContent(
                             FilledTonalButton(
                                 onClick = { onNavigateToBudget?.invoke() },
                                 modifier = Modifier.height(DashboardDimens.buttonHeightSm),
-                                contentPadding = PaddingValues(horizontal = DashboardDimens.spaceLg),
+                                contentPadding = PaddingValues(start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg),
                             ) {
                                 Text("Details", style = MaterialTheme.typography.labelMedium)
                             }
                         },
                     ) {
                         Text(
-                            text = "${(totalBudget.toDouble() - totalSpentInBudgets.toDouble()).toCurrency(fmt)} of ${totalBudget.toDouble().toCurrency(fmt)}",
+                            text = "${(totalBudget.toDouble() - totalSpentInBudgets.toDouble()).toCurrency(fmt)} of ${
+                                totalBudget.toDouble().toCurrency(fmt)
+                            }",
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.SemiBold,
@@ -194,7 +189,10 @@ fun HomeTabContent(
 
             // Recent transactions
             item {
-                RecentTransactionsCard(transactions = recentTx)
+                RecentTransactionsCard(
+                    transactions = recentTx,
+                    onViewAll = { onViewAll?.invoke() }
+                )
             }
 
             // FAB clearance — last item never hidden behind the FAB
@@ -246,30 +244,6 @@ private fun SectionHeader(text: String) {
     )
 }
 
-// Budget progress bar
-
-@Composable
-fun BudgetProgressBar(
-    progress: Float,
-    modifier: Modifier = Modifier,
-) {
-    val color = progressColor(progress, MaterialTheme.colorScheme.error)
-    Column(modifier = modifier) {
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth().height(DashboardDimens.progressBarHeight2),
-            color = color,
-            trackColor = Color(0xFFD9DEE3),
-            strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
-        )
-        Spacer(Modifier.height(DashboardDimens.spaceXs))
-        Text(
-            text = "${(progress * 100).toInt()}% used",
-            style = MaterialTheme.typography.bodySmall,
-            color = color,
-        )
-    }
-}
 
 // Insight nudge card
 
@@ -308,6 +282,7 @@ private fun InsightCard(
 fun RecentTransactionsCard(
     modifier: Modifier = Modifier,
     transactions: List<HomeTransactionItem>,
+    onViewAll: (() -> Unit)? = null,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -319,9 +294,9 @@ fun RecentTransactionsCard(
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth().padding(
-                        horizontal = DashboardDimens.screenPaddingH,
-                        vertical = DashboardDimens.spaceLg,
-                    ),
+                    horizontal = DashboardDimens.screenPaddingH,
+                    vertical = DashboardDimens.spaceLg,
+                ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -334,6 +309,7 @@ fun RecentTransactionsCard(
                     text = "View all",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onViewAll?.invoke() }
                 )
             }
 
@@ -342,9 +318,9 @@ fun RecentTransactionsCard(
             // Column labels
             Row(
                 modifier = Modifier.fillMaxWidth().padding(
-                        horizontal = DashboardDimens.screenPaddingH,
-                        vertical = DashboardDimens.spaceMd,
-                    ),
+                    horizontal = DashboardDimens.screenPaddingH,
+                    vertical = DashboardDimens.spaceMd,
+                ),
                 horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
             ) {
                 TxColumnLabel("Transaction", Modifier.weight(1f), TextAlign.Start)
@@ -398,9 +374,9 @@ private fun TransactionRow(tx: HomeTransactionItem) {
     val (prefix, numeric, suffix) = formatAmountParts(tx.amount, tx.currencyCode)
     Row(
         modifier = Modifier.fillMaxWidth().padding(
-                horizontal = DashboardDimens.screenPaddingH,
-                vertical = DashboardDimens.spaceLg,
-            ),
+            horizontal = DashboardDimens.screenPaddingH,
+            vertical = DashboardDimens.spaceLg,
+        ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
     ) {
@@ -447,14 +423,104 @@ private fun TransactionRow(tx: HomeTransactionItem) {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun HomeTabScreenPreview() {
+    val sampleTopCategories = listOf(
+        HomeSpendingCategory("Food", 4250.0, 0.42f),
+        HomeSpendingCategory("Shopping", 2250.0, 0.22f),
+        HomeSpendingCategory("Transport", 450.0, 0.045f),
+    )
+    val sampleRecent = listOf(
+        HomeTransactionItem(id = "tx1", title = "Zomato", category = "Food", amount = 500.0, currencyCode = "INR"),
+        HomeTransactionItem(id = "tx2", title = "Uber", category = "Transport", amount = 350.0, currencyCode = "INR"),
+        HomeTransactionItem(
+            id = "tx3",
+            title = "BigBasket",
+            category = "Groceries",
+            amount = 1200.0,
+            currencyCode = "INR"
+        ),
+    )
+
+    val fmt = remember { currencyFormat("INR") }
+
     MaterialTheme {
-        HomeTabContent(
-            monthlySpend = 1_234.56,
-            hasSmsPermission = false,
-            onAddExpense = {},
-            onSmsGranted = {},
-            username = "Tarun",
-            currencyCode = "INR",
-        )
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = { DashboardTopBar(username = "Tarun") },
+            floatingActionButton = {
+                AddFab(onClick = {})
+            }
+        ) { inner ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(inner),
+                contentPadding = PaddingValues(
+                    start = DashboardDimens.screenPaddingH,
+                    end = DashboardDimens.screenPaddingH,
+                    top = DashboardDimens.spaceLg,
+                    bottom = DashboardDimens.spaceLg,
+                ),
+                verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
+            ) {
+                item {
+                    SectionCard(title = "Spend this month") {
+                        Text(
+                            text = 12345.0.toCurrency(fmt),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+
+                item {
+                    SectionCard(
+                        title = "Budget",
+                        trailingContent = {
+                            FilledTonalButton(
+                                onClick = { /*TODO*/ },
+                                modifier = Modifier.height(DashboardDimens.buttonHeightSm),
+                                contentPadding = PaddingValues(start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg),
+                            ) {
+                                Text("Details", style = MaterialTheme.typography.labelMedium)
+                            }
+                        },
+                    ) {
+                        Text(
+                            text = "8,000.00 of 10,000.00",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(DashboardDimens.spaceMdL))
+                        BudgetProgressBar(progress = 0.8f)
+                    }
+                }
+
+                item {
+                    InsightCard(
+                        message = "You spent more on food this week than usual",
+                        actionText = "Consider setting a weekly limit",
+                        onAction = { /* navigate */ },
+                    )
+                }
+
+                item {
+                    SectionHeader(text = "Highest spending categories this month")
+                }
+
+                items(sampleTopCategories, key = { it.name }) { category ->
+                    SpendingCategoryCard(
+                        category = category,
+                        fmt = fmt,
+                        errorColor = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                item {
+                    RecentTransactionsCard(transactions = sampleRecent)
+                }
+
+                item { Spacer(Modifier.height(DashboardDimens.fabClearance)) }
+            }
+        }
     }
 }

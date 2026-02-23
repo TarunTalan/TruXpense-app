@@ -5,13 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,10 +24,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.budget.budgetColorForCategory
+import com.example.truxpense.presentation.screens.dashboard.components.DateNavigatorRow
+import com.example.truxpense.presentation.screens.dashboard.components.PeriodTabRow
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.screens.dashboard.home.HomeViewModel
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 
-enum class PeriodMode { MONTH, WEEK }
+enum class PeriodMode(val label: String) {
+    WEEK("week"), MONTH("Month"), YEAR("Year"),
+}
+
 enum class TrendRange { WEEKLY, MONTHLY, YEARLY }
 
 // Helpers
@@ -44,26 +47,30 @@ private fun formatINR(amount: Double): String {
 // Sample data (kept for previews)
 
 val sampleCategories = listOf(
-    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Food", 4250.0, Color(0xFFE53935)),
-    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Shopping", 2250.0, Color(0xFFFFA726)),
-    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Transport", 450.0, Color(0xFF1E88E5)),
-    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Bills", 340.0, Color(0xFF43A047)),
-    com.example.truxpense.presentation.screens.dashboard.analytic.CategorySpend("Others", 250.0, Color(0xFFBDBDBD)),
+    CategorySpend("Food", 4250.0, Color(0xFFE53935)),
+    CategorySpend("Shopping", 2250.0, Color(0xFFFFA726)),
+    CategorySpend("Transport", 450.0, Color(0xFF1E88E5)),
+    CategorySpend("Bills", 340.0, Color(0xFF43A047)),
+    CategorySpend("Others", 250.0, Color(0xFFBDBDBD)),
 )
 
 val sampleTrendPointsMonth = listOf(
-    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("1", 300.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("7", 1200.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("14", 800.0),
-    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("21", 500.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("28", 950.0),
+    TrendPoint("1", 300.0),
+    TrendPoint("7", 1200.0), TrendPoint("14", 800.0),
+    TrendPoint("21", 500.0), TrendPoint("28", 950.0),
 )
 
 val sampleTrendPointsWeek = listOf(
-    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Mon", 300.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Tue", 1200.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Wed", 600.0),
-    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Thu", 400.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Fri", 800.0), com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Sat", 500.0),
-    com.example.truxpense.presentation.screens.dashboard.analytic.TrendPoint("Sun", 350.0),
+    TrendPoint("Mon", 300.0),
+    TrendPoint("Tue", 1200.0), TrendPoint("Wed", 600.0),
+    TrendPoint("Thu", 400.0),
+    TrendPoint("Fri", 800.0), TrendPoint("Sat", 500.0),
+    TrendPoint("Sun", 350.0),
 )
 
 // Screen
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(
     // keep parameters for preview usage
@@ -71,15 +78,29 @@ fun AnalyticsScreen(
     totalBudget: Double = 20_000.0,
     changePercent: Int = 8,
     categories: List<CategorySpend> = sampleCategories,
+    // Optional overrides for preview / non-Hilt usage
+    recentTransactionsOverride: List<HomeTransactionItem>? = null,
+    budgetLimitOverride: Double? = null,
 ) {
     var periodMode by remember { mutableStateOf(PeriodMode.MONTH) }
-    var periodExpanded by remember { mutableStateOf(false) }
     var trendRange by remember { mutableStateOf(TrendRange.MONTHLY) }
+    // Month navigator offset (0 = current month, -1 = prev, etc.)
+    var monthOffset by remember { mutableStateOf(0) }
 
-    // Read actual data from HomeViewModel (shared dashboard state)
-    val homeVm: HomeViewModel = hiltViewModel()
-    val recentTx by homeVm.recentTransactions.collectAsState()
-    val budgetLimit by homeVm.budgetLimit.collectAsState()
+    // If overrides are provided (preview), use them; otherwise read actual data from HomeViewModel
+    val recentTx: List<HomeTransactionItem>
+    val budgetLimit: Double
+
+    if (recentTransactionsOverride != null && budgetLimitOverride != null) {
+        recentTx = recentTransactionsOverride
+        budgetLimit = budgetLimitOverride
+    } else {
+        val homeVm: HomeViewModel = hiltViewModel()
+        val recentTxState by homeVm.recentTransactions.collectAsState()
+        val budgetLimitState by homeVm.budgetLimit.collectAsState()
+        recentTx = recentTransactionsOverride ?: recentTxState
+        budgetLimit = budgetLimitOverride ?: budgetLimitState
+    }
 
     // Compute aggregates from recent transactions
     val computedCategories = remember(recentTx) {
@@ -116,21 +137,55 @@ fun AnalyticsScreen(
         }
     }
 
-    val periodLabel = if (periodMode == PeriodMode.MONTH) "February 2026" else "This week"
+    val periodLabel = when (periodMode) {
+        PeriodMode.MONTH -> {
+            val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+            val base = 1 // February = index 1
+            val total = base + monthOffset
+            val year = 2026 + (total / 12)
+            val month = ((total % 12) + 12) % 12
+            "${
+                listOf(
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December"
+                )[month]
+            } $year"
+        }
+
+        PeriodMode.WEEK -> if (monthOffset == 0) "This week" else "Week of ${16 + monthOffset * 7} Feb"
+        PeriodMode.YEAR -> if (monthOffset == 0) "2026" else "${2026 + monthOffset}"
+    }
+    val canNavBack = monthOffset > -12
+    val canNavForward = monthOffset < 0
     val trendPoints = if (periodMode == PeriodMode.MONTH) vmTrendMonth else vmTrendWeek
     val trendTitle = if (periodMode == PeriodMode.MONTH) "Spending trend this month" else "Spending trend"
     val insightText = if (periodMode == PeriodMode.MONTH) "Your spending increased during the second half of the month."
     else "Your spending increased during the first half of the week."
 
-    val categoriesToUse = if (computedCategories.isEmpty()) categories else computedCategories
+    val categoriesToUse = computedCategories.ifEmpty { categories }
     val donutTotal = categoriesToUse.sumOf { it.amount }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { ScreenTopBar(title = "Analytics", showBack = false) },
+    ) { innerPadding ->
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(innerPadding), contentPadding = PaddingValues(
+                start = DashboardDimens.screenPaddingH,
+                end = DashboardDimens.screenPaddingH,
+                bottom = DashboardDimens.spaceLg
+            ), verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg)
         ) {
 
             // Summary card — show computed totals if available
@@ -143,71 +198,25 @@ fun AnalyticsScreen(
                 )
             }
 
-            // Period selector + date nav
+            // ── Period segmented control ──────────────────────────────────────
             item {
-                Row(
+                PeriodTabRow(
+                    selected = periodMode,
+                    onSelect = { periodMode = it as PeriodMode; monthOffset = 0 },
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Dropdown pill
-                    Box {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.clickable { periodExpanded = true }) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (periodMode == PeriodMode.MONTH) "Month" else "Week",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = periodExpanded, onDismissRequest = { periodExpanded = false }) {
-                            listOf(PeriodMode.WEEK, PeriodMode.MONTH).forEach { mode ->
-                                DropdownMenuItem(
-                                    leadingIcon = {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.edit),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    },
-                                    text = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                    onClick = { periodMode = mode; periodExpanded = false })
-                            }
-                        }
-                    }
+                )
+            }
 
-                    // Date nav
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = periodLabel,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Icon(
-                            painter = painterResource(R.drawable.right_arrow),
-                            contentDescription = "Next",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            // ── Month / period navigator ──────────────────────────────────────
+            item {
+                DateNavigatorRow(
+                    label = periodLabel,
+                    canBack = canNavBack,
+                    canForward = canNavForward,
+                    onBack = { monthOffset-- },
+                    onForward = { if (monthOffset < 0) monthOffset++ },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             // Donut chart
@@ -233,7 +242,7 @@ fun AnalyticsScreen(
                 )
             }
 
-            item { Spacer(Modifier.height(16.dp)) }
+            item { Spacer(Modifier.height(DashboardDimens.spaceXl)) }
         }
     }
 }
@@ -250,30 +259,30 @@ private fun SummaryCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             Text(
                 text = "${formatINR(totalSpent)} spent in $monthName",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceXxs))
             Text(
                 text = "of ${formatINR(totalBudget)} Budget",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceSm))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     painter = painterResource(R.drawable.upward_arrow),
                     contentDescription = null,
                     tint = Color(0xFF43A047),
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(DashboardDimens.iconXs)
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(DashboardDimens.spaceXs))
                 Text(
-                    text = "↑ $changePercent% vs January",
+                    text = "$changePercent% vs January",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF43A047)
                 )
@@ -298,17 +307,18 @@ private fun DonutChartCard(
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(DashboardDimens.cardPadding), horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                modifier = Modifier.size(200.dp), contentAlignment = Alignment.Center
+                modifier = Modifier.size(DashboardDimens.donutChartSize), contentAlignment = Alignment.Center
             ) {
                 DonutChart(categories = categories, total = total)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = formatINR(total),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         text = "Total spent",
@@ -318,16 +328,16 @@ private fun DonutChartCard(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceMdL))
 
             insights.forEach { text ->
                 Text(
                     text = text,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    modifier = Modifier.fillMaxWidth().padding(vertical = DashboardDimens.spaceXxs)
                 )
             }
         }
@@ -348,7 +358,7 @@ private fun DonutChart(
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val strokeWidth = 38.dp.toPx()
+        val strokeWidth = DashboardDimens.donutStrokeWidth.toPx()
         val diameter = size.minDimension - strokeWidth
         val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
         val arcSize = Size(diameter, diameter)
@@ -358,7 +368,7 @@ private fun DonutChart(
             drawArc(
                 color = categories[i].color,
                 startAngle = startAngle,
-                sweepAngle = sweep - 2f, // 2° gap between segments
+                sweepAngle = sweep - 2f,
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcSize,
@@ -378,29 +388,32 @@ private fun LabelsCard(categories: List<CategorySpend>) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             Text(
                 text = "Labels",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 10.dp)
+                modifier = Modifier.padding(bottom = DashboardDimens.spaceMdL),
+                color = MaterialTheme.colorScheme.onBackground
             )
             categories.forEachIndexed { index, cat ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = DashboardDimens.spaceMdL - 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMdL)
                     ) {
                         Box(
                             modifier = Modifier.size(10.dp).background(cat.color, CircleShape)
                         )
 
                         Text(
-                            text = cat.name, style = MaterialTheme.typography.bodyMedium
+                            text = cat.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                     Text(
@@ -436,7 +449,7 @@ private fun SpendingTrendCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             // Header row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -449,51 +462,18 @@ private fun SpendingTrendCard(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Box {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { rangeMenuExpanded = true }) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = trendRange.name.lowercase().replaceFirstChar { it.uppercase() },
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                            Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = rangeMenuExpanded, onDismissRequest = { rangeMenuExpanded = false }) {
-                        TrendRange.entries.forEach { r ->
-                            DropdownMenuItem(
-                                leadingIcon = {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.upward_arrow),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                text = { Text(r.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                onClick = { onRangeChange(r); rangeMenuExpanded = false })
-                        }
-                    }
-                }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
 
             // Chart
             TrendLineChart(
-                points = points, modifier = Modifier.fillMaxWidth().height(120.dp)
+                points = points, modifier = Modifier.fillMaxWidth().height(DashboardDimens.trendChartHeight)
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceMdL))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
 
             Text(
                 text = insightText,
@@ -523,20 +503,29 @@ private fun TrendLineChart(
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val labelH = 18.dp.toPx()
-        val chartH = h - labelH
-        val step = w / (points.size - 1).coerceAtLeast(1)
 
-        fun xAt(i: Int) = i * step
-        fun yAt(v: Double) = (chartH - (v / maxVal * chartH * 0.82f)).toFloat()
+        // Internal padding so everything (points, labels, tooltips) stays inside the card bounds
+        val paddingTop = DashboardDimens.chartPadV.toPx()
+        val paddingBottom = DashboardDimens.spaceXxl.toPx() // leave space for day labels
+        val paddingHorizontal = DashboardDimens.chartPadH.toPx()
+
+        val chartLeft = paddingHorizontal
+        val chartRight = (w - paddingHorizontal)
+        val chartWidth = (chartRight - chartLeft).coerceAtLeast(1f)
+        val chartH = (h - paddingTop - paddingBottom).coerceAtLeast(1f)
+
+        val step = chartWidth / (points.size - 1).coerceAtLeast(1)
+
+        fun xAt(i: Int) = chartLeft + i * step
+        fun yAt(v: Double) = (paddingTop + chartH - (v / maxVal * chartH * 0.82f)).toFloat()
 
         val pts = points.mapIndexed { i, p -> Offset(xAt(i), yAt(p.amount)) }
 
-        // Fill
+        // Fill area under line
         val fillPath = Path().apply {
-            moveTo(pts.first().x, chartH)
+            moveTo(pts.first().x, paddingTop + chartH)
             pts.forEach { lineTo(it.x, it.y) }
-            lineTo(pts.last().x, chartH)
+            lineTo(pts.last().x, paddingTop + chartH)
             close()
         }
         drawPath(
@@ -550,20 +539,26 @@ private fun TrendLineChart(
             moveTo(pts.first().x, pts.first().y)
             pts.drop(1).forEach { lineTo(it.x, it.y) }
         }
-        drawPath(linePath, color = lineColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(
+            linePath,
+            color = lineColor,
+            style = Stroke(width = DashboardDimens.chartLineStroke.toPx(), cap = StrokeCap.Round)
+        )
 
         // Dots
         pts.forEachIndexed { i, pt ->
             val isHighlight = i == maxIdx || i == secondIdx
             if (isHighlight) {
-                drawCircle(color = lineColor, radius = 5.dp.toPx(), center = pt)
-                drawCircle(color = Color.White, radius = 3.dp.toPx(), center = pt)
+                drawCircle(color = lineColor, radius = DashboardDimens.chartDotHighlight.toPx(), center = pt)
+                drawCircle(color = Color.White, radius = DashboardDimens.chartDotNormal.toPx(), center = pt)
             } else {
-                drawCircle(color = lineColor.copy(alpha = 0.4f), radius = 2.5.dp.toPx(), center = pt)
+                drawCircle(
+                    color = lineColor.copy(alpha = 0.4f), radius = DashboardDimens.spaceXxs.toPx() + 0.5f, center = pt
+                )
             }
         }
 
-        // Tooltip labels for highlights
+        // Tooltip labels for highlights (draw above the point, keep inside top padding)
         val nativeCanvas = drawContext.canvas.nativeCanvas
         listOf(maxIdx, secondIdx).forEach { idx ->
             if (idx < 0) return@forEach
@@ -571,51 +566,87 @@ private fun TrendLineChart(
             val label = formatINR(points[idx].amount)
             val paint = android.graphics.Paint().apply {
                 color = android.graphics.Color.DKGRAY
-                textSize = 10.dp.toPx()
+                textSize = DashboardDimens.textSm.toPx()
                 textAlign = android.graphics.Paint.Align.CENTER
                 isFakeBoldText = true
             }
-            // Tooltip background rect
             val fm = paint.fontMetrics
             val tw = paint.measureText(label)
-            val pad = 4.dp.toPx()
-            val boxL = pt.x - tw / 2 - pad
-            val boxR = pt.x + tw / 2 + pad
-            val boxT = pt.y - (-fm.ascent) - pad - 14.dp.toPx()
-            val boxB = pt.y - 14.dp.toPx() + fm.descent + pad
-            nativeCanvas.drawRoundRect(
-                boxL, boxT, boxR, boxB, 4.dp.toPx(), 4.dp.toPx(), android.graphics.Paint().apply {
-                    color = android.graphics.Color.argb(230, 245, 245, 245)
-                })
-            nativeCanvas.drawText(label, pt.x, pt.y - 16.dp.toPx(), paint)
+            val pad = DashboardDimens.spaceXs.toPx()
+            val liftPx = DashboardDimens.chartLabelLift.toPx()
+            val boxL = (pt.x - tw / 2 - pad).coerceAtLeast(chartLeft)
+            val boxR = (pt.x + tw / 2 + pad).coerceAtMost(chartRight)
+            val boxT = (pt.y - (-fm.ascent) - pad - liftPx).coerceAtLeast(pad)
+            val boxB = (pt.y - liftPx + fm.descent + pad).coerceAtLeast(boxT + 1f)
 
-            // Day label below dot
+            val boxWidth = boxR - boxL
+            val neededWidth = tw + pad * 2
+            if (boxWidth >= neededWidth) {
+                nativeCanvas.drawRoundRect(
+                    boxL,
+                    boxT,
+                    boxR,
+                    boxB,
+                    DashboardDimens.cornerBadge.toPx(),
+                    DashboardDimens.cornerBadge.toPx(),
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.argb(230, 245, 245, 245)
+                    })
+                val textMinX = boxL + tw / 2
+                val textMaxX = boxR - tw / 2
+                val textX = if (textMinX <= textMaxX) pt.x.coerceIn(textMinX, textMaxX) else (boxL + boxR) / 2f
+                nativeCanvas.drawText(label, textX, pt.y - liftPx, paint)
+            } else {
+                val textMinX = chartLeft + tw / 2
+                val textMaxX = chartRight - tw / 2
+                val textX = if (textMinX <= textMaxX) pt.x.coerceIn(textMinX, textMaxX) else pt.x
+                nativeCanvas.drawText(label, textX, (pt.y - liftPx).coerceAtLeast(pad), paint)
+            }
+
             val dayPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.GRAY
-                textSize = 9.dp.toPx()
+                textSize = DashboardDimens.textXs.toPx()
                 textAlign = android.graphics.Paint.Align.CENTER
             }
-            nativeCanvas.drawText(points[idx].label, pt.x, h, dayPaint)
+            val safeBottom = DashboardDimens.spaceXxs.toPx()
+            val dayY = (paddingTop + chartH + (paddingBottom / 2)).coerceAtMost(h - safeBottom)
+            val dayX = if (chartLeft <= chartRight) pt.x.coerceIn(chartLeft, chartRight) else pt.x
+            nativeCanvas.drawText(points[idx].label, dayX, dayY, dayPaint)
         }
 
-        // All day labels at bottom
+        // All day labels at bottom (inside padding)
         pts.forEachIndexed { i, pt ->
             val dayPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.LTGRAY
-                textSize = 9.dp.toPx()
+                textSize = DashboardDimens.textXs.toPx()
                 textAlign = android.graphics.Paint.Align.CENTER
             }
-            nativeCanvas.drawText(points[i].label, pt.x, h, dayPaint)
+            val safeBottom = DashboardDimens.spaceXxs.toPx()
+            val dayY = (paddingTop + chartH + (paddingBottom / 2)).coerceAtMost(h - safeBottom)
+            val dayX = if (chartLeft <= chartRight) pt.x.coerceIn(chartLeft, chartRight) else pt.x
+            nativeCanvas.drawText(points[i].label, dayX, dayY, dayPaint)
         }
     }
 }
 
-// Preview
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun AnalyticsScreenPreview() {
     MaterialTheme {
-        AnalyticsScreen()
+        AnalyticsScreen(
+            recentTransactionsOverride = listOf(
+                HomeTransactionItem(id = "tx1", title = "Cafe", category = "Food", amount = 1500.0),
+                HomeTransactionItem(id = "tx2", title = "Metro", category = "Transport", amount = 300.0),
+                HomeTransactionItem(id = "tx3", title = "Bistro", category = "Food", amount = 1800.0),
+                HomeTransactionItem(id = "tx4", title = "Electricity", category = "Bills", amount = 500.0),
+                HomeTransactionItem(id = "tx5", title = "Mall", category = "Shopping", amount = 2200.0),
+                HomeTransactionItem(id = "tx6", title = "Taxi", category = "Transport", amount = 350.0),
+                HomeTransactionItem(id = "tx7", title = "Cafe", category = "Food", amount = 1600.0),
+                HomeTransactionItem(id = "tx8", title = "ISP", category = "Bills", amount = 550.0),
+                HomeTransactionItem(id = "tx9", title = "Market", category = "Shopping", amount = 2100.0),
+                HomeTransactionItem(id = "tx10", title = "Bus", category = "Transport", amount = 400.0),
+            ), budgetLimitOverride = 25000.0
+        )
     }
 }
