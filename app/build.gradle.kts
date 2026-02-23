@@ -113,6 +113,12 @@ dependencies {
     implementation(libs.androidx.ui)
     kapt(libs.hilt.compiler)
 
+    // Room (local database)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
+    androidTestImplementation(libs.androidx.room.testing)
+
     // Networking & JSON
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
@@ -122,8 +128,8 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    // Use the versioned play-services coroutine artifact only once (direct coordinate kept as fallback)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    // Use the versioned play-services coroutine artifact from the catalog
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Secure storage
     implementation(libs.androidx.security.crypto)

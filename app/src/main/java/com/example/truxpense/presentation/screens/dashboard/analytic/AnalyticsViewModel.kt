@@ -2,64 +2,92 @@ package com.example.truxpense.presentation.screens.dashboard.analytic
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.budget.BudgetRepository
-import com.example.truxpense.data.repository.dashboard.RepositoryProvider
+import com.example.truxpense.data.repository.dashboard.BudgetRepository
+import com.example.truxpense.data.repository.dashboard.ExpenseRepository
 import com.example.truxpense.presentation.screens.dashboard.budget.budgetColorForCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
+data class CategorySpend(val name: String, val amount: Double, val color: androidx.compose.ui.graphics.Color)
+data class TrendPoint(val label: String, val amount: Double)
+
 @HiltViewModel
-class AnalyticsViewModel @Inject constructor() : ViewModel() {
-    private val _categories = MutableStateFlow<List<CategorySpend>>(emptyList())
-    val categories: StateFlow<List<CategorySpend>> = _categories
+class AnalyticsViewModel @Inject constructor(
+    private val expenseRepository: ExpenseRepository,
+    private val budgetRepository: BudgetRepository,
+) : ViewModel() {
 
-    private val _trendMonth = MutableStateFlow<List<TrendPoint>>(emptyList())
-    val trendMonth: StateFlow<List<TrendPoint>> = _trendMonth
+    // ── Category breakdown ────────────────────────────────────────────────────
 
-    private val _trendWeek = MutableStateFlow<List<TrendPoint>>(emptyList())
-    val trendWeek: StateFlow<List<TrendPoint>> = _trendWeek
-
-    private val _totalSpent = MutableStateFlow(0.0)
-    val totalSpent: StateFlow<Double> = _totalSpent
-
-    private val _totalBudget = MutableStateFlow(0.0)
-    val totalBudget: StateFlow<Double> = _totalBudget
-
-    private val repo = RepositoryProvider.expenseRepository
-
-    init {
-        // Combine transactions and budgets so analytics reflect both sources
-        viewModelScope.launch {
-            combine(repo.transactions, BudgetRepository.budgets) { txs, budgets ->
-                Pair(txs, budgets)
-            }.collect { (txs, budgets) ->
-                // categories aggregated from transactions
-                val grouped = txs.groupBy { it.category }
-                val cats = grouped.entries.map { (cat, items) ->
-                    val amt = items.sumOf { it.amount }
-                    CategorySpend(cat, amt, budgetColorForCategory(cat))
-                }.sortedByDescending { it.amount }
-                _categories.value = cats
-
-                // totals
-                _totalSpent.value = txs.sumOf { it.amount }
-                _totalBudget.value = budgets.sumOf { it.amount }
-
-                // trend points (simple chunking logic)
-                _trendMonth.value = if (txs.isEmpty()) emptyList() else {
-                    val per = (txs.size + 4) / 5
-                    txs.chunked(per).mapIndexed { idx, ch -> TrendPoint("${(idx + 1) * 7}", ch.sumOf { it.amount }) }
+    val categories: StateFlow<List<CategorySpend>> =
+        expenseRepository.transactions.map { txs ->
+            txs.groupBy { it.category }
+                .entries
+                .map { (cat, items) ->
+                    CategorySpend(cat, items.sumOf { it.amount }, budgetColorForCategory(cat))
                 }
+                .sortedByDescending { it.amount }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-                _trendWeek.value = if (txs.isEmpty()) emptyList() else {
-                    val per = (txs.size + 6) / 7
-                    txs.chunked(per).mapIndexed { idx, ch -> TrendPoint(listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")[idx.coerceAtMost(6)], ch.sumOf { it.amount }) }
-                }
+    // ── Totals ────────────────────────────────────────────────────────────────
+
+    val totalSpent: StateFlow<Double> =
+        expenseRepository.transactions.map { it.sumOf { t -> t.amount } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+
+    val totalBudget: StateFlow<Double> =
+        budgetRepository.budgets.map { it.sumOf { b -> b.amount } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+
+    val budgetUtilisation: StateFlow<Float> =
+        combine(totalBudget, totalSpent) { budget, spent ->
+            if (budget > 0) (spent / budget).toFloat().coerceIn(0f, 1f) else 0f
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
+
+    // ── Trend — monthly (chunked into 5 "weeks") ──────────────────────────────
+
+    val trendMonth: StateFlow<List<TrendPoint>> =
+        expenseRepository.transactions.map { txs ->
+            if (txs.isEmpty()) return@map emptyList()
+            val sorted = txs.sortedBy { it.timestamp }
+            val perChunk = maxOf(1, (sorted.size + 4) / 5)
+            sorted.chunked(perChunk).mapIndexed { idx, chunk ->
+                TrendPoint("${(idx + 1) * 7}d", chunk.sumOf { it.amount })
             }
-        }
-    }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Trend — weekly (chunked into 7 days) ─────────────────────────────────
+
+    val trendWeek: StateFlow<List<TrendPoint>> =
+        expenseRepository.transactions.map { txs ->
+            if (txs.isEmpty()) return@map emptyList()
+            // Bucket each transaction into its day-of-week
+            val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+            val buckets = MutableList(7) { 0.0 }
+            val cal = java.util.Calendar.getInstance()
+            txs.forEach { t ->
+                cal.timeInMillis = t.timestamp
+                val dow = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7  // Mon=0
+                buckets[dow] += t.amount
+            }
+            days.mapIndexed { i, label -> TrendPoint(label, buckets[i]) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Top merchant (insight) ────────────────────────────────────────────────
+
+    val topMerchant: StateFlow<Pair<String, Double>?> =
+        expenseRepository.transactions.map { txs ->
+            txs.groupBy { it.merchant }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+                .entries
+                .maxByOrNull { it.value }
+                ?.let { it.key to it.value }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    // ── Category with highest spend (insight) ─────────────────────────────────
+
+    val topCategory: StateFlow<Pair<String, Double>?> =
+        categories.map { cats -> cats.firstOrNull()?.let { it.name to it.amount } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

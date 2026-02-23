@@ -81,13 +81,7 @@ fun AddExpenseScreen(
             val merchantVal = vm.merchant.value.ifBlank { "Expense" }
             val categoryVal = vm.selectedCategory.value ?: "Other"
             val accountVal = vm.selectedAccount.value ?: ""
-            // Persist via ViewModel
-            vm.saveExpense(
-                amount = amt,
-                category = categoryVal,
-                paymentMethod = accountVal,
-                merchant = merchantVal
-            )
+            vm.saveExpense()
             val tx = HomeTransactionItem(
                 id = UUID.randomUUID().toString(),
                 title = merchantVal,

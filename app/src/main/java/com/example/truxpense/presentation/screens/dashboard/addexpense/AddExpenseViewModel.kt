@@ -2,20 +2,20 @@ package com.example.truxpense.presentation.screens.dashboard.addexpense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.repository.dashboard.RepositoryProvider
+import com.example.truxpense.data.repository.dashboard.ExpenseRepository
 import com.example.truxpense.data.repository.dashboard.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-
 @HiltViewModel
-class AddExpenseViewModel @Inject constructor() : ViewModel() {
+class AddExpenseViewModel @Inject constructor(
+    private val repository: ExpenseRepository,
+) : ViewModel() {
 
     // ── 1. Raw inputs ─────────────────────────────────────────────────────────
 
-    /** Digits-only string from the amount field. */
     private val _rawAmount = MutableStateFlow("")
     val rawAmount: StateFlow<String> = _rawAmount.asStateFlow()
 
@@ -27,7 +27,6 @@ class AddExpenseViewModel @Inject constructor() : ViewModel() {
 
     // ── 2. Derived display ────────────────────────────────────────────────────
 
-    /** "₹0", "₹1,200" etc. — composable never formats numbers itself. */
     val formattedAmount: StateFlow<String> = _rawAmount.map { raw ->
         val num = raw.toDoubleOrNull()
         if (num == null || raw.isEmpty()) "₹0"
@@ -54,7 +53,15 @@ class AddExpenseViewModel @Inject constructor() : ViewModel() {
     private val _selectedDate = MutableStateFlow<String?>(null)
     val selectedDate: StateFlow<String?> = _selectedDate.asStateFlow()
 
-    // ── 4. Form validity ──────────────────────────────────────────────────────
+    // ── 4. Save state ─────────────────────────────────────────────────────────
+
+    private val _saveComplete = MutableSharedFlow<Unit>(replay = 0)
+    val saveComplete: SharedFlow<Unit> = _saveComplete
+
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    // ── 5. Form validity ──────────────────────────────────────────────────────
 
     val isFormValid: StateFlow<Boolean> = combine(_rawAmount, _selectedCategory) { amt, cat ->
         amt.isNotBlank() && amt.toDoubleOrNull() != null && cat != null
@@ -62,54 +69,47 @@ class AddExpenseViewModel @Inject constructor() : ViewModel() {
 
     // ── Events ────────────────────────────────────────────────────────────────
 
-    fun setRawAmount(v: String) {
-        _rawAmount.value = v.filter { it.isDigit() || it == '.' }
+    fun setRawAmount(v: String) { _rawAmount.value = v.filter { it.isDigit() || it == '.' } }
+    fun setMerchant(v: String) { _merchant.value = v }
+    fun setNotes(v: String) { _notes.value = v }
+    fun selectCategory(cat: String) { _selectedCategory.value = cat; _categoryExpanded.value = false }
+    fun setCategoryExpanded(open: Boolean) { _categoryExpanded.value = open }
+    fun selectAccount(acc: String) { _selectedAccount.value = acc; _accountExpanded.value = false }
+    fun setAccountExpanded(open: Boolean) { _accountExpanded.value = open }
+    fun setDate(date: String) { _selectedDate.value = date }
+
+    /** Persists the expense to Room and emits [saveComplete] when done. */
+    fun saveExpense() {
+        val amount = _rawAmount.value.toDoubleOrNull() ?: return
+        val category = _selectedCategory.value ?: return
+        val paymentMethod = _selectedAccount.value ?: "UPI"
+        val merchantName = _merchant.value.trim().ifBlank { category }
+
+        viewModelScope.launch {
+            _isSaving.value = true
+            try {
+                repository.addExpense(
+                    Transaction(
+                        amount = amount,
+                        category = category,
+                        paymentMethod = paymentMethod,
+                        merchant = merchantName,
+                    )
+                )
+                _saveComplete.emit(Unit)
+                resetForm()
+            } finally {
+                _isSaving.value = false
+            }
+        }
     }
 
-    fun setMerchant(v: String) {
-        _merchant.value = v
+    private fun resetForm() {
+        _rawAmount.value = ""
+        _merchant.value = ""
+        _notes.value = ""
+        _selectedCategory.value = null
+        _selectedAccount.value = null
+        _selectedDate.value = null
     }
-
-    fun setNotes(v: String) {
-        _notes.value = v
-    }
-
-    fun selectCategory(cat: String) {
-        _selectedCategory.value = cat; _categoryExpanded.value = false
-    }
-
-    fun setCategoryExpanded(open: Boolean) {
-        _categoryExpanded.value = open
-    }
-
-    fun selectAccount(acc: String) {
-        _selectedAccount.value = acc; _accountExpanded.value = false
-    }
-
-    fun setAccountExpanded(open: Boolean) {
-        _accountExpanded.value = open
-    }
-
-    fun setDate(date: String) {
-        _selectedDate.value = date
-    }
-
-    private val repository = RepositoryProvider.expenseRepository
-
-    fun saveExpense(
-        amount: Double,
-        category: String,
-        paymentMethod: String,
-        merchant: String
-    ) {
-        repository.addExpense(
-            Transaction(
-                amount = amount,
-                category = category,
-                paymentMethod = paymentMethod,
-                merchant = merchant
-            )
-        )
-    }
-
 }
