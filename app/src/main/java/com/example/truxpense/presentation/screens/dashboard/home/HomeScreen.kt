@@ -39,11 +39,11 @@ import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScre
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
-import com.example.truxpense.presentation.screens.dashboard.components.DashboardTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 
 // Dashboard shell: owns the NavController and tab routing
 
@@ -123,9 +123,7 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Home.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     HomeTabScreen(
-                        username = username,
                         vm = vm,
-                        onLogout = onLogout,
                         onAddExpense = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
                         },
@@ -164,9 +162,38 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Transactions.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     TransactionsScreen(
-                        // recentHome was removed from TransactionsScreen signature; it reads its own data from the repository
+                        onTransactionClick = { transactionId ->
+                            dashboardNavController.safeNavigate(
+                                Screen.Dashboard.Transactions.detailRoute(transactionId)
+                            )
+                        },
                     )
                 }
+            }
+
+            // Transaction detail
+            composable(
+                route = Screen.Dashboard.Transactions.Detail,
+                arguments = listOf(
+                    navArgument("transactionId") {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
+                TransactionDetailScreen(
+                    transactionId = transactionId,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onEdit = {
+                        // Navigate to edit/add-expense screen; future: prefill with transaction data
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.AddExpense)
+                    },
+                    onDeleted = {
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                            popUpTo(Screen.Dashboard.Transactions.Root) { inclusive = false }
+                        }
+                    },
+                )
             }
 
             composable(Screen.Dashboard.Transactions.AddExpense) {
@@ -372,10 +399,4 @@ private fun DashboardBottomBarPreview() {
             onItemSelected = {},
         )
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun DashboardTopBarPreview() {
-    DashboardTopBar(username = "Tarun")
 }

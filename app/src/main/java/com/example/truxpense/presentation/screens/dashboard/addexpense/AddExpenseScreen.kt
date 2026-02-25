@@ -139,7 +139,7 @@ fun AddExpenseScreenContent(
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(title = "Add expense", showBack = true, onBack = onBack) },
+        topBar = { ScreenTopBar(headerTitle = "Add expense", showBack = true, onBack = onBack) },
     ) { innerPadding ->
         Column(
             modifier = Modifier

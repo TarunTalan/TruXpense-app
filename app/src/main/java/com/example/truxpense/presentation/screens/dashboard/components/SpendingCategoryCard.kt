@@ -27,7 +27,7 @@ fun BudgetProgressBar(
     val progressForBar = progress.coerceIn(0f, 1f)
     val renderColor = progressColor(progressForBar, errorColor)
     val trackColor = Color(0xFFD9DEE3)
-    val barHeight = 8.dp
+    val barHeight = 6.dp
 
     Column(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxWidth().height(barHeight)) {
@@ -93,7 +93,7 @@ fun SpendingCategoryCard(
                         text = name,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = titleColor ?: MaterialTheme.colorScheme.onSurface,
+                        color = titleColor ?: MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -106,7 +106,7 @@ fun SpendingCategoryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             BudgetProgressBar(progress = progress, errorColor = errorColor)
         }
     }

@@ -53,7 +53,7 @@ fun AddBudgetScreen(
     }
 
     Scaffold(
-        topBar = { ScreenTopBar(title = "Add Budget", showBack = true, onBack = onBack) },
+        topBar = { ScreenTopBar(headerTitle = "Add Budget", showBack = true, onBack = onBack) },
         bottomBar = {
             if (!expanded) {
                 Column(

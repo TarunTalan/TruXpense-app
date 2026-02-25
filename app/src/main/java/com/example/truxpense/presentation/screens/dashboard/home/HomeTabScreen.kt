@@ -1,6 +1,8 @@
 package com.example.truxpense.presentation.screens.dashboard.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,9 +27,7 @@ import com.example.truxpense.util.toCurrency
 
 @Composable
 fun HomeTabScreen(
-    username: String?,
     vm: HomeViewModel,
-    onLogout: (() -> Unit)?,
     onAddExpense: (() -> Unit)? = null,
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
@@ -50,9 +50,7 @@ fun HomeTabScreen(
     if (expenseCount == 0) {
         EmptyHomeContent(
             onAddExpense = onAddExpense,
-            onLogout = onLogout,
             hasSmsPermission = hasSmsPermission,
-            username = username,
         )
         return
     }
@@ -62,7 +60,6 @@ fun HomeTabScreen(
         hasSmsPermission = hasSmsPermission,
         onAddExpense = onAddExpense,
         onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
-        username = username,
         currencyCode = currencyCode,
         vm = vm,
         onNavigateToBudget = onNavigateToBudget,
@@ -77,7 +74,6 @@ fun HomeTabContent(
     hasSmsPermission: Boolean,
     onAddExpense: (() -> Unit)? = null,
     onSmsGranted: (() -> Unit)? = null,
-    username: String?,
     currencyCode: String = "INR",
     vm: HomeViewModel = hiltViewModel(),
     onNavigateToBudget: (() -> Unit)? = null,
@@ -97,7 +93,9 @@ fun HomeTabContent(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { DashboardTopBar(username = username) },
+        topBar = {
+            ScreenTopBar(headerTitle = "TruXpense", showBack = false, showProfileIcons = true)
+        },
         floatingActionButton = {
             AddFab(onClick = { onAddExpense?.invoke() })
         },
@@ -142,10 +140,21 @@ fun HomeTabContent(
                     SectionCard(
                         title = "Budget",
                         trailingContent = {
+                            // Use `secondary` as background color in dark mode, keep primaryContainer in light mode.
+                            val detailContainer =
+                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primaryContainer
+                            val detailContent =
+                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onPrimaryContainer
                             FilledTonalButton(
                                 onClick = { onNavigateToBudget?.invoke() },
                                 modifier = Modifier.height(DashboardDimens.buttonHeightSm),
-                                contentPadding = PaddingValues(start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg),
+                                contentPadding = PaddingValues(
+                                    start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg
+                                ),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = detailContainer,
+                                    contentColor = detailContent,
+                                )
                             ) {
                                 Text("Details", style = MaterialTheme.typography.labelMedium)
                             }
@@ -190,9 +199,7 @@ fun HomeTabContent(
             // Recent transactions
             item {
                 RecentTransactionsCard(
-                    transactions = recentTx,
-                    onViewAll = { onViewAll?.invoke() }
-                )
+                    transactions = recentTx, onViewAll = { onViewAll?.invoke() })
             }
 
             // FAB clearance — last item never hidden behind the FAB
@@ -304,22 +311,24 @@ fun RecentTransactionsCard(
                     text = "Recent transactions",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
                     text = "View all",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onViewAll?.invoke() }
-                )
+                    modifier = Modifier.clickable { onViewAll?.invoke() })
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Column labels
+            HorizontalDivider(color = MaterialTheme.colorScheme.background)
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
+            // Column labels (increase vertical padding to spaceXl)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = DashboardDimens.screenPaddingH,
-                    vertical = DashboardDimens.spaceMd,
+                    start = DashboardDimens.screenPaddingH,
+                    end = DashboardDimens.screenPaddingH,
+                    top = DashboardDimens.spaceMd,
+                    bottom = DashboardDimens.spaceMd,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
             ) {
@@ -328,7 +337,6 @@ fun RecentTransactionsCard(
                 TxColumnLabel("Amount", Modifier.weight(1f), TextAlign.End)
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             if (transactions.isEmpty()) {
                 Box(
@@ -363,7 +371,7 @@ private fun TxColumnLabel(text: String, modifier: Modifier, align: TextAlign) {
     Text(
         text = text,
         modifier = modifier,
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = align,
     )
@@ -375,7 +383,7 @@ private fun TransactionRow(tx: HomeTransactionItem) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(
             horizontal = DashboardDimens.screenPaddingH,
-            vertical = DashboardDimens.spaceLg,
+            vertical = DashboardDimens.spaceXl,
         ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
@@ -383,9 +391,10 @@ private fun TransactionRow(tx: HomeTransactionItem) {
         Text(
             text = tx.title,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = tx.category,
@@ -402,17 +411,26 @@ private fun TransactionRow(tx: HomeTransactionItem) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (prefix.isNotEmpty()) {
-                Text(prefix, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    prefix,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
                 Spacer(Modifier.width(DashboardDimens.spaceXxs))
             }
             Text(
                 text = numeric,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
             )
             if (suffix.isNotEmpty()) {
                 Spacer(Modifier.width(DashboardDimens.spaceXs))
-                Text(suffix, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    suffix,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
             }
         }
     }
@@ -432,24 +450,18 @@ fun HomeTabScreenPreview() {
         HomeTransactionItem(id = "tx1", title = "Zomato", category = "Food", amount = 500.0, currencyCode = "INR"),
         HomeTransactionItem(id = "tx2", title = "Uber", category = "Transport", amount = 350.0, currencyCode = "INR"),
         HomeTransactionItem(
-            id = "tx3",
-            title = "BigBasket",
-            category = "Groceries",
-            amount = 1200.0,
-            currencyCode = "INR"
+            id = "tx3", title = "BigBasket", category = "Groceries", amount = 1200.0, currencyCode = "INR"
         ),
     )
 
     val fmt = remember { currencyFormat("INR") }
 
     MaterialTheme {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = { DashboardTopBar(username = "Tarun") },
-            floatingActionButton = {
-                AddFab(onClick = {})
-            }
-        ) { inner ->
+        Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+            ScreenTopBar(headerTitle = "TruXpense", showBack = false, showProfileIcons = true)
+        }, floatingActionButton = {
+            AddFab(onClick = {})
+        }) { inner ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(inner),
                 contentPadding = PaddingValues(
@@ -475,12 +487,25 @@ fun HomeTabScreenPreview() {
                     SectionCard(
                         title = "Budget",
                         trailingContent = {
-                            FilledTonalButton(
+                            // Preview: reflect same dark-mode behavior for visuals
+                            val previewDetailContainer =
+                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primaryContainer
+                            val previewDetailContent =
+                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onPrimaryContainer
+                            Button(
                                 onClick = { /*TODO*/ },
-                                modifier = Modifier.height(DashboardDimens.buttonHeightSm),
-                                contentPadding = PaddingValues(start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg),
+                                modifier = Modifier.height(DashboardDimens.buttonHeightSm).background(
+                                    color = previewDetailContainer, shape = MaterialTheme.shapes.medium
+                                ),
+                                contentPadding = PaddingValues(
+                                    start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg
+                                ),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = previewDetailContainer,
+                                    contentColor = previewDetailContent,
+                                )
                             ) {
-                                Text("Details", style = MaterialTheme.typography.labelMedium)
+                                Text("", style = MaterialTheme.typography.labelMedium)
                             }
                         },
                     ) {
@@ -521,6 +546,24 @@ fun HomeTabScreenPreview() {
 
                 item { Spacer(Modifier.height(DashboardDimens.fabClearance)) }
             }
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "RecentTransactionsCardPreview")
+@Composable
+fun RecentTransactionsCardPreview() {
+    val sampleRecent = listOf(
+        HomeTransactionItem(id = "tx1", title = "Zomato", category = "Food", amount = 500.0, currencyCode = "INR"),
+        HomeTransactionItem(id = "tx2", title = "Uber", category = "Transport", amount = 350.0, currencyCode = "INR"),
+        HomeTransactionItem(
+            id = "tx3", title = "BigBasket", category = "Groceries", amount = 1200.0, currencyCode = "INR"
+        ),
+    )
+
+    MaterialTheme {
+        Surface(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            RecentTransactionsCard(transactions = sampleRecent)
         }
     }
 }

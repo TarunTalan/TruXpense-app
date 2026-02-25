@@ -17,11 +17,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.DateNavigatorRow
@@ -47,6 +45,7 @@ import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
+    onTransactionClick: (transactionId: String) -> Unit = {},
     vm: TransactionsViewModel = hiltViewModel(),
 ) {
     val selectedPeriod by vm.selectedPeriod.collectAsState()
@@ -59,9 +58,12 @@ fun TransactionsScreen(
     val availableCats by vm.availableCategories.collectAsState()
     val availablePayments by vm.availablePaymentMethods.collectAsState()
     val monthGroupsVal by vm.monthGroups.collectAsState()
-    val totalExpanded by vm.totalExpanded.collectAsState()
     val activeFilterCount by vm.activeFilterCount.collectAsState()
     val hasActiveFilter by vm.hasActiveFiltersOrSearch.collectAsState()
+
+    // Per-group toggle state — absent key = true (all start expanded)
+    val monthExpandedStates = remember { mutableStateMapOf<String, Boolean>() }
+    val dayExpandedStates = remember { mutableStateMapOf<String, Boolean>() }
 
     // ── Bottom-sheet state ────────────────────────────────────────────────────
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -72,13 +74,15 @@ fun TransactionsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TransactionTopBar()
+            ScreenTopBar(
+                headerTitle = "Transaction", showBack = false
+            )
         },
     ) { innerPadding ->
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(top = DashboardDimens.heroZonePadTop),
-            contentPadding = PaddingValues(start = 0.dp, top = 0.dp, end = 0.dp, bottom = DashboardDimens.spaceXxl),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(top = DashboardDimens.spaceLg),
+            contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxl),
         ) {
 
             // ── ① Period tab row ──────────────────────────────────────────────
@@ -86,10 +90,10 @@ fun TransactionsScreen(
                 PeriodTabRow(
                     selected = selectedPeriod,
                     onSelect = { vm.selectPeriod(it) },
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(start = DashboardDimens.screenPaddingH, end = DashboardDimens.screenPaddingH),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
                 )
             }
+            item { Spacer(Modifier.height(DashboardDimens.spaceLg)) }
 
             // ── ② Date navigator ─────────────────────────────────────────────
             item {
@@ -99,51 +103,57 @@ fun TransactionsScreen(
                     canForward = canNavForward,
                     onBack = { vm.navBack() },
                     onForward = { vm.navForward() },
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(start = DashboardDimens.spaceMd, end = DashboardDimens.spaceMd),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.spaceMd),
                 )
             }
 
-            item { Spacer(Modifier.height(DashboardDimens.spaceMd)) }
+            item { Spacer(Modifier.height(DashboardDimens.spaceLg)) }
 
-            // ── ③ Search bar + Filter button ──────────────────────────────────
-            item {
-                SearchAndFilterRow(
-                    query = searchQuery,
-                    onQueryChange = { vm.setSearchQuery(it) },
-                    onClearSearch = {
-                        vm.clearSearch()
-                        focusManager.clearFocus()
-                    },
-                    activeFilterCount = activeFilterCount,
-                    onFilterClick = { showFilterSheet = true },
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(start = DashboardDimens.screenPaddingH, end = DashboardDimens.screenPaddingH),
-                )
-            }
-
-            // ── ④ Active filter chips (animated) ──────────────────────────────
-            item {
-                AnimatedVisibility(
-                    visible = selectedCategory != null || selectedPayment != null,
-                    enter = expandVertically(),
-                    exit = shrinkVertically(),
+            // ── ③ Search bar + Active filter chips (sticky) ───────────────────
+            stickyHeader {
+                // Keep same background as scaffold so the header appears seamless
+                Surface(
+                    color = MaterialTheme.colorScheme.background,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp,
                 ) {
-                    ActiveFilterChipsRow(
-                        selectedCategory = selectedCategory,
-                        selectedPayment = selectedPayment,
-                        onClearCategory = { vm.setCategory(null) },
-                        onClearPayment = { vm.setPaymentMethod(null) },
-                        modifier = Modifier.fillMaxWidth().padding(
-                            start = DashboardDimens.screenPaddingH,
-                            end = DashboardDimens.screenPaddingH,
-                            top = DashboardDimens.spaceMd,
-                        ),
-                    )
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        SearchAndFilterRow(
+                            query = searchQuery,
+                            onQueryChange = { vm.setSearchQuery(it) },
+                            onClearSearch = {
+                                vm.clearSearch()
+                                focusManager.clearFocus()
+                            },
+                            activeFilterCount = activeFilterCount,
+                            onFilterClick = { showFilterSheet = true },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
+                        )
+
+                        AnimatedVisibility(
+                            visible = selectedCategory != null || selectedPayment != null,
+                            enter = expandVertically(),
+                            exit = shrinkVertically(),
+                        ) {
+                            ActiveFilterChipsRow(
+                                selectedCategory = selectedCategory,
+                                selectedPayment = selectedPayment,
+                                onClearCategory = { vm.setCategory(null) },
+                                onClearPayment = { vm.setPaymentMethod(null) },
+                                modifier = Modifier.fillMaxWidth().padding(
+                                    start = DashboardDimens.screenPaddingH,
+                                    end = DashboardDimens.screenPaddingH,
+                                    top = DashboardDimens.spaceMd,
+                                ),
+                            )
+                        }
+
+                        Spacer(Modifier.height(DashboardDimens.spaceMd))
+                    }
                 }
             }
 
-            item { Spacer(Modifier.height(DashboardDimens.spaceMd)) }
+            item { Spacer(Modifier.height(DashboardDimens.spaceXxl)) }
 
             // ── ⑥ Empty state ────────────────────────────────────────────────
             if (monthGroupsVal.isEmpty()) {
@@ -151,61 +161,84 @@ fun TransactionsScreen(
                     TransactionsEmptyState(
                         hasFilter = hasActiveFilter,
                         onClearAll = { vm.clearAllFilters() },
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(top = DashboardDimens.fabClearance - DashboardDimens.spaceXxl),
+                        modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
                     )
                 }
             } else {
                 // ── ⑦ Month groups ───────────────────────────────────────────
                 monthGroupsVal.forEach { monthGroup ->
+                    val isMonthExpanded = monthExpandedStates[monthGroup.monthLabel] ?: true
 
                     item(key = "header_${monthGroup.monthLabel}") {
                         MonthGroupHeader(
                             monthLabel = monthGroup.monthLabel,
                             totalSpent = monthGroup.totalSpent,
-                            expanded = totalExpanded,
-                            onToggle = { vm.toggleTotalExpanded() },
-                            modifier = Modifier.fillMaxWidth()
-                                .padding(start = DashboardDimens.screenPaddingH, end = DashboardDimens.screenPaddingH)
-                                .padding(bottom = DashboardDimens.spaceMd),
+                            expanded = isMonthExpanded,
+                            onToggle = {
+                                monthExpandedStates[monthGroup.monthLabel] = !isMonthExpanded
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH)
+                                .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceXs),
                         )
                     }
 
-                    monthGroup.days.forEach { dayGroup ->
+                    if (isMonthExpanded) {
+                        monthGroup.days.forEach { dayGroup ->
+                            val dayKey = "${monthGroup.monthLabel}_${dayGroup.dayLabel}"
+                            val isDayExpanded = dayExpandedStates[dayKey] ?: true
+                            val dayTotal = dayGroup.items.sumOf { kotlin.math.abs(it.amount) }
 
-                        item(key = "day_${monthGroup.monthLabel}_${dayGroup.dayLabel}") {
-                            Text(
-                                text = dayGroup.dayLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                                modifier = Modifier.padding(
-                                    start = DashboardDimens.screenPaddingH,
-                                    end = DashboardDimens.screenPaddingH,
-                                    top = DashboardDimens.spaceXs,
-                                    bottom = DashboardDimens.spaceXs,
-                                    ),
-                            )
+                            item(key = "day_$dayKey") {
+                                DayGroupHeader(
+                                    dayLabel = dayGroup.dayLabel,
+                                    totalSpent = dayTotal,
+                                    expanded = isDayExpanded,
+                                    onToggle = {
+                                        dayExpandedStates[dayKey] = !isDayExpanded
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(horizontal = DashboardDimens.screenPaddingH).padding(
+                                            top = DashboardDimens.spaceLg,
+                                            bottom = DashboardDimens.spaceXs,
+                                        ),
+                                )
+                            }
+
+                            // All rows for this day in one item so AnimatedVisibility works cleanly
+                            item(key = "items_$dayKey") {
+                                AnimatedVisibility(
+                                    visible = isDayExpanded,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically(),
+                                ) {
+                                    Column {
+                                        dayGroup.items.forEachIndexed { index, tx ->
+                                            TransactionRow(
+                                                tx = tx,
+                                                query = searchQuery,
+                                                modifier = Modifier.fillMaxWidth().clickable(
+                                                        indication = null,
+                                                        interactionSource = remember { MutableInteractionSource() },
+                                                    ) { onTransactionClick(tx.id) }
+                                                    .padding(horizontal = DashboardDimens.screenPaddingH),
+                                            )
+                                            // Only show divider if this is not the last item of the day
+                                            if (index < dayGroup.items.lastIndex) {
+                                                HorizontalDivider(
+                                                    thickness = DashboardDimens.dividerThin,
+                                                    modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
+                                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        itemsIndexed(
-                            items = dayGroup.items,
-                            key = { idx, tx -> "${monthGroup.monthLabel}_${dayGroup.dayLabel}_${tx.id}_$idx" },
-                        ) { _, tx ->
-                            TransactionRow(
-                                tx = tx,
-                                query = searchQuery,
-                                modifier = Modifier.fillMaxWidth().padding(
-                                    start = DashboardDimens.screenPaddingH,
-                                    end = DashboardDimens.screenPaddingH
-                                ),
-                            )
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                thickness = DividerDefaults.Thickness,
-                            )
+                        item(key = "foot_${monthGroup.monthLabel}") {
+                            Spacer(Modifier.height(DashboardDimens.spaceLg))
                         }
-
-                        item { Spacer(Modifier.height(DashboardDimens.spaceMd)) }
                     }
                 }
             }
@@ -230,9 +263,22 @@ fun TransactionsScreen(
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TransactionTopBar() {
-    ScreenTopBar(title = "Transactions", showBack = false)
+    TopAppBar(
+        title = {
+            Text(
+                text = "Transactions",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+        ),
+    )
 }
 
 @Composable
@@ -245,7 +291,7 @@ private fun SearchAndFilterRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.height(DashboardDimens.buttonHeight),
+        modifier = modifier.height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
     ) {
@@ -254,7 +300,7 @@ private fun SearchAndFilterRow(
             query = query,
             onChange = onQueryChange,
             onClear = onClearSearch,
-            modifier = Modifier.weight(1f).height(DashboardDimens.buttonHeight),
+            modifier = Modifier.weight(1f).height(48.dp),
         )
 
         // Filter button with badge
@@ -302,7 +348,7 @@ private fun SearchField(
                     if (query.isEmpty()) {
                         Text(
                             text = "Search merchant or category…",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 1,
@@ -321,7 +367,7 @@ private fun SearchField(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Clear search",
                             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                            modifier = Modifier.size(DashboardDimens.iconSm),
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
@@ -342,8 +388,7 @@ private fun FilterButton(
     Box(modifier = modifier) {
         IconButton(
             onClick = onClick,
-            modifier = Modifier.size(DashboardDimens.buttonHeight - DashboardDimens.spaceXs)
-                .clip(RoundedCornerShape(DashboardDimens.cornerChip))
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(DashboardDimens.cornerChip))
                 .background(if (activeCount > 0) primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer),
         ) {
             Icon(
@@ -356,16 +401,14 @@ private fun FilterButton(
         // Badge
         if (activeCount > 0) {
             Box(
-                modifier = Modifier.align(Alignment.TopEnd)
-                    .offset(x = DashboardDimens.badgeOffset, y = -DashboardDimens.badgeOffset)
-                    .size(DashboardDimens.badgeSize).clip(CircleShape)
+                modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(16.dp).clip(CircleShape)
                     .background(primary),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "$activeCount",
                     color = Color.White,
-                    fontSize = DashboardDimens.textXs,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -426,9 +469,9 @@ private fun ActiveFilterChip(
             color = primary,
             fontWeight = FontWeight.Medium,
         )
-        Spacer(Modifier.width(DashboardDimens.spaceXs))
+        Spacer(Modifier.width(4.dp))
         Box(
-            modifier = Modifier.size(DashboardDimens.iconSm).clip(CircleShape).background(primary.copy(alpha = 0.18f))
+            modifier = Modifier.size(16.dp).clip(CircleShape).background(primary.copy(alpha = 0.18f))
                 .clickable(onClick = onClear),
             contentAlignment = Alignment.Center,
         ) {
@@ -469,15 +512,13 @@ private fun FilterBottomSheet(
         containerColor = MaterialTheme.colorScheme.background,
         dragHandle = {
             Box(
-                modifier = Modifier.padding(top = DashboardDimens.spaceLg, bottom = DashboardDimens.spaceXs)
-                    .width(DashboardDimens.sheetHandleWidth).height(DashboardDimens.sheetHandleHeight)
-                    .clip(RoundedCornerShape(DashboardDimens.cornerSheetHandle)).background(sheetHandleColor),
+                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).width(36.dp).height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)).background(sheetHandleColor),
             )
         },
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding()
-                .padding(bottom = DashboardDimens.sheetBottomPadding),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 24.dp),
         ) {
             // ── Sheet header ─────────────────────────────────────────────────
             Row(
@@ -503,7 +544,7 @@ private fun FilterBottomSheet(
                 }
             }
 
-            HorizontalDivider(color = dividerColor, thickness = DividerDefaults.Thickness)
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, color = dividerColor)
             Spacer(Modifier.height(DashboardDimens.spaceLg))
 
             // ── Category section ─────────────────────────────────────────────
@@ -628,16 +669,16 @@ private fun SheetFilterChip(
             indication = null,
             interactionSource = remember { MutableInteractionSource() },
             onClick = onClick,
-        ).padding(horizontal = DashboardDimens.chipPaddingH, vertical = DashboardDimens.spaceMd),
+        ).padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(DashboardDimens.iconXs),
+                modifier = Modifier.size(13.dp),
             )
         }
         Text(
@@ -662,36 +703,87 @@ private fun MonthGroupHeader(
     val formattedTotal = "₹${"%,.0f".format(totalSpent)}"
 
     Row(
-        modifier = modifier,
+        modifier = modifier.clickable(
+            indication = null,
+            interactionSource = remember { MutableInteractionSource() },
+            onClick = onToggle,
+        ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = monthLabel,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Row(
-            modifier = Modifier.clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onToggle,
-            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXxs),
         ) {
             Text(
                 text = formattedTotal,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
+            )
+//            Icon(
+//                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+//                contentDescription = if (expanded) "Collapse" else "Expand",
+//                tint = MaterialTheme.colorScheme.onBackground,
+//                modifier = Modifier.size(DashboardDimens.iconMd),
+//            )
+        }
+    }
+}
+
+// ─── Day Group Header ─────────────────────────────────────────────────────────
+
+@Composable
+private fun DayGroupHeader(
+    dayLabel: String,
+    totalSpent: Double,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val formattedTotal = "₹${"%,.0f".format(totalSpent)}"
+
+    Row(
+        modifier = modifier.clickable(
+            indication = null,
+            interactionSource = remember { MutableInteractionSource() },
+            onClick = onToggle,
+        ).padding(top = DashboardDimens.spaceMd),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = dayLabel,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXxs),
+        ) {
+            Text(
+                text = formattedTotal,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                modifier = Modifier.size(DashboardDimens.iconSm),
             )
         }
     }
 }
 
-// ─── Transaction Row ─────────────────────────────────────────────────────────
 
 @Composable
 private fun TransactionRow(
@@ -707,7 +799,7 @@ private fun TransactionRow(
     ) {
         // Merchant initial avatar
         Box(
-            modifier = Modifier.size(DashboardDimens.avatarSize).clip(CircleShape)
+            modifier = Modifier.size(38.dp).clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
             contentAlignment = Alignment.Center,
         ) {
@@ -715,7 +807,7 @@ private fun TransactionRow(
                 text = tx.merchant.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
-                fontSize = DashboardDimens.textXl,
+                fontSize = 15.sp,
             )
         }
 
@@ -726,9 +818,9 @@ private fun TransactionRow(
                 text = tx.merchant,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MaterialTheme.colorScheme.onBackground.copy(0.5f),
             )
-            Spacer(Modifier.height(DashboardDimens.spaceXxs))
+            Spacer(Modifier.height(DashboardDimens.spaceXs))
             Text(
                 text = tx.category,
                 style = MaterialTheme.typography.labelSmall,
@@ -743,7 +835,7 @@ private fun TransactionRow(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
-            Spacer(Modifier.height(DashboardDimens.spaceXxs))
+            Spacer(Modifier.height(DashboardDimens.spaceXs))
             if (tx.paymentMethod.isNotBlank()) {
                 PaymentBadge(label = tx.paymentMethod)
             }
@@ -753,17 +845,11 @@ private fun TransactionRow(
 
 @Composable
 private fun PaymentBadge(label: String) {
-    Box(
-        modifier = Modifier.clip(RoundedCornerShape(DashboardDimens.cornerBadge))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .padding(horizontal = DashboardDimens.spaceSm, vertical = DashboardDimens.spaceXxs),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-        )
-    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+    )
 }
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
@@ -795,9 +881,7 @@ private fun TransactionsEmptyState(
             OutlinedButton(
                 onClick = onClearAll,
                 shape = RoundedCornerShape(DashboardDimens.cornerCard),
-                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
-                    brush = SolidColor(MaterialTheme.colorScheme.primary)
-                ),
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true),
             ) {
                 Text("Clear all filters", color = MaterialTheme.colorScheme.primary)
             }
@@ -808,12 +892,12 @@ private fun TransactionsEmptyState(
 // ─── Preview ─────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Preview(showBackground = true, widthDp = 390, heightDp = 844, name = "TransactionScreen Preview")
+@Preview(showBackground = true, widthDp = 390, heightDp = 844, name = "TransactionsScreen Preview")
 @Composable
 fun TransactionsScreenPreview() {
+    // Local preview state to quickly toggle filters/search
     var query by remember { mutableStateOf("") }
     var selectedPeriod by remember { mutableStateOf(TransactionPeriod.MONTH) }
-    var showSheet by remember { mutableStateOf(false) }
     var selectedCat by remember { mutableStateOf<String?>(null) }
 
     MaterialTheme {
@@ -822,29 +906,32 @@ fun TransactionsScreenPreview() {
             topBar = { TransactionTopBar() },
         ) { inner ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(inner).padding(top = DashboardDimens.heroZonePadTop),
-                contentPadding = PaddingValues(bottom = 80.dp),
+                modifier = Modifier.fillMaxSize().padding(inner).padding(top = DashboardDimens.spaceXxl),
+                contentPadding = PaddingValues(bottom = DashboardDimens.fabClearance),
+                verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
             ) {
+                // Period tabs
                 item {
                     PeriodTabRow(
                         selected = selectedPeriod,
                         onSelect = { selectedPeriod = it },
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(start = DashboardDimens.screenPaddingH, end = DashboardDimens.screenPaddingH),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
                     )
                 }
-                item { Spacer(Modifier.height(DashboardDimens.spaceMd)) }
+
+                // Search + filter
                 item {
                     SearchAndFilterRow(
                         query = query,
                         onQueryChange = { query = it },
                         onClearSearch = { query = "" },
                         activeFilterCount = if (selectedCat != null) 1 else 0,
-                        onFilterClick = { showSheet = true },
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(start = DashboardDimens.screenPaddingH, end = DashboardDimens.screenPaddingH),
+                        onFilterClick = { /* no-op in preview */ },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
                     )
                 }
+
+                // Active filters
                 item {
                     AnimatedVisibility(visible = selectedCat != null) {
                         ActiveFilterChipsRow(
@@ -853,54 +940,46 @@ fun TransactionsScreenPreview() {
                             onClearCategory = { selectedCat = null },
                             onClearPayment = {},
                             modifier = Modifier.fillMaxWidth().padding(
-                                horizontal = DashboardDimens.screenPaddingH,
-                                vertical = DashboardDimens.spaceMd
+                                horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceMd
                             ),
                         )
                     }
                 }
-                item { Spacer(Modifier.height(DashboardDimens.spaceMd)) }
+
+                // Sample month groups + transactions
                 sampleMonthGroups.forEach { mg ->
                     item {
                         MonthGroupHeader(
                             monthLabel = mg.monthLabel,
                             totalSpent = mg.totalSpent,
-                            expanded = false,
+                            expanded = true,
                             onToggle = {},
-                            modifier = Modifier.fillMaxWidth()
-                                .padding(start = DashboardDimens.screenPaddingH, end = DashboardDimens.screenPaddingH)
-                                .padding(bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH)
+                                .padding(bottom = DashboardDimens.spaceSm),
                         )
                     }
+
                     mg.days.forEach { dg ->
                         item {
                             Text(
-                                dg.dayLabel,
+                                text = dg.dayLabel,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                                 modifier = Modifier.padding(
-                                    start = DashboardDimens.screenPaddingH,
-                                    end = DashboardDimens.screenPaddingH,
-                                    top = DashboardDimens.spaceXs,
-                                    bottom = DashboardDimens.spaceXs
-
+                                    horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceSm
                                 ),
                             )
                         }
-                        items(dg.items) { tx ->
+
+                        itemsIndexed(dg.items) { index, tx ->
                             TransactionRow(
                                 tx = tx,
                                 query = query,
-                                modifier = Modifier.fillMaxWidth().padding(
-                                    start = DashboardDimens.screenPaddingH,
-                                    end = DashboardDimens.screenPaddingH
-                                )
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
                             )
-                            HorizontalDivider(
-                                Modifier,
-                                DividerDefaults.Thickness,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                            )
+                            if (index < dg.items.lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                            }
                         }
                     }
                 }

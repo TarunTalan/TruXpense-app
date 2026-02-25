@@ -31,12 +31,8 @@ import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.unit.dp
 
-@Composable
-fun DashboardTopBar(username: String?) {
-    val title = username?.let { "Hi, ${it.split(' ').firstOrNull() ?: it}" } ?: "Hi"
-    ScreenTopBar(title = title, showBack = false, showProfileIcons = true)
-}
 
 @Composable
 fun DashboardBottomBar(
@@ -99,7 +95,7 @@ fun DashboardBottomBar(
                             painter = painterResource(if (selected) item.selectedIcon else item.icon),
                             contentDescription = item.label,
                             modifier = Modifier
-                                .size(DashboardDimens.iconLg)
+                                .size(21.dp)
                                 .scale(scaleAnim.value),
                             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = contentAlpha)
                         )
@@ -108,7 +104,7 @@ fun DashboardBottomBar(
 
                         Text(
                             text = item.label,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = DashboardDimens.textSm),
                             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = contentAlpha),
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -266,10 +262,4 @@ fun AddFab(
 fun DashboardBottomBarPreview() {
     val items = BottomNavBarMenu.all
     DashboardBottomBar(items = items, isSelected = { it == BottomNavBarMenu.Home }, onItemSelected = {})
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DashboardTopBarPreview() {
-    DashboardTopBar(username = "Tarun")
 }

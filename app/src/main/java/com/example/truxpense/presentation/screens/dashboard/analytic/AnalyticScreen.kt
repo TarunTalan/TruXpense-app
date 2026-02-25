@@ -177,7 +177,7 @@ fun AnalyticsScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(title = "Analytics", showBack = false) },
+        topBar = { ScreenTopBar(headerTitle = "Analytics", showBack = false) },
     ) { innerPadding ->
 
         LazyColumn(

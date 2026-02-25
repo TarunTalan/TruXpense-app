@@ -18,7 +18,7 @@ import com.example.truxpense.presentation.screens.dashboard.components.SmsPermis
 
 @Composable
 fun TransactionsTopBar() {
-    ScreenTopBar(title = "Transactions", showBack = false)
+    ScreenTopBar(headerTitle = "Transactions", showBack = false)
 }
 
 @Composable

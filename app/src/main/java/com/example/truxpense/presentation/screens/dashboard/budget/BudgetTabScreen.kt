@@ -60,7 +60,7 @@ fun BudgetTab(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(title = "Budgets", showBack = false) },
+        topBar = { ScreenTopBar(headerTitle = "Budgets", showBack = false) },
         floatingActionButton = {
             AddFab(onClick = onNavigateToAddBudget)
         },

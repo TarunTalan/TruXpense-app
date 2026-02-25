@@ -78,7 +78,7 @@ fun BudgetDetailScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             ScreenTopBar(
-                title = budgetNameFinal,
+                headerTitle = budgetNameFinal,
                 showBack = true,
                 onBack = onBack,
                 actions = {
@@ -541,10 +541,131 @@ private fun TransactionDetailRow(label: String, value: String) {
 
 // Preview
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(name = "BudgetDetail - Light", showBackground = true, showSystemUi = true)
 @Composable
-fun BudgetDetailScreenPreview() {
+fun BudgetDetailScreenPreviewLight() {
     MaterialTheme {
-        BudgetDetailScreen()
+        BudgetDetailPreviewContent(isDark = false)
+    }
+}
+
+@Preview(name = "BudgetDetail - Dark", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, showSystemUi = true)
+@Composable
+fun BudgetDetailScreenPreviewDark() {
+    MaterialTheme {
+        BudgetDetailPreviewContent(isDark = true)
+    }
+}
+
+@Composable
+private fun BudgetDetailPreviewContent(isDark: Boolean) {
+    // Sample data for preview
+    val samplePoints = listOf(
+        SpendPoint(amount = 120.0, dayLabel = "Mon"),
+        SpendPoint(amount = 80.0, dayLabel = "Tue"),
+        SpendPoint(amount = 200.0, dayLabel = "Wed"),
+        SpendPoint(amount = 40.0, dayLabel = "Thu"),
+        SpendPoint(amount = 160.0, dayLabel = "Fri"),
+        SpendPoint(amount = 60.0, dayLabel = "Sat"),
+        SpendPoint(amount = 100.0, dayLabel = "Sun")
+    )
+
+    val sampleTransactions = listOf(
+        BudgetTransaction(
+            id = "1",
+            amount = 120.0,
+            type = "Payment",
+            addedFrom = "Mobile",
+            merchant = "Coffee Shop",
+            category = "Food",
+            account = "Card ****1234",
+            date = "01 Feb 2026",
+            time = "09:15"
+        ),
+        BudgetTransaction(
+            id = "2",
+            amount = 450.0,
+            type = "Transfer",
+            addedFrom = "",
+            merchant = "Supermarket",
+            category = "Groceries",
+            account = "Card ****5678",
+            date = "02 Feb 2026",
+            time = "14:30"
+        ),
+        BudgetTransaction(
+            id = "3",
+            amount = 75.0,
+            type = "Payment",
+            addedFrom = "POS",
+            merchant = "Bakery",
+            category = "Food",
+            account = "Cash",
+            date = "03 Feb 2026",
+            time = "08:05"
+        )
+    )
+
+    // Compose the screen using internal components to avoid Hilt/ViewModel in preview
+    val monthlyLimit = 3000.0
+    val spent = 985.0
+    val left = (monthlyLimit - spent).coerceAtLeast(0.0)
+    val progress = if (monthlyLimit > 0) (spent / monthlyLimit).toFloat().coerceIn(0f, 1f) else 0f
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // Top bar preview (simple)
+        ScreenTopBar(headerTitle = "Groceries", showBack = true, onBack = {}, actions = {})
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                horizontal = DashboardDimens.screenPaddingH,
+                vertical = DashboardDimens.spaceLg
+            ),
+            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg)
+        ) {
+            item {
+                MonthlyBudgetCard(
+                    limit = monthlyLimit,
+                    spent = spent,
+                    left = left,
+                    animatedProgress = progress,
+                    progress = progress
+                )
+            }
+
+            item {
+                PeriodToggle(selected = PeriodTab.WEEK, onSelect = {})
+            }
+
+            item {
+                SpendingTrendCard(points = samplePoints, periodTab = PeriodTab.WEEK)
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = DashboardDimens.spaceXs),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Transactions",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "See all",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            items(sampleTransactions, key = { it.id }) { tx ->
+                TransactionCard(tx = tx)
+            }
+
+            item { Spacer(Modifier.height(DashboardDimens.spaceXl)) }
+        }
     }
 }
