@@ -21,10 +21,10 @@ import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetTopBar() {
-    ScreenTopBar(title = "Budgets", showBack = false)
+    ScreenTopBar(headerTitle = "Budgets", showBack = false)
 }
 
 @Composable

@@ -65,7 +65,7 @@ fun SettingsScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(title = "Settings", showBack = false) }
+        topBar = { ScreenTopBar(headerTitle = "Settings", showBack = false) }
     ) { innerPadding ->
 
         LazyColumn(

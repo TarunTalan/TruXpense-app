@@ -46,5 +46,22 @@ fun currencyFormat(currencyCode: String?): NumberFormat =
         }
     }.getOrElse { NumberFormat.getCurrencyInstance() }
 
-fun Double.toCurrency(fmt: NumberFormat) = runCatching { fmt.format(this) }.getOrDefault("$this")
+fun Double.toCurrency(fmt: NumberFormat): String = runCatching {
+    // Format using provided NumberFormat then strip unnecessary fractional zeros
+    val formatted = fmt.format(this)
+    val decimalSep = (fmt as? java.text.DecimalFormat)?.decimalFormatSymbols?.decimalSeparator ?: '.'
 
+    // Common case: ends with decimalSep + two zeros (e.g. ".00" or ",00")
+    val zeroSuffix = "${decimalSep}00"
+    if (formatted.endsWith(zeroSuffix)) {
+        return@runCatching formatted.substring(0, formatted.length - zeroSuffix.length)
+    }
+
+    if (!formatted.contains(decimalSep)) return@runCatching formatted
+
+    // Otherwise trim trailing zeros after decimal separator (e.g. 123.40 -> 123.4, 123.00 handled above)
+    var s = formatted
+    while (s.isNotEmpty() && s.last() == '0') s = s.dropLast(1)
+    if (s.isNotEmpty() && s.last() == decimalSep) s = s.dropLast(1)
+    s
+}.getOrDefault("$this")

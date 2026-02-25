@@ -20,7 +20,7 @@ import com.example.truxpense.presentation.screens.dashboard.components.ScreenTop
 
 @Composable
 fun AnalyticsTopBar() {
-    ScreenTopBar(title = "Analytics", showBack = false)
+    ScreenTopBar(headerTitle = "Analytics", showBack = false)
 }
 
 @Composable

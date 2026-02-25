@@ -15,20 +15,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
-import com.example.truxpense.presentation.screens.dashboard.components.DashboardTopBar
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 
 @Composable
 fun EmptyHomeContent(
     onAddExpense: (() -> Unit)? = null,
-    onLogout: (() -> Unit)? = null,
     hasSmsPermission: Boolean,
-    onSmsGranted: (() -> Unit)? = null,
-    username: String? = null
+    onSmsGranted: (() -> Unit)? = null
 ) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = { DashboardTopBar(username = username) }) { innerPadding ->
+        containerColor = MaterialTheme.colorScheme.background, topBar = {
+            ScreenTopBar(
+                headerTitle = "TruXpense", showBack = false, showProfileIcons = true
+            )
+        }) { innerPadding ->
 
         Column(
             modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
@@ -90,11 +91,7 @@ fun EmptyHomeContent(
 fun EmptyHomeTabScreenPreview() {
     MaterialTheme {
         EmptyHomeContent(
-            onAddExpense = {},
-            onLogout = {},
-            hasSmsPermission = false,
-            onSmsGranted = {},
-            username = "Tarun"
+            onAddExpense = {}, hasSmsPermission = false, onSmsGranted = {}
         )
     }
 }

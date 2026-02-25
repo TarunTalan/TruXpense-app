@@ -3,7 +3,10 @@ package com.example.truxpense.data.repository.dashboard
 import com.example.truxpense.data.local.dao.ExpenseDao
 import com.example.truxpense.data.local.entity.ExpenseEntity
 import kotlinx.coroutines.flow.Flow
+    import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +19,7 @@ data class Transaction(
     val category: String,
     val paymentMethod: String,
     val merchant: String,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 // ── Repository ────────────────────────────────────────────────────────────────
