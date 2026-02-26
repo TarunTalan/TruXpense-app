@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.AccountDropdown
+import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
@@ -48,14 +51,17 @@ fun AddExpenseScreen(
     val merchant by vm.merchant.collectAsState()
     val notes by vm.notes.collectAsState()
     val selectedCategory by vm.selectedCategory.collectAsState()
-    val categoryExpanded by vm.categoryExpanded.collectAsState()
     val selectedAccount by vm.selectedAccount.collectAsState()
-    val accountExpanded by vm.accountExpanded.collectAsState()
     val selectedDate by vm.selectedDate.collectAsState()
     val isFormValid by vm.isFormValid.collectAsState()
 
     // Delegate UI to a parameterized content function (makes preview easier)
     val context = LocalContext.current
+
+    // Capture theme colors once (safe to call in @Composable scope)
+    val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
+    val onPrimaryArgb = MaterialTheme.colorScheme.onPrimary.toArgb()
+    val onBackgroundArgb = MaterialTheme.colorScheme.onBackground.toArgb()
 
     fun openDatePicker() {
         val now = Calendar.getInstance()
@@ -70,6 +76,15 @@ fun AddExpenseScreen(
             vm.setDate(sdf.format(cal.time))
             onDatePick()
         }, year, month, day)
+        // Make the platform DatePickerDialog follow Compose theme colors (best-effort)
+        picker.setOnShowListener {
+            try {
+                val window = picker.window
+                window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(surfaceArgb))
+                picker.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
+                picker.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
+            } catch (_: Exception) { /* best-effort */ }
+        }
         picker.show()
     }
 
@@ -78,9 +93,7 @@ fun AddExpenseScreen(
         merchant = merchant,
         notes = notes,
         selectedCategory = selectedCategory,
-        categoryExpanded = categoryExpanded,
         selectedAccount = selectedAccount,
-        accountExpanded = accountExpanded,
         categories = vm.categories,
         accounts = vm.accountList,
         selectedDate = selectedDate,
@@ -88,9 +101,7 @@ fun AddExpenseScreen(
         onRawChange = { vm.setRawAmount(it) },
         onMerchantChange = { vm.setMerchant(it) },
         onNotesChange = { vm.setNotes(it) },
-        onSetCategoryExpanded = { vm.setCategoryExpanded(it) },
         onSelectCategory = { vm.selectCategory(it) },
-        onSetAccountExpanded = { vm.setAccountExpanded(it) },
         onSelectAccount = { vm.selectAccount(it) },
         onDatePick = { openDatePicker() },
         onSave = { // build tx and forward to parent onSave
@@ -119,9 +130,7 @@ fun AddExpenseScreenContent(
     merchant: String,
     notes: String,
     selectedCategory: String?,
-    categoryExpanded: Boolean,
     selectedAccount: String?,
-    accountExpanded: Boolean,
     categories: List<String>,
     accounts: List<String>,
     selectedDate: String?,
@@ -129,28 +138,27 @@ fun AddExpenseScreenContent(
     onRawChange: (String) -> Unit,
     onMerchantChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
-    onSetCategoryExpanded: (Boolean) -> Unit,
     onSelectCategory: (String) -> Unit,
-    onSetAccountExpanded: (Boolean) -> Unit,
     onSelectAccount: (String) -> Unit,
     onDatePick: () -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
+    // New optional parameters for overrides (Edit screen passes these)
+    screenTitle: String = "Add expense",
+    saveLabel: String? = null,
+    extraBottomContent: (@Composable () -> Unit)? = null,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(headerTitle = "Add expense", showBack = true, onBack = onBack) },
+        topBar = { ScreenTopBar(headerTitle = screenTitle, showBack = true, onBack = onBack) },
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = DashboardDimens.screenPaddingH)
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = DashboardDimens.screenPaddingH)
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(DashboardDimens.spaceMd))
 
-            // Amount card (separate card above details) — use same inner padding as DetailsCard
+            // Amount card (separate card above details)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(DashboardDimens.cornerCard),
@@ -158,9 +166,7 @@ fun AddExpenseScreenContent(
                 elevation = CardDefaults.cardElevation(defaultElevation = DashboardDimens.cardElevation),
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(DashboardDimens.cardPaddingComp),
+                    modifier = Modifier.fillMaxWidth().padding(DashboardDimens.cardPaddingComp),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     AmountInputZone(rawAmount = rawAmount, onRawChange = onRawChange)
@@ -172,19 +178,13 @@ fun AddExpenseScreenContent(
             // Details card (category, merchant, account, date)
             DetailsCard(
                 selectedCategory = selectedCategory,
-                categoryExpanded = categoryExpanded,
                 categories = categories,
-                onCategoryToggle = { onSetCategoryExpanded(!categoryExpanded) },
                 onCategorySelect = onSelectCategory,
-                onCategoryDismiss = { onSetCategoryExpanded(false) },
                 merchant = merchant,
                 onMerchantChange = onMerchantChange,
                 selectedAccount = selectedAccount,
-                accountExpanded = accountExpanded,
                 accounts = accounts,
-                onAccountToggle = { onSetAccountExpanded(!accountExpanded) },
                 onAccountSelect = onSelectAccount,
-                onAccountDismiss = { onSetAccountExpanded(false) },
                 selectedDate = selectedDate,
                 onDateClick = onDatePick,
             )
@@ -197,8 +197,15 @@ fun AddExpenseScreenContent(
             Spacer(Modifier.height(DashboardDimens.spaceXxl))
 
             // Action buttons
-            SaveButton(enabled = isFormValid, onClick = onSave)
+            SaveButton(enabled = isFormValid, onClick = onSave, label = saveLabel ?: "Save expense")
             Spacer(Modifier.height(DashboardDimens.spaceMd))
+
+            // Optional extra bottom content (e.g., Cancel button for Edit screen)
+            if (extraBottomContent != null) {
+                Spacer(Modifier.height(DashboardDimens.spaceMd))
+                extraBottomContent()
+            }
+
             Spacer(Modifier.height(DashboardDimens.spaceXxl))
         }
     }
@@ -211,7 +218,7 @@ private fun AmountInputZone(
     rawAmount: String,
     onRawChange: (String) -> Unit,
 ) {
-    // Single centered text field for amount input. No border and no background by design.
+    // Single centered text field for amount input
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -226,11 +233,10 @@ private fun AmountInputZone(
 
         Spacer(Modifier.height(DashboardDimens.spaceLg))
 
-        // Focus and keyboard controller moved here so the full-width box can request focus.
         val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
-        // Measurement helpers to size the composed currency+amount tightly
+        // Measurement helpers to size the currency+amount tightly
         val textMeasurer = rememberTextMeasurer()
         val displayStyle = MaterialTheme.typography.displaySmall.copy(
             color = MaterialTheme.colorScheme.onBackground,
@@ -248,25 +254,17 @@ private fun AmountInputZone(
         val finalWidth = totalDp + DashboardDimens.spaceSm
 
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                // Make the whole row tappable: request focus and show keyboard without ripple
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) {
-                    focusRequester.requestFocus()
-                    keyboardController?.show()
-                },
-            contentAlignment = Alignment.Center
+            modifier = Modifier.fillMaxWidth().clickable(
+            indication = null, interactionSource = remember { MutableInteractionSource() }) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }, contentAlignment = Alignment.Center
         ) {
             BasicTextField(
                 value = rawAmount,
                 onValueChange = onRawChange,
                 singleLine = true,
-                modifier = Modifier
-                    .widthIn(min = DashboardDimens.iconButtonMd)
-                    .width(finalWidth)
+                modifier = Modifier.widthIn(min = DashboardDimens.iconButtonMd).width(finalWidth)
                     .focusRequester(focusRequester),
                 textStyle = displayStyle,
                 keyboardOptions = KeyboardOptions(
@@ -276,7 +274,6 @@ private fun AmountInputZone(
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.wrapContentWidth()) {
-                        // currency symbol immediately before the inner content
                         Text(
                             text = currencyText,
                             style = displayStyle,
@@ -294,8 +291,7 @@ private fun AmountInputZone(
                             inner()
                         }
                     }
-                }
-            )
+                })
         }
     }
 
@@ -308,19 +304,13 @@ private fun AmountInputZone(
 @Composable
 private fun DetailsCard(
     selectedCategory: String?,
-    categoryExpanded: Boolean,
     categories: List<String>,
-    onCategoryToggle: () -> Unit,
     onCategorySelect: (String) -> Unit,
-    onCategoryDismiss: () -> Unit,
     merchant: String,
     onMerchantChange: (String) -> Unit,
     selectedAccount: String?,
-    accountExpanded: Boolean,
     accounts: List<String>,
-    onAccountToggle: () -> Unit,
     onAccountSelect: (String) -> Unit,
-    onAccountDismiss: () -> Unit,
     selectedDate: String?,
     onDateClick: () -> Unit,
 ) {
@@ -333,95 +323,15 @@ private fun DetailsCard(
         Column(modifier = Modifier.fillMaxWidth()) {
 
             // ── Row 1: Category ──────────────────────────────────────────────
-            ExposedDropdownMenuBox(
-                expanded = categoryExpanded,
-                onExpandedChange = { if (it) onCategoryToggle() else onCategoryDismiss() },
+            CategoryDropdown(
+                selected = selectedCategory,
+                categories = categories,
+                onSelect = { onCategorySelect(it) },
+                iconForCategory = { cat -> iconForCategory(cat) },
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                DetailRow(
-                    leadingIcon = {
-                        val selTrim = selectedCategory?.trim().orEmpty()
-                        val hasIcon = selTrim.isNotEmpty() && selTrim.lowercase() !in listOf("other", "others")
-                        val iconRes = if (hasIcon) iconForCategory(selectedCategory) else R.drawable.category_icon
-                        Icon(
-                            painter = painterResource(iconRes),
-                            contentDescription = null,
-                            tint = if (selectedCategory != null) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(DashboardDimens.iconMd),
-                        )
-                    },
-                    label = "Category",
-                    trailingIcon = {
-                        Icon(
-                            painter = painterResource(R.drawable.drop_down_icon),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(DashboardDimens.iconMd),
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                ) {
-                    Text(
-                        text = selectedCategory ?: "Select category",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (selectedCategory == null) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.onBackground,
-                    )
-                }
-
-                // ExposedDropdownMenu naturally anchors BELOW the menuAnchor composable
-                ExposedDropdownMenu(
-                    expanded = categoryExpanded,
-                    onDismissRequest = onCategoryDismiss,
-                    modifier = Modifier.exposedDropdownSize(false),
-                ) {
-                    if (categories.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No categories found", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = { onCategoryDismiss() },
-                        )
-                    } else {
-                        categories.forEach { item ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = item,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (item == selectedCategory) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onBackground,
-                                    )
-                                },
-                                onClick = { onCategorySelect(item); onCategoryDismiss() },
-                                leadingIcon = {
-                                    Icon(
-                                        painter = painterResource(iconForCategory(item)),
-                                        contentDescription = null,
-                                        tint = if (item == selectedCategory) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(DashboardDimens.iconMd),
-                                    )
-                                },
-                                trailingIcon = {
-                                    if (item == selectedCategory) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.drop_down_icon),
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(DashboardDimens.iconSm),
-                                        )
-                                    }
-                                },
-                                colors = MenuDefaults.itemColors(
-                                    textColor = MaterialTheme.colorScheme.onBackground,
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
+                placeholder = "Select category",
+                inline = true,
+            )
 
             RowDivider()
 
@@ -467,72 +377,15 @@ private fun DetailsCard(
             RowDivider()
 
             // ── Row 3: Account ────────────────────────────────────────────────
-            ExposedDropdownMenuBox(
-                expanded = accountExpanded,
-                onExpandedChange = { if (it) onAccountToggle() else onAccountDismiss() },
+            AccountDropdown(
+                selected = selectedAccount,
+                accounts = accounts,
+                onSelect = { onAccountSelect(it) },
+                iconForAccount = { acc -> iconForAccount(acc) },
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                DetailRow(
-                    leadingIcon = {
-                        Icon(
-                            painter = painterResource(R.drawable.bills),
-                            contentDescription = null,
-                            tint = if (selectedAccount != null) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(DashboardDimens.iconMd),
-                        )
-                    },
-                    label = "Account",
-                    trailingIcon = {
-                        Icon(
-                            painter = painterResource(R.drawable.drop_down_icon),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(DashboardDimens.iconMd),
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                ) {
-                    Text(
-                        text = selectedAccount ?: "Select account",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (selectedAccount == null) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.onBackground,
-                    )
-                }
-
-                ExposedDropdownMenu(
-                    expanded = accountExpanded,
-                    onDismissRequest = onAccountDismiss,
-                    modifier = Modifier.exposedDropdownSize(false),
-                ) {
-                    accounts.forEach { item ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = item,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (item == selectedAccount) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onBackground,
-                                )
-                            },
-                            onClick = { onAccountSelect(item); onAccountDismiss() },
-                            trailingIcon = {
-                                if (item == selectedAccount) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.drop_down_icon),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(DashboardDimens.iconSm),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                }
-            }
+                placeholder = "Select account",
+                inline = true,
+            )
 
             RowDivider()
 
@@ -556,13 +409,11 @@ private fun DetailsCard(
                         modifier = Modifier.size(DashboardDimens.iconMd),
                     )
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = onDateClick,
-                    ),
+                modifier = Modifier.fillMaxWidth().clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = onDateClick,
+                ),
             ) {
                 Text(
                     text = selectedDate ?: "Pick a date",
@@ -585,14 +436,12 @@ private fun DetailRow(
     content: @Composable () -> Unit,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(DashboardDimens.detailRowHeight)
+        modifier = modifier.fillMaxWidth().height(DashboardDimens.detailRowHeight)
             .padding(horizontal = DashboardDimens.screenPaddingH),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
     ) {
-        // Leading icon — consistent 20 dp slot
+        // Leading icon — consistent slot
         Box(
             modifier = Modifier.size(DashboardDimens.iconMd),
             contentAlignment = Alignment.Center,
@@ -614,7 +463,7 @@ private fun DetailRow(
             content()
         }
 
-        // Optional trailing icon — consistent 20 dp slot
+        // Optional trailing icon
         if (trailingIcon != null) {
             Box(
                 modifier = Modifier.size(DashboardDimens.iconMd),
@@ -626,12 +475,11 @@ private fun DetailRow(
     }
 }
 
-/** Thin divider with screen-edge inset, matching the leading-icon column offset. */
+/** Thin divider with screen-edge inset */
 @Composable
 private fun RowDivider() {
     HorizontalDivider(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
             .padding(start = DashboardDimens.screenPaddingH + DashboardDimens.iconMd + DashboardDimens.spaceMd),
         color = MaterialTheme.colorScheme.outlineVariant,
         thickness = DashboardDimens.dividerThin,
@@ -650,11 +498,10 @@ private fun NotesCard(notes: String, onChange: (String) -> Unit) {
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceLg),
         ) {
-            // Header row — icon + label, mirroring the DetailRow leading-icon style
+            // Header row — icon + label
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
@@ -674,13 +521,11 @@ private fun NotesCard(notes: String, onChange: (String) -> Unit) {
 
             Spacer(Modifier.height(DashboardDimens.spaceMd))
 
-            // Text input — borderless, blends into the card surface
+            // Text input
             BasicTextField(
                 value = notes,
                 onValueChange = onChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(DashboardDimens.cornerChip))
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerChip))
                     .background(MaterialTheme.colorScheme.background)
                     .padding(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceMdL)
                     .defaultMinSize(minHeight = DashboardDimens.inputMinHeight),
@@ -705,7 +550,7 @@ private fun NotesCard(notes: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
+private fun SaveButton(enabled: Boolean, onClick: () -> Unit, label: String = "Save expense") {
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -719,7 +564,7 @@ private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
         ),
         elevation = ButtonDefaults.buttonElevation(0.dp)
     ) {
-        Text(text = "Save expense", fontWeight = FontWeight.SemiBold, fontSize = DashboardDimens.textXl)
+        Text(text = label, fontWeight = FontWeight.SemiBold, fontSize = DashboardDimens.textXl, color = MaterialTheme.colorScheme.background)
     }
 }
 
@@ -731,9 +576,7 @@ fun AddExpenseScreenPreview() {
         merchant = "Cafe",
         notes = "Lunch",
         selectedCategory = "Food",
-        categoryExpanded = false,
         selectedAccount = "Cash",
-        accountExpanded = false,
         categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Groceries", "Other"),
         accounts = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI"),
         selectedDate = null,
@@ -741,9 +584,7 @@ fun AddExpenseScreenPreview() {
         onRawChange = {},
         onMerchantChange = {},
         onNotesChange = {},
-        onSetCategoryExpanded = {},
         onSelectCategory = {},
-        onSetAccountExpanded = {},
         onSelectAccount = {},
         onDatePick = {},
         onSave = {},
@@ -761,4 +602,14 @@ private fun iconForCategory(category: String?): Int = when (category?.trim()?.lo
     "entertainment" -> R.drawable.entertainment
     "groceries" -> R.drawable.groceries
     else -> R.drawable.category_icon
+}
+
+private fun iconForAccount(account: String?): Int = when (account?.trim()?.lowercase()) {
+    "hdfc bank", "hdfc" -> R.drawable.bills
+    "sbi", "sbi bank" -> R.drawable.bills
+    "icici bank", "icici" -> R.drawable.bills
+    "axis bank", "axis" -> R.drawable.bills
+    "cash" -> R.drawable.bills
+    "upi" -> R.drawable.bills
+    else -> R.drawable.bills
 }

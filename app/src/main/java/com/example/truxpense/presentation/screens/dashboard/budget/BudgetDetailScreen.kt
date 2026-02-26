@@ -207,7 +207,7 @@ private fun MonthlyBudgetCard(
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = DashboardDimens.spaceMd),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation),
     ) {
         Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
             Text(

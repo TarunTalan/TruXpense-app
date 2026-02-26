@@ -22,6 +22,24 @@ interface ExpenseDao {
     @Query("SELECT SUM(amount) FROM expenses")
     fun getTotalSpent(): Flow<Double?>
 
+    @Query(
+        """UPDATE expenses
+           SET amount = :amount,
+               category = :category,
+               paymentMethod = :paymentMethod,
+               merchant = :merchant,
+               timestamp = :timestamp
+           WHERE id = :id"""
+    )
+    suspend fun updateExpense(
+        id: String,
+        amount: Double,
+        category: String,
+        paymentMethod: String,
+        merchant: String,
+        timestamp: Long,
+    )
+
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteExpense(id: String)
 

@@ -33,7 +33,7 @@ class AddExpenseViewModel @Inject constructor(
         else "₹${"%,.0f".format(num)}"
     }.stateIn(viewModelScope, SharingStarted.Eagerly, "₹0")
 
-    // ── 3. Selections & dropdown open/close ───────────────────────────────────
+    // ── 3. Selections (dropdown open/close now handled by components) ─────────
 
     val categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Groceries", "Other")
     val accountList = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI")
@@ -41,14 +41,8 @@ class AddExpenseViewModel @Inject constructor(
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
-    private val _categoryExpanded = MutableStateFlow(false)
-    val categoryExpanded: StateFlow<Boolean> = _categoryExpanded.asStateFlow()
-
     private val _selectedAccount = MutableStateFlow<String?>(null)
     val selectedAccount: StateFlow<String?> = _selectedAccount.asStateFlow()
-
-    private val _accountExpanded = MutableStateFlow(false)
-    val accountExpanded: StateFlow<Boolean> = _accountExpanded.asStateFlow()
 
     private val _selectedDate = MutableStateFlow<String?>(null)
     val selectedDate: StateFlow<String?> = _selectedDate.asStateFlow()
@@ -69,16 +63,30 @@ class AddExpenseViewModel @Inject constructor(
 
     // ── Events ────────────────────────────────────────────────────────────────
 
-    fun setRawAmount(v: String) { _rawAmount.value = v.filter { it.isDigit() || it == '.' } }
-    fun setMerchant(v: String) { _merchant.value = v }
-    fun setNotes(v: String) { _notes.value = v }
-    fun selectCategory(cat: String) { _selectedCategory.value = cat; _categoryExpanded.value = false }
-    fun setCategoryExpanded(open: Boolean) { _categoryExpanded.value = open }
-    fun selectAccount(acc: String) { _selectedAccount.value = acc; _accountExpanded.value = false }
-    fun setAccountExpanded(open: Boolean) { _accountExpanded.value = open }
-    fun setDate(date: String) { _selectedDate.value = date }
+    fun setRawAmount(v: String) {
+        _rawAmount.value = v.filter { it.isDigit() || it == '.' }
+    }
 
-    /** Persists the expense to Room and emits [saveComplete] when done. */
+    fun setMerchant(v: String) {
+        _merchant.value = v
+    }
+
+    fun setNotes(v: String) {
+        _notes.value = v
+    }
+
+    fun selectCategory(cat: String) {
+        _selectedCategory.value = cat
+    }
+
+    fun selectAccount(acc: String) {
+        _selectedAccount.value = acc
+    }
+
+    fun setDate(date: String) {
+        _selectedDate.value = date
+    }
+
     fun saveExpense() {
         val amount = _rawAmount.value.toDoubleOrNull() ?: return
         val category = _selectedCategory.value ?: return

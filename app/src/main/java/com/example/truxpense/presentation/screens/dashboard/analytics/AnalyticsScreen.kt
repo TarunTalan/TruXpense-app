@@ -1,4 +1,4 @@
-package com.example.truxpense.presentation.screens.dashboard.analytic
+package com.example.truxpense.presentation.screens.dashboard.analytics
 
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -177,7 +177,7 @@ fun AnalyticsScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(headerTitle = "Analytics", showBack = false) },
+        topBar = { ScreenTopBar(headerTitle = "Analytics", showBack = false, modifier = Modifier.padding(bottom = DashboardDimens.spaceLg)) },
     ) { innerPadding ->
 
         LazyColumn(
@@ -187,16 +187,6 @@ fun AnalyticsScreen(
                 bottom = DashboardDimens.spaceLg
             ), verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg)
         ) {
-
-            // Summary card — show computed totals if available
-            item {
-                SummaryCard(
-                    totalSpent = if (computedTotalSpent > 0.0) computedTotalSpent else totalSpent,
-                    totalBudget = if (computedTotalBudget > 0.0) computedTotalBudget else totalBudget,
-                    changePercent = changePercent,
-                    periodMode = periodMode
-                )
-            }
 
             // ── Period segmented control ──────────────────────────────────────
             item {
@@ -216,6 +206,18 @@ fun AnalyticsScreen(
                     onBack = { monthOffset-- },
                     onForward = { if (monthOffset < 0) monthOffset++ },
                     modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            item { Spacer(Modifier.height(DashboardDimens.spaceSm)) }
+
+            // Summary card — show computed totals if available
+            item {
+                SummaryCard(
+                    totalSpent = if (computedTotalSpent > 0.0) computedTotalSpent else totalSpent,
+                    totalBudget = if (computedTotalBudget > 0.0) computedTotalBudget else totalBudget,
+                    changePercent = changePercent,
+                    periodMode = periodMode
                 )
             }
 
@@ -257,7 +259,7 @@ private fun SummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp)
+        elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation)
     ) {
         Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             Text(
@@ -398,7 +400,7 @@ private fun LabelsCard(categories: List<CategorySpend>) {
             )
             categories.forEachIndexed { index, cat ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = DashboardDimens.spaceMdL - 3.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = DashboardDimens.spaceMdL),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {

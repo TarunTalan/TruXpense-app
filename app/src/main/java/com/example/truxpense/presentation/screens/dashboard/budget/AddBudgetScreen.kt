@@ -1,27 +1,17 @@
 package com.example.truxpense.presentation.screens.dashboard.budget
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
-import com.example.truxpense.presentation.components.CategoryDropdown
 import com.example.truxpense.presentation.components.NumberField
+import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
@@ -40,171 +30,128 @@ fun AddBudgetScreen(
     val categories by viewModel.categories.collectAsState(initial = emptyList())
     val isFormValid by viewModel.isFormValid.collectAsState()
 
-    // Pure UI state — dropdown open/close is presentational only, not business logic
-    var expanded by remember { mutableStateOf(false) }
+    AddBudgetScreenContent(
+        amountInput = amountInput,
+        selected = selected,
+        categories = categories,
+        isFormValid = isFormValid,
+        onSelectCategory = { viewModel.setSelected(it) },
+        onAmountChange = { viewModel.setAmountInput(it) },
+        onCreateBudget = { viewModel.createBudget(onSave) },
+        onBack = onBack,
+    )
+}
 
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    val dismissDropdown = {
-        expanded = false
-        focusManager.clearFocus()
-        keyboardController?.hide()
-    }
-
+// Stateless, previewable UI separated from ViewModel usage
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddBudgetScreenContent(
+    amountInput: String,
+    selected: String?,
+    categories: List<String>,
+    isFormValid: Boolean,
+    onSelectCategory: (String) -> Unit,
+    onAmountChange: (String) -> Unit,
+    onCreateBudget: () -> Unit,
+    onBack: () -> Unit,
+) {
     Scaffold(
-        topBar = { ScreenTopBar(headerTitle = "Add Budget", showBack = true, onBack = onBack) },
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            ScreenTopBar(
+                headerTitle = "Add Budget", showBack = true, onBack = onBack
+            )
+        },
         bottomBar = {
-            if (!expanded) {
-                Column(
-                    modifier = Modifier.padding(
-                        top = DashboardDimens.spaceMdL,
-                        start = DashboardDimens.screenPaddingH,
-                        end = DashboardDimens.screenPaddingH,
-                        bottom = DashboardDimens.spaceXxxl,
+            Column(
+                modifier = Modifier.padding(
+                    start = DashboardDimens.screenPaddingH,
+                    end = DashboardDimens.screenPaddingH,
+                    bottom = DashboardDimens.spaceXxxl,
+                ),
+            ) {
+                Button(
+                    onClick = onCreateBudget,
+                    enabled = isFormValid,
+                    modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
+                    shape = RoundedCornerShape(DashboardDimens.cornerCard),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(0.5f),
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(0.6f),
                     ),
-                    verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)
                 ) {
-                    Button(
-                        onClick = { viewModel.createBudget(onSave) },
-                        enabled = isFormValid,
-                        modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
-                        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(0.5f),
-                            disabledContentColor = MaterialTheme.colorScheme.background.copy(0.4f),
-                        ),
-                    ) {
-                        Text(
-                            text = "Create budget",
-                            color = MaterialTheme.colorScheme.background,
-                            fontSize = DashboardDimens.textXxl,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    Text(
+                        text = "Create budget",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = DashboardDimens.textXl,
+                        color = MaterialTheme.colorScheme.background
+                    )
                 }
             }
         },
     ) { contentPadding ->
-
-        val bottomPad = if (expanded) 0.dp else contentPadding.calculateBottomPadding()
 
         Column(
             modifier = Modifier.fillMaxSize().clearFocusOnTap().padding(
                 start = DashboardDimens.screenPaddingH,
                 end = DashboardDimens.screenPaddingH,
                 top = contentPadding.calculateTopPadding(),
-                bottom = bottomPad,
+                bottom = contentPadding.calculateBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
 
-            // Category selector
-            CategoryDropdown(
-                selected = selected,
-                categories = categories,
-                onSelect = { viewModel.setSelected(it) },
-                iconForCategory = { viewModel.iconForCategory(it) },
-                expanded = expanded,
-                onExpandedChange = { expanded = it },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Details card with category and budget amount
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(DashboardDimens.cornerCard),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                elevation = CardDefaults.cardElevation(0.dp),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
 
-            // Dropdown list
-            BackHandler(enabled = expanded) { dismissDropdown() }
+                    // Category selector (bottom sheet handled inside CategoryDropdown)
+                    CategoryDropdown(
+                        selected = selected,
+                        categories = categories,
+                        onSelect = { onSelectCategory(it) },
+                        iconForCategory = { cat -> iconForCategory(cat) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "Select category",
+                        inline = true,
+                    )
 
-            if (expanded) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f).background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = MaterialTheme.shapes.medium,
-                    ).padding(bottom = DashboardDimens.spaceMdL),
-                ) {
-                    if (categories.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("No categories found", color = MaterialTheme.colorScheme.onBackground)
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium).padding(
-                                horizontal = DashboardDimens.listPaddingH,
-                                vertical = DashboardDimens.listPaddingV,
-                            ),
-                        ) {
-                            itemsIndexed(categories) { _, item ->
-                                val isSelected = selected == item
-                                val containerColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.primaryContainer
+                    HorizontalDivider(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(start = DashboardDimens.screenPaddingH + DashboardDimens.iconMd + DashboardDimens.spaceMd),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        thickness = DashboardDimens.dividerThin,
+                    )
 
-                                // Icon resolved by VM — no when-block in the composable
-                                val iconRes = viewModel.iconForCategory(item)
-
-                                ListItem(
-                                    modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable {
-                                        viewModel.setSelected(item)
-                                        // no search/query handling — simple dropdown-only
-                                        dismissDropdown()
-                                    },
-                                    colors = ListItemDefaults.colors(containerColor = containerColor),
-                                    trailingContent = {
-                                        // Show icon at trailing for all categories except 'Other'/'Others'
-                                        val trimmed = item.trim().lowercase()
-                                        if (trimmed != "other" && trimmed != "others") {
-                                            Icon(
-                                                painter = painterResource(iconRes),
-                                                contentDescription = "$item icon",
-                                                tint = MaterialTheme.colorScheme.onBackground,
-                                                modifier = Modifier.size(DashboardDimens.iconMd),
-                                            )
-                                        } else {
-                                            Spacer(modifier = Modifier.width(DashboardDimens.iconMd))
-                                        }
-                                    },
-                                    headlineContent = {
-                                        Text(
-                                            text = item,
-                                            color = MaterialTheme.colorScheme.onBackground,
-                                            style = MaterialTheme.typography.labelLarge
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Budget limit section (hidden while dropdown is open)
-            if (!expanded) {
-                SectionCard {
-                    Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
+                    // Budget amount section
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(DashboardDimens.screenPaddingH)
+                    ) {
                         Text(
                             text = "Monthly Budget limit",
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontSize = DashboardDimens.textXl,
-                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
                         )
-                        Spacer(Modifier.height(DashboardDimens.spaceLg))
-
-                        Text(
-                            text = "Enter amount",
-                            color = MaterialTheme.colorScheme.secondary,
-                            fontSize = DashboardDimens.textMd,
-                        )
-                        Spacer(Modifier.height(DashboardDimens.spaceXs))
+                        Spacer(Modifier.height(DashboardDimens.spaceMd))
 
                         NumberField(
                             value = amountInput,
-                            onValueChange = { viewModel.setAmountInput(it) },
+                            onValueChange = { onAmountChange(it) },
                             leadingIcon = {
                                 Text(
                                     text = "₹",
                                     color = MaterialTheme.colorScheme.onBackground,
                                     fontSize = DashboardDimens.textXl,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                             },
                             placeholder = "0",
@@ -213,66 +160,83 @@ fun AddBudgetScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
 
-                        Spacer(Modifier.height(DashboardDimens.spaceXs))
+                        Spacer(Modifier.height(DashboardDimens.spaceSm))
                         Text(
                             text = "This resets every month",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = DashboardDimens.textMd,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }
+            }
 
-                Spacer(Modifier.height(DashboardDimens.spaceLg))
-
-                Column {
+            // Budget period info card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(DashboardDimens.cornerCard),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                elevation = CardDefaults.cardElevation(0.dp),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(DashboardDimens.screenPaddingH)
+                ) {
                     Text(
                         text = "Budget period",
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontSize = DashboardDimens.textMd,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
                     )
                     Spacer(Modifier.height(DashboardDimens.spaceMd))
                     Text(
                         text = "Monthly (resets on the 1st)",
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = DashboardDimens.textLg,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
-
-                Spacer(Modifier.height(DashboardDimens.spaceLg))
-
-                Text(
-                    text = "Budgets help you stay on top of your spending. You can edit or remove them anytime.",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = DashboardDimens.textMd,
-                    lineHeight = DashboardDimens.lineHeightHelper,
-                )
-
-                Spacer(Modifier.weight(1f))
             }
+
+            // Help text
+            Text(
+                text = "Budgets help you stay on top of your spending. You can edit or remove them anytime.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                lineHeight = DashboardDimens.lineHeightHelper,
+                modifier = Modifier.padding(horizontal = DashboardDimens.spaceXs)
+            )
+
+            Spacer(Modifier.weight(1f))
         }
     }
 }
 
-
-// Section card shell
-
-@Composable
-private fun SectionCard(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerCard))
-            .background(MaterialTheme.colorScheme.primaryContainer),
-    ) {
-        content()
-    }
+// Helper function for category icons
+private fun iconForCategory(category: String): Int = when (category.trim().lowercase()) {
+    "food" -> R.drawable.food
+    "transport" -> R.drawable.transport
+    "bills" -> R.drawable.bills
+    "shopping" -> R.drawable.shopping
+    "travel" -> R.drawable.category_icon
+    "health" -> R.drawable.health
+    "education" -> R.drawable.category_icon
+    "entertainment" -> R.drawable.entertainment
+    "groceries" -> R.drawable.groceries
+    else -> R.drawable.category_icon
 }
 
 // Preview
-@Preview(showBackground = true, widthDp = 360, heightDp = 800, backgroundColor = 0xFFFFFFFF)
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
 fun AddBudgetScreenPreview() {
-    MaterialTheme { AddBudgetScreen() }
+    MaterialTheme {
+        AddBudgetScreenContent(
+            amountInput = "",
+            selected = null,
+            categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Other"),
+            isFormValid = false,
+            onSelectCategory = {},
+            onAmountChange = {},
+            onCreateBudget = {},
+            onBack = {},
+        )
+    }
 }

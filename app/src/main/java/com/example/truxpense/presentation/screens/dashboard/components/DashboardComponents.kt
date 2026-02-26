@@ -205,16 +205,18 @@ fun SmsPermissionBanner(
     if (showRationaleDialog) {
         AlertDialog(
             onDismissRequest = { showRationaleDialog = false },
-            title = { Text("Why we need SMS access") },
-            text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.") },
+            shape = RoundedCornerShape(DashboardDimens.cornerCard),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Why we need SMS access", color = MaterialTheme.colorScheme.onBackground) },
+            text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(onClick = {
                     showRationaleDialog = false
                     permissionLauncher.launch(permission)
-                }) { Text("Grant") }
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Grant") }
             },
             dismissButton = {
-                TextButton(onClick = { showRationaleDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showRationaleDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
             }
         )
     }
@@ -222,8 +224,10 @@ fun SmsPermissionBanner(
     if (showPermanentlyDeniedDialog) {
         AlertDialog(
             onDismissRequest = { showPermanentlyDeniedDialog = false },
-            title = { Text("Permission blocked") },
-            text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.") },
+            shape = RoundedCornerShape(DashboardDimens.cornerCard),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Permission blocked", color = MaterialTheme.colorScheme.onBackground) },
+            text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(onClick = {
                     showPermanentlyDeniedDialog = false
@@ -231,10 +235,10 @@ fun SmsPermissionBanner(
                         data = Uri.fromParts("package", context.packageName, null)
                     }
                     context.startActivity(intent)
-                }) { Text("Open settings") }
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Open settings") }
             },
             dismissButton = {
-                TextButton(onClick = { showPermanentlyDeniedDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showPermanentlyDeniedDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
             }
         )
     }

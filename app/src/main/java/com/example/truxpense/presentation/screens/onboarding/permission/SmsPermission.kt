@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -32,6 +33,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 @Composable
@@ -198,16 +200,20 @@ fun SmsPermission(
     if (showRationaleDialog) {
         AlertDialog(
             onDismissRequest = { closeRationale() },
-            title = { Text("Why we need SMS access") },
-            text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.") },
+            shape = RoundedCornerShape(DashboardDimens.cornerCard),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Why we need SMS access", color = MaterialTheme.colorScheme.onBackground) },
+            text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(onClick = {
                     closeRationale()
                     permissionLauncher.launch(permission)
-                }) { Text("Grant") }
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                    Text("Grant")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { closeRationale() }) { Text("Cancel") }
+                TextButton(onClick = { closeRationale() }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
             }
         )
     }
@@ -216,8 +222,10 @@ fun SmsPermission(
     if (showPermanentlyDeniedDialog) {
         AlertDialog(
             onDismissRequest = { closePermanentlyDenied() },
-            title = { Text("Permission blocked") },
-            text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.") },
+            shape = RoundedCornerShape(DashboardDimens.cornerCard),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Permission blocked", color = MaterialTheme.colorScheme.onBackground) },
+            text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(onClick = {
                     closePermanentlyDenied()
@@ -226,10 +234,12 @@ fun SmsPermission(
                         data = Uri.fromParts("package", context.packageName, null)
                     }
                     context.startActivity(intent)
-                }) { Text("Open settings") }
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                    Text("Open settings")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { closePermanentlyDenied() }) { Text("Cancel") }
+                TextButton(onClick = { closePermanentlyDenied() }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
             }
         )
     }

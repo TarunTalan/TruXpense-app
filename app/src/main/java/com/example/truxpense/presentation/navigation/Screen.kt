@@ -32,11 +32,16 @@ object Screen {
             const val Root = "transactions"
             const val AddExpense = "transactions/add_expense"
 
-            /** Route with a required transactionId path param. */
             const val Detail = "transactions/detail/{transactionId}"
 
             fun detailRoute(transactionId: String): String =
                 "transactions/detail/${java.net.URLEncoder.encode(transactionId, "UTF-8")}"
+
+            // Edit route for editing an existing transaction
+            const val Edit = "transactions/edit/{transactionId}"
+
+            fun editRoute(transactionId: String): String =
+                "transactions/edit/${java.net.URLEncoder.encode(transactionId, "UTF-8")}"
         }
 
         // ── Budget tab ────────────────────────────────────────────────────────

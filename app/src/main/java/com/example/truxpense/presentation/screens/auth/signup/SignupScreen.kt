@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -33,6 +34,7 @@ import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 import com.example.truxpense.presentation.utils.blockTouchesWhen
 import com.example.truxpense.presentation.utils.clearFocusOnTap
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 
 @Composable
 fun SignupScreen(
@@ -314,7 +316,9 @@ private fun TncCheckbox(
 private fun TncDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Terms and Conditions") },
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("Terms and Conditions", color = MaterialTheme.colorScheme.onBackground) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState())
@@ -324,7 +328,8 @@ private fun TncDialog(onDismiss: () -> Unit) {
 
                 Text(
                     text = "What we access:",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text("• Bank transaction SMS messages")
                 Text("• App usage data for improvements")
@@ -333,7 +338,8 @@ private fun TncDialog(onDismiss: () -> Unit) {
 
                 Text(
                     text = "What we don't access:",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text("• Personal messages")
                 Text("• OTPs from other apps")
@@ -344,13 +350,14 @@ private fun TncDialog(onDismiss: () -> Unit) {
 
                 Text(
                     "By continuing, you agree to allow TruXpense to access the data listed above for the purpose of automatically categorizing and tracking your expenses.",
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("Close", color = MaterialTheme.colorScheme.primary)
             }
         }
     )

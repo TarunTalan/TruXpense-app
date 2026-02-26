@@ -34,7 +34,6 @@ data class TransactionDetail(
     val amount: Double,          // negative = expense, positive = income
     val type: String,            // "Expense" | "Income"
     val source: String,          // "Detected from SMS" | "Added manually"
-    val paymentMethod: String,   // e.g. "UPI", "Card"
     val notes: String,
 )
 

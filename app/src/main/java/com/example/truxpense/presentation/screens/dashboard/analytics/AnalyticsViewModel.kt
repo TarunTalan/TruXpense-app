@@ -1,4 +1,4 @@
-package com.example.truxpense.presentation.screens.dashboard.analytic
+package com.example.truxpense.presentation.screens.dashboard.analytics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

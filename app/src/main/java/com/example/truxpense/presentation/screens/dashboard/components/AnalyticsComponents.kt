@@ -83,7 +83,7 @@ fun DateNavigatorRow(
                 painter = painterResource(id = com.example.truxpense.R.drawable.left_arrow),
                 contentDescription = "Previous",
                 tint = MaterialTheme.colorScheme.onBackground.copy(alpha = if (canBack) 1f else 0.3f),
-                modifier = Modifier.size(DashboardDimens.iconNav),
+                modifier = Modifier.size(DashboardDimens.iconMd),
             )
         }
 
@@ -103,7 +103,7 @@ fun DateNavigatorRow(
                 painter = painterResource(id = com.example.truxpense.R.drawable.right_arrow),
                 contentDescription = "Next",
                 tint = MaterialTheme.colorScheme.onBackground.copy(alpha = if (canForward) 1f else 0.3f),
-                modifier = Modifier.size(DashboardDimens.iconNav),
+                modifier = Modifier.size(DashboardDimens.iconMd),
             )
         }
     }

@@ -3,11 +3,8 @@ package com.example.truxpense.data.repository.dashboard
 import com.example.truxpense.data.local.dao.ExpenseDao
 import com.example.truxpense.data.local.entity.ExpenseEntity
 import kotlinx.coroutines.flow.Flow
-    import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
-import java.util.UUID
+import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,6 +32,17 @@ class ExpenseRepository @Inject constructor(
 
     suspend fun addExpense(transaction: Transaction) {
         expenseDao.insertExpense(transaction.toEntity())
+    }
+
+    suspend fun updateExpense(transaction: Transaction) {
+        expenseDao.updateExpense(
+            id = transaction.id,
+            amount = transaction.amount,
+            category = transaction.category,
+            paymentMethod = transaction.paymentMethod,
+            merchant = transaction.merchant,
+            timestamp = transaction.timestamp,
+        )
     }
 
     suspend fun deleteExpense(id: String) {
