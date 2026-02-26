@@ -51,13 +51,41 @@ fun BudgetTab(
         )
     } ?: displayItems
 
-    if (budgetsToShow.isEmpty()) {
-        BudgetsEmptyScreen(onAddBudget = onNavigateToAddBudget)
-        return
-    }
-
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
 
+    // Convert totals to formatted strings for the content
+    val totalBudgetStr = totalBudget.toDouble().toCurrency(fmt)
+    val totalSpentStr = totalSpent.toDouble().toCurrency(fmt)
+
+    BudgetTabContent(
+        budgetsToShow = budgetsToShow,
+        totalBudget = totalBudgetStr,
+        totalSpent = totalSpentStr,
+        currentMonth = currentMonth,
+        canGoBack = canGoBack,
+        canGoForward = canGoForward,
+        onPrevious = { vm.previousMonth() },
+        onNext = { vm.nextMonth() },
+        onNavigateToAddBudget = onNavigateToAddBudget,
+        onNavigateToBudgetDetail = onNavigateToBudgetDetail,
+    )
+}
+
+// Stateless UI extracted for preview and reuse
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BudgetTabContent(
+    budgetsToShow: List<BudgetCategoryDisplay>,
+    totalBudget: String,
+    totalSpent: String,
+    currentMonth: String,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onNavigateToAddBudget: () -> Unit,
+    onNavigateToBudgetDetail: (BudgetCategory) -> Unit,
+) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ScreenTopBar(headerTitle = "Budgets", showBack = false) },
@@ -78,16 +106,16 @@ fun BudgetTab(
                     currentMonth = currentMonth,
                     canGoBack = canGoBack,
                     canGoForward = canGoForward,
-                    onPrevious = { vm.previousMonth() },
-                    onNext = { vm.nextMonth() },
+                    onPrevious = onPrevious,
+                    onNext = onNext,
                 )
             }
 
             // Total budget summary
             item {
                 TotalBudgetCard(
-                    totalBudget = totalBudget.toDouble().toCurrency(fmt),
-                    totalSpent = totalSpent.toDouble().toCurrency(fmt),
+                    totalBudget = totalBudget,
+                    totalSpent = totalSpent,
                 )
             }
 
@@ -126,6 +154,7 @@ private fun MonthNavigatorRow(
                 painter = painterResource(R.drawable.left_arrow),
                 contentDescription = "Previous month",
                 tint = MaterialTheme.colorScheme.onBackground.copy(alpha = if (canGoBack) 1f else 0.38f),
+                modifier = Modifier.size(DashboardDimens.iconMd)
             )
         }
         Text(
@@ -133,12 +162,15 @@ private fun MonthNavigatorRow(
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
+
         )
         IconButton(onClick = onNext, enabled = canGoForward) {
             Icon(
                 painter = painterResource(R.drawable.right_arrow),
                 contentDescription = "Next month",
                 tint = MaterialTheme.colorScheme.onBackground.copy(alpha = if (canGoForward) 1f else 0.38f),
+                modifier = Modifier.size(DashboardDimens.iconMd)
+
             )
         }
     }
@@ -153,7 +185,7 @@ private fun TotalBudgetCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
+        elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation),
     ) {
         Column(modifier = Modifier.padding(DashboardDimens.cardPaddingComp)) {
             Text(
@@ -186,5 +218,27 @@ fun BudgetScreenPreview() {
         BudgetCategory(id = 1, name = "Food", spent = 1_200, total = 3_000, barColor = Color(0xFFEF4444)),
         BudgetCategory(id = 2, name = "Shopping", spent = 500, total = 2_000, barColor = Color(0xFFF59E0B)),
     )
-    MaterialTheme { BudgetTab(previewBudgets = sample) }
+    val sampleDisplay = sample.map {
+        BudgetCategoryDisplay(
+            category = it,
+            amountText = "${it.spent} / ${it.total}",
+            progress = if (it.total > 0) it.spent.toFloat() / it.total else 0f,
+        )
+    }
+
+    val fmt = remember { currencyFormat("INR") }
+    MaterialTheme {
+        BudgetTabContent(
+            budgetsToShow = sampleDisplay,
+            totalBudget = sample.sumOf { it.total }.toDouble().toCurrency(fmt),
+            totalSpent = sample.sumOf { it.spent }.toDouble().toCurrency(fmt),
+            currentMonth = "February 2026",
+            canGoBack = true,
+            canGoForward = false,
+            onPrevious = {},
+            onNext = {},
+            onNavigateToAddBudget = {},
+            onNavigateToBudgetDetail = {}
+        )
+    }
 }

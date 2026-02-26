@@ -22,7 +22,8 @@ import java.text.NumberFormat
 fun BudgetProgressBar(
     progress: Float,
     modifier: Modifier = Modifier,
-    errorColor: Color = MaterialTheme.colorScheme.error
+    errorColor: Color = MaterialTheme.colorScheme.error,
+    label: String = "used",
 ) {
     val progressForBar = progress.coerceIn(0f, 1f)
     val renderColor = progressColor(progressForBar, errorColor)
@@ -61,84 +62,86 @@ fun BudgetProgressBar(
         Spacer(Modifier.height(4.dp))
         val displayPercent = (progressForBar * 100).toInt()
         Text(
-            text = "${displayPercent}% used",
-            style = MaterialTheme.typography.bodySmall,
-            color = renderColor
-        )
-    }
-}
+            // label is customizable (default "used"). For spending cards we pass "spent".
+            text = "${displayPercent}% ${label}",
+             style = MaterialTheme.typography.bodySmall,
+             color = renderColor
+         )
+     }
+ }
 
-@Composable
-fun SpendingCategoryCard(
-    name: String,
-    amountText: String,
-    progress: Float,
-    modifier: Modifier = Modifier,
-    errorColor: Color = MaterialTheme.colorScheme.error,
-    titleColor: Color? = null
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Left: name
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = titleColor ?: MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+ @Composable
+ fun SpendingCategoryCard(
+     name: String,
+     amountText: String,
+     progress: Float,
+     modifier: Modifier = Modifier,
+     errorColor: Color = MaterialTheme.colorScheme.error,
+     titleColor: Color? = null
+ ) {
+     Card(
+         modifier = modifier.fillMaxWidth(),
+         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+     ) {
+         Column(modifier = Modifier.padding(16.dp)) {
+             Row(
+                 modifier = Modifier.fillMaxWidth(),
+                 horizontalArrangement = Arrangement.SpaceBetween
+             ) {
+                 // Left: name
+                 Column(modifier = Modifier.weight(1f)) {
+                     Text(
+                         text = name,
+                         style = MaterialTheme.typography.bodyMedium,
+                         fontWeight = FontWeight.Medium,
+                         color = titleColor ?: MaterialTheme.colorScheme.onBackground,
+                         maxLines = 1,
+                         overflow = TextOverflow.Ellipsis
+                     )
+                 }
 
-                // Right: amount
-                Text(
-                    text = amountText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            BudgetProgressBar(progress = progress, errorColor = errorColor)
-        }
-    }
-}
+                 // Right: amount
+                 Text(
+                     text = amountText,
+                     style = MaterialTheme.typography.bodyMedium,
+                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                 )
+             }
+             Spacer(Modifier.height(6.dp))
+             // For spending category card we show percent as "X% spent"
+             BudgetProgressBar(progress = progress, errorColor = errorColor, label = "spent")
+         }
+     }
+ }
 
-// Overload used by HomeTabScreen: accept a HomeSpendingCategory and a NumberFormat (fmt)
-@Composable
-fun SpendingCategoryCard(
-    category: HomeSpendingCategory,
-    fmt: NumberFormat,
-    modifier: Modifier = Modifier,
-    errorColor: Color = MaterialTheme.colorScheme.error,
-    titleColor: Color? = null
-) {
-    val raw = category.amount.toCurrency(fmt)
-    // Trim trailing decimals when not abbreviated (e.g., remove ".00"), but keep abbreviated forms like "1.2K"
-    fun trimmedAmount(s: String): String {
-        // if contains alphabetic abbreviation (K/M etc), return as-is
-        if (s.contains(Regex("[A-Za-z]"))) return s
-        val dot = s.lastIndexOf('.')
-        if (dot == -1) return s
-        val frac = s.substring(dot + 1).replace(Regex("\\D"), "")
-        return if (frac.all { it == '0' }) s.substring(0, dot) else s
-    }
+ // Overload used by HomeTabScreen: accept a HomeSpendingCategory and a NumberFormat (fmt)
+ @Composable
+ fun SpendingCategoryCard(
+     category: HomeSpendingCategory,
+     fmt: NumberFormat,
+     modifier: Modifier = Modifier,
+     errorColor: Color = MaterialTheme.colorScheme.error,
+     titleColor: Color? = null
+ ) {
+     val raw = category.amount.toCurrency(fmt)
+     // Trim trailing decimals when not abbreviated (e.g., remove ".00"), but keep abbreviated forms like "1.2K"
+     fun trimmedAmount(s: String): String {
+         // if contains alphabetic abbreviation (K/M etc), return as-is
+         if (s.contains(Regex("[A-Za-z]"))) return s
+         val dot = s.lastIndexOf('.')
+         if (dot == -1) return s
+         val frac = s.substring(dot + 1).replace(Regex("\\D"), "")
+         return if (frac.all { it == '0' }) s.substring(0, dot) else s
+     }
 
-    val amountText = trimmedAmount(raw)
-    SpendingCategoryCard(
-        name = category.name,
-        amountText = amountText,
-        progress = category.progress,
-        modifier = modifier,
-        errorColor = errorColor,
-        titleColor = titleColor,
-    )
-}
+     val amountText = trimmedAmount(raw)
+     SpendingCategoryCard(
+         name = category.name,
+         amountText = amountText,
+         progress = category.progress,
+         modifier = modifier,
+         errorColor = errorColor,
+         titleColor = titleColor,
+     )
+ }

@@ -6,10 +6,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -147,10 +149,11 @@ fun HomeTabContent(
                                 if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onPrimaryContainer
                             FilledTonalButton(
                                 onClick = { onNavigateToBudget?.invoke() },
-                                modifier = Modifier.height(DashboardDimens.buttonHeightSm),
                                 contentPadding = PaddingValues(
                                     start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg
                                 ),
+                                modifier = Modifier.height(DashboardDimens.buttonHeightSm),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = detailContainer,
                                     contentColor = detailContent,
@@ -220,7 +223,7 @@ private fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
+        elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation),
     ) {
         Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
             Row(
@@ -494,9 +497,8 @@ fun HomeTabScreenPreview() {
                                 if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onPrimaryContainer
                             Button(
                                 onClick = { /*TODO*/ },
-                                modifier = Modifier.height(DashboardDimens.buttonHeightSm).background(
-                                    color = previewDetailContainer, shape = MaterialTheme.shapes.medium
-                                ),
+                                modifier = Modifier.height(DashboardDimens.buttonHeightSm).clip(RoundedCornerShape(12.dp)),
+                                shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(
                                     start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg
                                 ),

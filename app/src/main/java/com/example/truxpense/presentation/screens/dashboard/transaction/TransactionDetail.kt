@@ -5,13 +5,14 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 
 
@@ -91,21 +93,74 @@ fun TransactionDetailContent(
     onNotesChange: (String) -> Unit,
     onToggleNotes: () -> Unit,
 ) {
+    // 3-dot menu state
+    var showMenu by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            DetailTopBar(onBack = onBack)
+            ScreenTopBar(
+                headerTitle = "Transaction Details",
+                showBack = true,
+                onBack = onBack,
+                actions = {
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            DropdownMenuItem(text = {
+                                Text(
+                                    text = "Edit",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }, onClick = {
+                                showMenu = false
+                                onEdit()
+                            }, leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.edit),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                )
+                            })
+                            DropdownMenuItem(text = {
+                                Text(
+                                    text = "Delete",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }, onClick = {
+                                showMenu = false
+                                onDeleteRequest()
+                            }, leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.delete),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            })
+                        }
+                    }
+                }
+            )
         },
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(
-                    horizontal = DashboardDimens.screenPaddingH,
-                    vertical = DashboardDimens.spaceXxl,
-                ),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
+                // ↓ changed: top spaceMd matches AddExpense; kept horizontal unchanged
+                .padding(horizontal = DashboardDimens.screenPaddingH)
+                .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceXxl),
             verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
 
@@ -123,81 +178,19 @@ fun TransactionDetailContent(
                 onToggle = onToggleNotes,
             )
 
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
-
-            // ── Action buttons ────────────────────────────────────────────────
-            EditButton(onClick = onEdit)
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
-            DeleteButton(onClick = onDeleteRequest)
             Spacer(Modifier.height(DashboardDimens.spaceXxl))
         }
     }
 }
 
 
-// ─── Top bar ─────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DetailTopBar(onBack: () -> Unit) {
-    TopAppBar(
-        title = {
-            Text(
-                text = "Transactions",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(
-                    painter = painterResource(R.drawable.back_icon),
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        },
-        actions = {
-            // Filter icon — navigates back with a filter applied (future feature placeholder)
-            Row(
-                modifier = Modifier
-                    .padding(end = DashboardDimens.spaceMd)
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = onBack,  // navigates back to filtered list
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.filter),
-                    contentDescription = "Filter",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(DashboardDimens.iconMd),
-                )
-                Text(
-                    text = "Filter",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-        ),
-    )
-}
-
-
-// ─── Hero section ─────────────────────────────────────────────────────────────
+// ─── Hero section (unchanged) ─────────────────────────────────────────────────
 
 @Composable
 private fun HeroSection(detail: TransactionDetail?) {
     val amountText = if (detail != null) {
         val abs = kotlin.math.abs(detail.amount)
-        val sign = if (detail.amount < 0) "−" else "+"
+        val sign = "−"
         "$sign₹${"%.0f".format(abs)}"
     } else "−₹—"
 
@@ -216,13 +209,17 @@ private fun HeroSection(detail: TransactionDetail?) {
             ),
         )
         Text(
-            text = detail?.type ?: "Expense",
+            text = "Expense",
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Medium,
+            color = if (isExpense) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
         )
         Text(
-            text = detail?.source ?: "Detected from SMS",
+            text = detail?.source ?: "—",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -235,21 +232,17 @@ private fun HeroSection(detail: TransactionDetail?) {
 @Composable
 private fun DetailsCard(detail: TransactionDetail?) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(DashboardDimens.cornerCard),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
 
-            // Card header
+            // ── Card header ───────────────────────────────────────────────────
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = DashboardDimens.screenPaddingH,
-                        vertical = DashboardDimens.spaceLg,
-                    ),
+                modifier = Modifier.fillMaxWidth().height(DashboardDimens.inputMinHeight)
+                    .padding(horizontal = DashboardDimens.screenPaddingH),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
             ) {
@@ -261,36 +254,33 @@ private fun DetailsCard(detail: TransactionDetail?) {
                 )
                 Text(
                     text = "Transaction details",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant,
-                thickness = DashboardDimens.dividerThin,
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.background,
+                thickness = 2.dp,
             )
-
-            // Detail rows
+            // ── Rows ──────────────────────────────────────────────────────────
             DetailRow(label = "Merchant", value = detail?.merchant ?: "—")
             DetailRow(label = "Category", value = detail?.category ?: "—")
             DetailRow(label = "Account", value = detail?.account ?: "—")
             DetailRow(label = "Date", value = detail?.date ?: "—")
             DetailRow(label = "Time", value = detail?.time ?: "—")
-            if (!detail?.paymentMethod.isNullOrBlank()) {
-                DetailRow(label = "Payment", value = detail!!.paymentMethod)
-            }
         }
     }
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(DashboardDimens.detailRowHeight)
+        modifier = Modifier.fillMaxWidth().height(DashboardDimens.inputMinHeight)
             .padding(horizontal = DashboardDimens.screenPaddingH),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -303,13 +293,17 @@ private fun DetailRow(label: String, value: String) {
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
         )
     }
+}
+
+@Composable
+private fun RowDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
+        color = MaterialTheme.colorScheme.outlineVariant,
         thickness = DashboardDimens.dividerThin,
     )
 }
@@ -324,27 +318,20 @@ private fun NotesCard(
     onChange: (String) -> Unit,
     onToggle: () -> Unit,
 ) {
+    // ↓ changed: Card(surfaceContainer) instead of Surface(surfaceVariant 30%)
     Card(
-        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(DashboardDimens.cornerCard),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-
-            // Header row — always visible
+            // Header (always visible) — structure unchanged
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = onToggle,
-                    )
-                    .padding(
-                        horizontal = DashboardDimens.screenPaddingH,
-                        vertical = DashboardDimens.spaceLg,
-                    ),
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(
+                    horizontal = DashboardDimens.screenPaddingH,
+                    vertical = DashboardDimens.spaceLg,
+                ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -360,17 +347,15 @@ private fun NotesCard(
                     )
                     Text(
                         text = "Notes",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        // ↓ changed: labelSmall to match AddExpense notes header style
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
-                // "+" when collapsed; "−" when expanded
+                // "+" when collapsed; "−" when expanded — unchanged
                 Box(
-                    modifier = Modifier
-                        .size(DashboardDimens.iconButtonSm)
-                        .clip(CircleShape)
+                    modifier = Modifier.size(DashboardDimens.iconButtonSm).clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -383,20 +368,18 @@ private fun NotesCard(
                 }
             }
 
-            // Expandable notes input
+            // Expandable notes input — structure unchanged
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(),
                 exit = shrinkVertically(),
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = DashboardDimens.screenPaddingH,
-                            end = DashboardDimens.screenPaddingH,
-                            bottom = DashboardDimens.spaceLg,
-                        ),
+                    modifier = Modifier.fillMaxWidth().padding(
+                        start = DashboardDimens.screenPaddingH,
+                        end = DashboardDimens.screenPaddingH,
+                        bottom = DashboardDimens.spaceLg,
+                    ),
                 ) {
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.outlineVariant,
@@ -406,11 +389,10 @@ private fun NotesCard(
                     BasicTextField(
                         value = notes,
                         onValueChange = onChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(DashboardDimens.cornerChip))
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerChip))
+                            // ↓ changed: background instead of surfaceVariant, matching AddExpense
                             .background(MaterialTheme.colorScheme.background)
-                            .padding(DashboardDimens.spaceLg)
+                            .padding(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceMdL)
                             .defaultMinSize(minHeight = DashboardDimens.inputMinHeight),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(
                             color = MaterialTheme.colorScheme.onBackground,
@@ -435,58 +417,7 @@ private fun NotesCard(
 }
 
 
-// ─── Action buttons ───────────────────────────────────────────────────────────
-
-@Composable
-private fun EditButton(onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(DashboardDimens.buttonHeight),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-        elevation = ButtonDefaults.buttonElevation(0.dp),
-    ) {
-        Text(
-            text = "Edit transaction",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun DeleteButton(onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(DashboardDimens.buttonHeight),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        border = ButtonDefaults.outlinedButtonBorder.copy(
-            brush = androidx.compose.ui.graphics.SolidColor(
-                MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
-            )
-        ),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.error,
-        ),
-    ) {
-        Text(
-            text = "Delete transaction",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.error,
-        )
-    }
-}
-
-
-// ─── Delete confirmation dialog ────────────────────────────────────────────────
+// ─── Delete confirmation dialog (unchanged) ───────────────────────────────────
 
 @Composable
 private fun DeleteConfirmDialog(
@@ -545,7 +476,6 @@ fun TransactionDetailPreview() {
         amount = -450.0,
         type = "Expense",
         source = "Detected from SMS",
-        paymentMethod = "UPI",
         notes = "",
     )
     MaterialTheme {

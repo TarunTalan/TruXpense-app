@@ -5,7 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.dashboard.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -20,6 +23,10 @@ class TransactionDetailViewModel @Inject constructor(
 
     private val _detail = MutableStateFlow<TransactionDetail?>(null)
     val detail: StateFlow<TransactionDetail?> = _detail.asStateFlow()
+
+    /** Expose the loaded id so the caller can build the edit route. */
+    val currentTransactionId: String?
+        get() = _detail.value?.id
 
     /** Notes typed by the user (edit-in-place on this screen). */
     private val _notes = MutableStateFlow("")
@@ -56,7 +63,6 @@ class TransactionDetailViewModel @Inject constructor(
                     amount = match.amount,
                     type = if (match.amount < 0) "Expense" else "Income",
                     source = "Detected from SMS",
-                    paymentMethod = match.paymentMethod,
                     notes = "",
                 )
             } else {
@@ -96,7 +102,6 @@ class TransactionDetailViewModel @Inject constructor(
         amount = -450.0,
         type = "Expense",
         source = "Detected from SMS",
-        paymentMethod = "UPI",
         notes = "",
     )
 }

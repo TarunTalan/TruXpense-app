@@ -103,7 +103,7 @@ fun TransactionsScreen(
                     canForward = canNavForward,
                     onBack = { vm.navBack() },
                     onForward = { vm.navForward() },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.spaceMd),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
                 )
             }
 
@@ -323,7 +323,7 @@ private fun SearchField(
     BasicTextField(
         value = query,
         onValueChange = onChange,
-        modifier = modifier.clip(RoundedCornerShape(DashboardDimens.cornerChip))
+        modifier = modifier.clip(RoundedCornerShape(DashboardDimens.cornerCard))
             .background(MaterialTheme.colorScheme.surfaceContainer).padding(
                 horizontal = DashboardDimens.spaceLg,
                 vertical = DashboardDimens.spaceMdL,
@@ -388,7 +388,7 @@ private fun FilterButton(
     Box(modifier = modifier) {
         IconButton(
             onClick = onClick,
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(DashboardDimens.cornerChip))
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(DashboardDimens.cornerCard))
                 .background(if (activeCount > 0) primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer),
         ) {
             Icon(
@@ -628,13 +628,13 @@ private fun FilterBottomSheet(
             // ── Done button ───────────────────────────────────────────────────
             Button(
                 onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = DashboardDimens.screenPaddingH),
+                modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = DashboardDimens.screenPaddingH),
                 shape = RoundedCornerShape(DashboardDimens.cornerCard),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
                 Text(
                     text = "Done",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.background,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -677,14 +677,14 @@ private fun SheetFilterChip(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.background,
                 modifier = Modifier.size(13.dp),
             )
         }
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onBackground,
+            color = if (isSelected) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onBackground,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
@@ -727,12 +727,12 @@ private fun MonthGroupHeader(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
-//            Icon(
-//                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-//                contentDescription = if (expanded) "Collapse" else "Expand",
-//                tint = MaterialTheme.colorScheme.onBackground,
-//                modifier = Modifier.size(DashboardDimens.iconMd),
-//            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(DashboardDimens.iconMd),
+            )
         }
     }
 }
@@ -749,37 +749,46 @@ private fun DayGroupHeader(
 ) {
     val formattedTotal = "₹${"%,.0f".format(totalSpent)}"
 
-    Row(
+    // Render the day header as a Card with onBackground container color
+    Card(
         modifier = modifier.clickable(
             indication = null,
             interactionSource = remember { MutableInteractionSource() },
             onClick = onToggle,
         ).padding(top = DashboardDimens.spaceMd),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Text(
-            text = dayLabel,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-        )
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXxs),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = formattedTotal,
+                text = dayLabel,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.secondary,
             )
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.size(DashboardDimens.iconSm),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXxs),
+            ) {
+                Text(
+                    text = formattedTotal,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(DashboardDimens.iconSm),
+                )
+            }
         }
     }
 }
@@ -794,7 +803,7 @@ private fun TransactionRow(
     val formattedAmount = "−₹${"%,.0f".format(-tx.amount)}"
 
     Row(
-        modifier = modifier.padding(vertical = DashboardDimens.spaceLg),
+        modifier = modifier.padding(vertical = DashboardDimens.spaceLg, horizontal = DashboardDimens.spaceLg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Merchant initial avatar
