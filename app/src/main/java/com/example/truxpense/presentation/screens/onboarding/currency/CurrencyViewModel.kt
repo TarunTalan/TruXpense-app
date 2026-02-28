@@ -61,14 +61,8 @@ class CurrencyViewModel @Inject constructor(
             // sort by display name using device locale collator
             .sortedWith { a, b -> collator.compare(a.name, b.name) }
 
-        // Prefer device locale currency first, then USD, then INR, keeping order and removing duplicates
-        val deviceCurrencyCode = try {
-            Currency.getInstance(deviceLocale).currencyCode
-        } catch (_: Exception) {
-            null
-        }
-
-        val preferredOrder = listOfNotNull(deviceCurrencyCode, "USD", "INR").distinct()
+        // Prefer INR first, then USD (remove device-locale currency selection to keep INR as default)
+        val preferredOrder = listOf("INR", "USD").distinct()
         val preferredItems = preferredOrder.mapNotNull { code -> baseList.firstOrNull { it.code == code } }
         val others = baseList.filterNot { item -> preferredOrder.contains(item.code) }
         preferredItems + others
@@ -117,26 +111,9 @@ class CurrencyViewModel @Inject constructor(
         _selectedCurrency.value = null
     }
 
-    // Choose a sensible default currency based on device locale, falling back to USD/INR/first available
+    // Choose a sensible default currency: prefer INR, then USD, then first available
     fun localeDefaultCurrency(): CurrencyItem? {
-        try {
-            val deviceLocale = Locale.getDefault()
-            val currency = try {
-                Currency.getInstance(deviceLocale)
-            } catch (_: Exception) {
-                null
-            }
-            val code = currency?.currencyCode
-            if (!code.isNullOrBlank()) {
-                val found = available.firstOrNull { it.code == code }
-                if (found != null) return found
-            }
-        } catch (_: Exception) {
-            // ignore
-        }
-
-        // fallback preference order
-        val fallbackCandidates = listOf("USD", "INR")
+        val fallbackCandidates = listOf("INR", "USD")
         for (c in fallbackCandidates) {
             val f = available.firstOrNull { it.code == c }
             if (f != null) return f
