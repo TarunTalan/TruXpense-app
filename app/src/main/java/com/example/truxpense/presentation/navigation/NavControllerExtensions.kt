@@ -12,10 +12,18 @@ fun NavController.safeNavigate(
 ) {
     val performNavigation = {
         try {
-            if (navOptionsBuilder != null) {
-                this.navigate(route, navOptionsBuilder)
-            } else {
-                this.navigate(route)
+            // Always apply provided nav options, then force animations to zero so navigation appears instant
+            this.navigate(route) {
+                // Apply caller options first (popUpTo, launchSingleTop, etc.)
+                navOptionsBuilder?.invoke(this)
+
+                // Override animation to none for a snappier navigation experience
+                anim {
+                    enter = 0
+                    exit = 0
+                    popEnter = 0
+                    popExit = 0
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

@@ -1,5 +1,7 @@
 package com.example.truxpense.presentation.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -15,7 +17,7 @@ import com.example.truxpense.presentation.screens.auth.intro.IntroViewModel
 import com.example.truxpense.presentation.screens.auth.login.LoginScreen
 import com.example.truxpense.presentation.screens.auth.otp.OtpScreen
 import com.example.truxpense.presentation.screens.auth.signup.SignupScreen
-import com.example.truxpense.presentation.screens.home.HomeScreen
+import com.example.truxpense.presentation.screens.dashboard.home.DashboardScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyScreen
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.presentation.screens.onboarding.loading.LoadingScreen
@@ -24,69 +26,73 @@ import com.example.truxpense.presentation.screens.onboarding.username.UsernameSc
 import com.example.truxpense.presentation.screens.splash.SplashViewModel
 import kotlinx.coroutines.flow.first
 
-
-// App lifecycle stages used by splash routing
-// Make public for use in SplashNavigator
-enum class AppStage {
-    AUTH,
-    ONBOARDING,
-    HOME
-}
-
+/**
+ * Root navigation host for the entire application.
+ *
+ * Responsibilities:
+ *  - Auth flow: Splash → Intro → Signup/Login → OTP
+ *  - Onboarding flow: Username → Currency → SmsPermission → Loading
+ *  - Dashboard: single [Screen.Dashboard.Root] composable that owns
+ *    its own bottom-nav NavController and sub-graph (see [DashboardScreen]).
+ *
+ * What is intentionally NOT here:
+ *  - AddExpense, AddBudget, BudgetDetail — these are inner-dashboard
+ *    destinations managed by DashboardScreen's own NavController.
+ */
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     startDestination: String = Screen.Splash,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
     onSplashEnter: () -> Unit = {}
 ) {
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
     ) {
-        // ==================== SPLASH SCREEN ====================
+
+        // ══════════════════════════════════════════════════════════════════════
+        // SPLASH
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Splash) {
             SplashNavigator(
                 navController = navController,
                 contentPadding = contentPadding,
-                onSplashEnter = onSplashEnter
+                onSplashEnter = onSplashEnter,
             )
         }
 
-        // ==================== INTRO SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // INTRO
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Intro) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 val introViewModel: IntroViewModel = hiltViewModel()
                 val introState by introViewModel.state.collectAsState()
 
-                // Handle navigation from IntroViewModel (OAuth flows)
                 LaunchedEffect(introState.navigateToHome, introState.navigateToUsername) {
                     when {
-                        introState.navigateToUsername -> {
-                            // New Google user or user needing onboarding -> go to username screen
-                            navController.safeNavigate(Screen.Username) {
-                                popUpTo(Screen.Splash) { inclusive = true }
-                            }
+                        introState.navigateToHome -> navController.safeNavigate(Screen.Dashboard.Root) {
+                            popUpTo(Screen.Splash) { inclusive = true }
                         }
 
-                        introState.navigateToHome -> {
-                            // Existing Google user with complete profile -> go directly to Home
-                            navController.safeNavigate(Screen.Home) {
-                                popUpTo(Screen.Splash) { inclusive = true }
-                            }
+                        introState.navigateToUsername -> navController.safeNavigate(Screen.Username) {
+                            popUpTo(Screen.Splash) { inclusive = true }
                         }
                     }
                 }
 
-                IntroScreen(
-                    onGetStarted = {
-                        navController.safeNavigate(Screen.Signup)
-                    }
-                )
+                IntroScreen(onGetStarted = { navController.safeNavigate(Screen.Signup) })
             }
         }
 
-        // ==================== LOGIN SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // LOGIN
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Login) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 LoginScreen(
@@ -96,19 +102,18 @@ fun AppNavHost(
                         }
                     },
                     onNavigateToOtp = { email, flow ->
-                        // Store auth context in SavedStateHandle for OTP screen
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
                             set(NavKeys.AUTH_EMAIL, email)
                             set(NavKeys.AUTH_FLOW, flow.name)
                         }
                         navController.safeNavigate(Screen.Otp)
                     },
-                    onNavigateToHome = { _ ->
-                        navController.safeNavigate(Screen.Home) {
+                    onNavigateToHome = {
+                        navController.safeNavigate(Screen.Dashboard.Root) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
                     },
-                    onNavigateToUsername = { _ ->
+                    onNavigateToUsername = {
                         navController.safeNavigate(Screen.Username) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
@@ -117,12 +122,14 @@ fun AppNavHost(
                         navController.safeNavigate(Screen.Signup) {
                             popUpTo(Screen.Login) { inclusive = true }
                         }
-                    }
+                    },
                 )
             }
         }
 
-        // ==================== SIGNUP SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // SIGNUP
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Signup) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 SignupScreen(
@@ -132,14 +139,13 @@ fun AppNavHost(
                         }
                     },
                     onNavigateToOtp = { email, flow ->
-                        // Store auth context in SavedStateHandle for OTP screen
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
                             set(NavKeys.AUTH_EMAIL, email)
                             set(NavKeys.AUTH_FLOW, flow.name)
                         }
                         navController.safeNavigate(Screen.Otp)
                     },
-                    onNavigateToUsername = { _ ->
+                    onNavigateToUsername = {
                         navController.safeNavigate(Screen.Username) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
@@ -148,85 +154,66 @@ fun AppNavHost(
                         navController.safeNavigate(Screen.Login) {
                             popUpTo(Screen.Signup) { inclusive = true }
                         }
-                    }
+                    },
                 )
             }
         }
 
-        // ==================== OTP SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // OTP
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Otp) {
             Box(modifier = Modifier.padding(contentPadding)) {
-                // Retrieve auth context from previous screen's SavedStateHandle
                 val authContext = retrieveAuthContext(navController)
-
                 val splashViewModel: SplashViewModel = hiltViewModel()
                 var otpVerifiedTrigger by remember { mutableStateOf(false) }
 
-                // Handle post-verification routing
                 LaunchedEffect(otpVerifiedTrigger) {
                     if (!otpVerifiedTrigger) return@LaunchedEffect
-
-                    val destination = when (authContext.flow) {
-                        AuthFlowType.SIGNUP -> {
-                            // After signup OTP, always go into onboarding username screen
-                            Screen.Username
-                        }
-                        AuthFlowType.LOGIN, null -> {
-                            // For login (or unknown), preserve existing behavior based on username
-                            determinePostOtpDestination(splashViewModel)
-                        }
-                    }
-
+                    val destination = determinePostOtpDestination(splashViewModel, authContext.flow)
                     navController.safeNavigate(destination) {
                         popUpTo(Screen.Splash) { inclusive = true }
                     }
-
                     otpVerifiedTrigger = false
                 }
 
                 OtpScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                    onVerified = {
-                        otpVerifiedTrigger = true
-                    },
-                    onResend = {
-                        // Resend handled in OtpViewModel
-                    },
+                    onBack = { navController.popBackStack() },
+                    onVerified = { otpVerifiedTrigger = true },
+                    onResend = { /* Resend handled in OtpViewModel */ },
                     authEmailParam = authContext.email,
-                    flowParam = authContext.flow
+                    flowParam = authContext.flow,
                 )
             }
         }
 
-        // ==================== USERNAME SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // ONBOARDING — USERNAME
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Username) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 val splashViewModel: SplashViewModel = hiltViewModel()
-                // Mark current onboarding step so restart resumes here
                 LaunchedEffect(Unit) { splashViewModel.saveOnboardingStep("username") }
 
                 UsernameScreen(
                     onComplete = {
-                        // Username is saved in UsernameViewModel along with onboarding step
-                        // navigate to currency selection after username
                         navController.safeNavigate(Screen.Currency) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
                     },
                     onSkip = {
-                        // User skipped username -> save step and proceed to currency selection
                         splashViewModel.saveOnboardingStep("currency")
                         navController.safeNavigate(Screen.Currency) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
-                    }
+                    },
                 )
             }
         }
 
-        // ==================== CURRENCY SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // ONBOARDING — CURRENCY
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Currency) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 val splashViewModel: SplashViewModel = hiltViewModel()
@@ -234,7 +221,6 @@ fun AppNavHost(
 
                 CurrencyScreen(
                     onContinue = {
-                        // Persist selected currency, then save step and proceed to sms permission
                         currencyViewModel.persistSelectedCurrency()
                         splashViewModel.saveOnboardingStep("sms_permission")
                         navController.safeNavigate(Screen.SmsPermission) {
@@ -242,18 +228,12 @@ fun AppNavHost(
                         }
                     },
                     onSkip = {
-                        // User skipped currency selection, save step and proceed to sms permission
-                        // Ensure default currency is set if nothing selected
                         val sel = currencyViewModel.selectedCurrency.value
                         if (sel == null) {
-                            val default = currencyViewModel.localeDefaultCurrency()
-                            if (default != null) {
+                            currencyViewModel.localeDefaultCurrency()?.let { default ->
                                 currencyViewModel.selectCurrency(default)
-                                // persist the default choice
-                                currencyViewModel.persistSelectedCurrency()
                             }
                         }
-                        // persist current selection (if user had selected earlier)
                         currencyViewModel.persistSelectedCurrency()
                         splashViewModel.saveOnboardingStep("sms_permission")
                         navController.safeNavigate(Screen.SmsPermission) {
@@ -261,173 +241,126 @@ fun AppNavHost(
                         }
                     },
                     onBack = {
-                        // Navigate back to username screen
                         navController.safeNavigate(Screen.Username) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
-                    }
+                    },
                 )
             }
         }
 
-        // ==================== SMS PERMISSION SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // ONBOARDING — SMS PERMISSION
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.SmsPermission) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 val splashViewModel: SplashViewModel = hiltViewModel()
 
                 SmsPermission(
                     onAllow = {
-                        // Save onboarding step before navigating
                         splashViewModel.saveOnboardingStep("loading")
                         navController.safeNavigate(Screen.Loading)
                     },
                     onSkip = {
-                        // Save onboarding step before navigating
                         splashViewModel.saveOnboardingStep("loading")
                         navController.safeNavigate(Screen.Loading)
-                    }
+                    },
                 )
             }
         }
 
-        // ==================== LOADING SCREEN ====================
+        // ══════════════════════════════════════════════════════════════════════
+        // ONBOARDING — LOADING
+        // ══════════════════════════════════════════════════════════════════════
         composable(Screen.Loading) {
             Box(modifier = Modifier.padding(contentPadding)) {
                 val splashViewModel: SplashViewModel = hiltViewModel()
 
                 LoadingScreen(
                     onFinished = {
-                        // Mark onboarding as complete and navigate to Home
                         splashViewModel.markOnboardingComplete()
-                        navController.safeNavigate(Screen.Home) {
+                        navController.safeNavigate(Screen.Dashboard.Root) {
                             popUpTo(Screen.Splash) { inclusive = true }
                         }
-                    }
+                    },
                 )
             }
         }
 
-        // ==================== HOME SCREEN ====================
-        composable(Screen.Home) {
-            Box(modifier = Modifier.padding(contentPadding)) {
-                HomeScreen(
-                    onLogout = {
-                        navController.safeNavigate(Screen.Intro) {
-                            popUpTo(Screen.Home) { inclusive = true }
-                        }
+        // ══════════════════════════════════════════════════════════════════════
+        // DASHBOARD
+        //
+        // One composable hosts the entire bottom-nav shell, its own NavController,
+        // and all tab sub-graphs (Home, Transactions, Budget, Analytics, Settings).
+        // Nothing inside the dashboard bleeds back into this outer NavHost.
+        // ══════════════════════════════════════════════════════════════════════
+        composable(Screen.Dashboard.Root) {
+            DashboardScreen(
+                onLogout = {
+                    navController.safeNavigate(Screen.Intro) {
+                        popUpTo(Screen.Dashboard.Root) { inclusive = true }
                     }
-                )
-            }
+                },
+            )
         }
     }
 }
 
-// ==================== HELPER FUNCTIONS ====================
+// ══════════════════════════════════════════════════════════════════════════════
+// Shared helpers (unchanged from original)
+// ══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Determine which app stage the user is in based on their state
- * onboardingStep takes precedence to keep the user inside onboarding
- */
+enum class AppStage { AUTH, ONBOARDING, HOME }
+
 fun determineAppStage(
     onboardingComplete: Boolean,
     signupStarted: Boolean,
     accessToken: String?,
     username: String?,
-    onboardingStep: String?
-): AppStage {
-    return when {
-        // Fully onboarded user
-        onboardingComplete -> AppStage.HOME
-
-        // If any onboarding step is saved (username/currency/sms/loading), remain in onboarding
-        !onboardingStep.isNullOrBlank() && onboardingStep != "completed" -> AppStage.ONBOARDING
-
-        // User started signup or has token but no username
-        signupStarted || (!accessToken.isNullOrBlank() && username.isNullOrBlank()) -> AppStage.ONBOARDING
-
-        // Default: needs authentication
-        else -> AppStage.AUTH
-    }
+    onboardingStep: String?,
+): AppStage = when {
+    onboardingComplete -> AppStage.HOME
+    !onboardingStep.isNullOrBlank() && onboardingStep != "completed" -> AppStage.ONBOARDING
+    signupStarted || (!accessToken.isNullOrBlank() && username.isNullOrBlank()) -> AppStage.ONBOARDING
+    else -> AppStage.AUTH
 }
 
-
-/**
- * Determine which onboarding screen to resume from based on saved step
- * This enables users to continue from where they left off if app restarts
- *
- * Special behavior: If user was at SMS Permission or beyond, auto-complete
- * onboarding and login user directly to Home screen (critical data already collected)
- */
-fun determineOnboardingScreen(
-    onboardingStep: String?,
-    username: String?
-): String {
-    return when (onboardingStep) {
+fun determineOnboardingScreen(onboardingStep: String?, username: String?): String =
+    when (onboardingStep) {
         "username" -> Screen.Username
         "currency" -> Screen.Currency
-        // If user had reached SMS permission or loading, resume to Home
-        "sms_permission", "loading" -> Screen.Home
+        "sms_permission", "loading" -> Screen.Dashboard.Root
         else -> if (username.isNullOrBlank()) Screen.Username else Screen.Currency
     }
-}
 
-/**
- * Data class to hold auth context
- */
-private data class AuthContext(
-    val email: String?,
-    val flow: AuthFlowType?
-)
+private data class AuthContext(val email: String?, val flow: AuthFlowType?)
 
-/**
- * Retrieve auth context from navigation
- */
 private fun retrieveAuthContext(navController: NavHostController): AuthContext {
-    val prevEntry = navController.previousBackStackEntry
-    val currentEntry = navController.currentBackStackEntry
+    val prev = navController.previousBackStackEntry
+    val current = navController.currentBackStackEntry
 
-    // Try SavedStateHandle first (in-app navigation)
-    val savedEmail = prevEntry?.savedStateHandle?.get<String>(NavKeys.AUTH_EMAIL)
-    val savedFlowName = prevEntry?.savedStateHandle?.get<String>(NavKeys.AUTH_FLOW)
-
-    // Fallback to nav arguments (deep links)
-    val argEmail = currentEntry?.arguments?.getString(NavKeys.AUTH_EMAIL)
-    val argFlowName = currentEntry?.arguments?.getString(NavKeys.AUTH_FLOW)
-
-    val email = savedEmail ?: argEmail
-    val flowName = savedFlowName ?: argFlowName
+    val email = prev?.savedStateHandle?.get<String>(NavKeys.AUTH_EMAIL)
+        ?: current?.arguments?.getString(NavKeys.AUTH_EMAIL)
+    val flowName = prev?.savedStateHandle?.get<String>(NavKeys.AUTH_FLOW)
+        ?: current?.arguments?.getString(NavKeys.AUTH_FLOW)
 
     val flow = when (flowName) {
         AuthFlowType.SIGNUP.name -> AuthFlowType.SIGNUP
         AuthFlowType.LOGIN.name -> AuthFlowType.LOGIN
         else -> null
     }
-
     return AuthContext(email, flow)
 }
 
-/**
- * Determine destination after OTP verification
- */
 private suspend fun determinePostOtpDestination(
-    splashViewModel: SplashViewModel
+    splashViewModel: SplashViewModel,
+    authFlow: AuthFlowType?,
 ): String {
-    val persistedUsername = try {
-        splashViewModel.username.first()
-    } catch (_: Exception) {
-        null
-    }
-
-    return if (!persistedUsername.isNullOrBlank()) {
-        Screen.Home
-    } else {
-        Screen.Username
-    }
+    if (authFlow == AuthFlowType.SIGNUP) return Screen.Username
+    val onboardingComplete = runCatching { splashViewModel.onboardingComplete.first() }.getOrDefault(false)
+    return if (onboardingComplete) Screen.Dashboard.Root else Screen.Username
 }
 
-/**
- * Navigation keys for SavedStateHandle
- */
 private object NavKeys {
     const val AUTH_EMAIL = "auth_email"
     const val AUTH_FLOW = "auth_flow"

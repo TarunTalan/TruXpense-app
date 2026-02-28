@@ -52,13 +52,17 @@ fun SplashNavigator(
                     val current = currencyViewModel.selectedCurrency.value
                     if (current == null) {
                         val default = currencyViewModel.available.firstOrNull { it.code == "INR" } ?: currencyViewModel.available.firstOrNull()
-                        if (default != null) currencyViewModel.selectCurrency(default)
+                        if (default != null) {
+                            currencyViewModel.selectCurrency(default)
+                            // Persist the default selection so other ViewModel instances (e.g., Home) read it from SharedPreferences
+                            currencyViewModel.persistSelectedCurrency()
+                        }
                     }
                     viewModel.markOnboardingComplete()
                 }
 
                 val destination = when (stage) {
-                    AppStage.HOME -> Screen.Home
+                    AppStage.HOME -> Screen.Dashboard.Root
                     AppStage.ONBOARDING -> determineOnboardingScreen(
                         onboardingStep = onboardingStep,
                         username = username
