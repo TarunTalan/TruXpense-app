@@ -9,6 +9,15 @@
     <!-- optional telephony feature declaration so READ_SMS permission is not flagged by lint -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
+    <!-- Android 13+ runtime notification permission -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for WorkManager on Android 12+ for exact-time reminders -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+                     android:maxSdkVersion="32" />
+    <!-- Android 12 needs this for foreground wakeup via WorkManager -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+
     <application
         android:name=".TruXpenseApplication"
         android:allowBackup="true"
@@ -32,6 +41,37 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+
+        <!-- ── FCM Service ──────────────────────────────────────────── -->
+        <service
+                android:name=".notification.TruxpenseFirebaseMessagingService"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Optional: set a custom notification icon for FCM display messages -->
+        <meta-data
+                android:name="com.google.firebase.messaging.default_notification_icon"
+                android:resource="@drawable/ic_notification" />
+        <meta-data
+                android:name="com.google.firebase.messaging.default_notification_color"
+                android:resource="@color/notification_accent" />
+
+        <!-- ── Disable default WorkManager initialiser so Hilt takes over -->
+        <provider
+                android:name="androidx.startup.InitializationProvider"
+                android:authorities="${applicationId}.androidx-startup"
+                android:exported="false"
+                tools:node="merge">
+            <meta-data
+                    android:name="androidx.work.WorkManagerInitializer"
+                    android:value="androidx.startup"
+                    tools:node="remove" />
+        </provider>
+
     </application>
 
 </manifest>
