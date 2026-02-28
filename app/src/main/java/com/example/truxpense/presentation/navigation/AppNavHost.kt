@@ -26,19 +26,15 @@ import com.example.truxpense.presentation.screens.onboarding.username.UsernameSc
 import com.example.truxpense.presentation.screens.splash.SplashViewModel
 import kotlinx.coroutines.flow.first
 
-/**
- * Root navigation host for the entire application.
- *
- * Responsibilities:
- *  - Auth flow: Splash → Intro → Signup/Login → OTP
- *  - Onboarding flow: Username → Currency → SmsPermission → Loading
- *  - Dashboard: single [Screen.Dashboard.Root] composable that owns
- *    its own bottom-nav NavController and sub-graph (see [DashboardScreen]).
- *
- * What is intentionally NOT here:
- *  - AddExpense, AddBudget, BudgetDetail — these are inner-dashboard
- *    destinations managed by DashboardScreen's own NavController.
- */
+
+// App lifecycle stages used by splash routing
+// Make public for use in SplashNavigator
+enum class AppStage {
+    AUTH,
+    ONBOARDING,
+    HOME
+}
+
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -76,12 +72,18 @@ fun AppNavHost(
 
                 LaunchedEffect(introState.navigateToHome, introState.navigateToUsername) {
                     when {
-                        introState.navigateToHome -> navController.safeNavigate(Screen.Dashboard.Root) {
-                            popUpTo(Screen.Splash) { inclusive = true }
+                        introState.navigateToUsername -> {
+                            // New Google user or user needing onboarding -> go to username screen
+                            navController.safeNavigate(Screen.Username) {
+                                popUpTo(Screen.Splash) { inclusive = true }
+                            }
                         }
 
-                        introState.navigateToUsername -> navController.safeNavigate(Screen.Username) {
-                            popUpTo(Screen.Splash) { inclusive = true }
+                        introState.navigateToHome -> {
+                            // Existing Google user with complete profile -> go directly to Home
+                            navController.safeNavigate(Screen.Home) {
+                                popUpTo(Screen.Splash) { inclusive = true }
+                            }
                         }
                     }
                 }
@@ -170,7 +172,18 @@ fun AppNavHost(
 
                 LaunchedEffect(otpVerifiedTrigger) {
                     if (!otpVerifiedTrigger) return@LaunchedEffect
-                    val destination = determinePostOtpDestination(splashViewModel, authContext.flow)
+
+                    val destination = when (authContext.flow) {
+                        AuthFlowType.SIGNUP -> {
+                            // After signup OTP, always go into onboarding username screen
+                            Screen.Username
+                        }
+                        AuthFlowType.LOGIN, null -> {
+                            // For login (or unknown), preserve existing behavior based on username
+                            determinePostOtpDestination(splashViewModel)
+                        }
+                    }
+
                     navController.safeNavigate(destination) {
                         popUpTo(Screen.Splash) { inclusive = true }
                     }
