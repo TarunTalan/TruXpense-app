@@ -222,7 +222,7 @@ private fun AmountInputZone(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = "How much did you spend?",

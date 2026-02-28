@@ -1,50 +1,30 @@
 package com.example.truxpense.presentation.screens.dashboard.transaction
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.dashboard.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
     private val repository: ExpenseRepository,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    // ── Period tab ────────────────────────────────────────────────────────────
-
-    private val _selectedPeriod = MutableStateFlow(TransactionPeriod.YEAR)
-    val selectedPeriod: StateFlow<TransactionPeriod> = _selectedPeriod.asStateFlow()
-
-    fun selectPeriod(period: TransactionPeriod) {
-        _selectedPeriod.value = period
-        _navOffset.value = 0
-    }
-
-    // ── Date navigator ────────────────────────────────────────────────────────
-
-    private val _navOffset = MutableStateFlow(0)
-
-    val periodNavLabel: StateFlow<String> = combine(_selectedPeriod, _navOffset) { period, offset ->
-        when (period) {
-            TransactionPeriod.YEAR -> if (offset == 0) "This year" else "${2026 + offset}"
-            TransactionPeriod.MONTH -> if (offset == 0) "This month" else monthOffset(offset)
-            TransactionPeriod.WEEK -> if (offset == 0) "This week" else weekOffset(offset)
+    init {
+        // If the dashboard sets a 'preselectCategory' in the savedStateHandle before or after
+        // navigating to the Transactions tab, observe it and apply the category filter once.
+        viewModelScope.launch {
+            savedStateHandle.getStateFlow<String?>("preselectCategory", null).filterNotNull().collect { category ->
+                setCategory(category)
+                // remove to avoid reapplying on process death/restore
+                savedStateHandle.remove<String>("preselectCategory")
+            }
         }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, "This year")
-
-    val canNavBack: StateFlow<Boolean> =
-        _navOffset.map { it > -24 }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val canNavForward: StateFlow<Boolean> =
-        _navOffset.map { it < 0 }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun navBack() {
-        _navOffset.value--
-    }
-
-    fun navForward() {
-        if (_navOffset.value < 0) _navOffset.value++
     }
 
     // ── Search ────────────────────────────────────────────────────────────────
@@ -66,7 +46,7 @@ class TransactionsViewModel @Inject constructor(
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
     fun setCategory(category: String?) {
-        _selectedCategory.value = category
+        _selectedCategory.value = category?.trim()?.takeIf { it.isNotBlank() }
     }
 
     // ── Payment method filter ─────────────────────────────────────────────────
@@ -75,7 +55,35 @@ class TransactionsViewModel @Inject constructor(
     val paymentMethod: StateFlow<String?> = _paymentMethod.asStateFlow()
 
     fun setPaymentMethod(method: String?) {
-        _paymentMethod.value = method
+        _paymentMethod.value = method?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    // ── Month / date range (missing declarations were causing type inference failures) ──
+
+    private val _selectedMonth = MutableStateFlow<Int?>(null)
+    val selectedMonth: StateFlow<Int?> = _selectedMonth.asStateFlow()
+
+    fun setMonth(month: Int?) {
+        _selectedMonth.value = month
+    }
+
+    private val _dateFrom = MutableStateFlow<Long?>(null)
+    val dateFrom: StateFlow<Long?> = _dateFrom.asStateFlow()
+
+    fun setDateFrom(ts: Long?) {
+        _dateFrom.value = ts
+    }
+
+    private val _dateTo = MutableStateFlow<Long?>(null)
+    val dateTo: StateFlow<Long?> = _dateTo.asStateFlow()
+
+    fun setDateTo(ts: Long?) {
+        _dateTo.value = ts
+    }
+
+    fun clearDateRange() {
+        _dateFrom.value = null
+        _dateTo.value = null
     }
 
     // ── Clear all filters ─────────────────────────────────────────────────────
@@ -84,11 +92,16 @@ class TransactionsViewModel @Inject constructor(
         _selectedCategory.value = null
         _paymentMethod.value = null
         _searchQuery.value = ""
+        _selectedMonth.value = null
+        _dateFrom.value = null
+        _dateTo.value = null
     }
 
     /** Number of active filters (for badge on the filter button). */
-    val activeFilterCount: StateFlow<Int> = combine(_selectedCategory, _paymentMethod) { cat, pay ->
-        listOfNotNull(cat, pay).size
+    val activeFilterCount: StateFlow<Int> = combine(
+        _selectedCategory, _paymentMethod, _selectedMonth, _dateFrom,
+    ) { cat, pay, month, from ->
+        (if (cat != null) 1 else 0) + (if (pay != null) 1 else 0) + (if (month != null) 1 else 0) + (if (from != null) 1 else 0)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     // ── Month total dropdown ──────────────────────────────────────────────────
@@ -129,9 +142,32 @@ class TransactionsViewModel @Inject constructor(
     val totalTransactionCount: StateFlow<Int> =
         _rawTransactions.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    /** Filtered + searched flat list — drives both [resultCount] and [monthGroups]. */
+    /** Filtered + searched flat list — drives both [resultCount] and [monthGroups].
+     *  Month and date-range are applied on the raw entity list (which has timestamps).
+     *  Category, payment-method and search are applied on the mapped UI list. */
     val transactions: StateFlow<List<TransactionItem>> = combine(
-        _rawTransactions, _selectedCategory, _paymentMethod, _searchQuery
+        // Pre-filter by month + date range on the raw entity list first
+        combine(repository.transactions, _selectedMonth, _dateFrom, _dateTo) { raw, month, from, to ->
+            raw.filter { t ->
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = t.timestamp }
+                val matchesMonth = month == null || cal.get(java.util.Calendar.MONTH) + 1 == month
+                val matchesFrom = from == null || t.timestamp >= from
+                val matchesTo = to == null || t.timestamp <= to
+                matchesMonth && matchesFrom && matchesTo
+            }.sortedByDescending { it.timestamp }.map { t ->
+                TransactionItem(
+                    id = t.id,
+                    merchant = t.merchant,
+                    category = t.category,
+                    timeLabel = formatRelativeTime(t.timestamp),
+                    amount = -t.amount,
+                    paymentMethod = t.paymentMethod,
+                )
+            }
+        },
+        _selectedCategory,
+        _paymentMethod,
+        _searchQuery,
     ) { list, category, payment, query ->
         list.filter { tx ->
             val matchesCategory = category == null || tx.category.equals(category, ignoreCase = true)
@@ -149,10 +185,11 @@ class TransactionsViewModel @Inject constructor(
         transactions.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** Whether any filter or search is currently active. */
-    val hasActiveFiltersOrSearch: StateFlow<Boolean> =
-        combine(_selectedCategory, _paymentMethod, _searchQuery) { cat, pay, q ->
-            cat != null || pay != null || q.isNotBlank()
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val hasActiveFiltersOrSearch: StateFlow<Boolean> = combine(
+        _selectedCategory, _paymentMethod, _searchQuery, _selectedMonth, _dateFrom
+    ) { cat, pay, q, month, from ->
+        cat != null || pay != null || q.isNotBlank() || month != null || from != null
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Grouped for the UI list (derived from already-filtered [transactions]). */
     val monthGroups: StateFlow<List<TransactionMonthGroup>> =
@@ -187,14 +224,4 @@ class TransactionsViewModel @Inject constructor(
         }
     }
 
-    private fun monthOffset(offset: Int): String {
-        val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-        val base = 1
-        val total = base + offset
-        val year = 2026 + (total / 12)
-        val month = ((total % 12) + 12) % 12
-        return "${months[month]} $year"
-    }
-
-    private fun weekOffset(offset: Int): String = "Week of ${16 + offset * 7} Feb"
 }

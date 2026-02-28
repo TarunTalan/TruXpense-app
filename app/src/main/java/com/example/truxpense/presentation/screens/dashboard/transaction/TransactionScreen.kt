@@ -25,41 +25,54 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.TextView
+import android.view.Gravity
+import android.graphics.Typeface
 import com.example.truxpense.R
-import com.example.truxpense.presentation.screens.dashboard.components.DateNavigatorRow
-import com.example.truxpense.presentation.screens.dashboard.components.PeriodTabRow
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavBackStackEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
+    // optional backStackEntry passed from the NavHost so we can read SavedStateHandle keys reliably
+    navBackStackEntry: NavBackStackEntry? = null,
     onTransactionClick: (transactionId: String) -> Unit = {},
+    onAddTransaction: () -> Unit = {},
     vm: TransactionsViewModel = hiltViewModel(),
 ) {
-    val selectedPeriod by vm.selectedPeriod.collectAsState()
-    val periodNavLabel by vm.periodNavLabel.collectAsState()
-    val canNavBack by vm.canNavBack.collectAsState()
-    val canNavForward by vm.canNavForward.collectAsState()
+    // If a preselectCategory was set on the backStackEntry's SavedStateHandle by the navigator,
+    // apply it here directly to the ViewModel. This is robust and avoids timing issues.
+    LaunchedEffect(navBackStackEntry) {
+        val pre = navBackStackEntry?.savedStateHandle?.get<String>("preselectCategory")
+        if (!pre.isNullOrBlank()) {
+            vm.setCategory(pre.trim())
+            navBackStackEntry.savedStateHandle.remove<String>("preselectCategory")
+        }
+    }
+
     val searchQuery by vm.searchQuery.collectAsState()
     val selectedCategory by vm.selectedCategory.collectAsState()
     val selectedPayment by vm.paymentMethod.collectAsState()
+    val selectedMonth by vm.selectedMonth.collectAsState()
+    val dateFrom by vm.dateFrom.collectAsState()
+    val dateTo by vm.dateTo.collectAsState()
     val availableCats by vm.availableCategories.collectAsState()
     val availablePayments by vm.availablePaymentMethods.collectAsState()
     val monthGroupsVal by vm.monthGroups.collectAsState()
     val activeFilterCount by vm.activeFilterCount.collectAsState()
-    val hasActiveFilter by vm.hasActiveFiltersOrSearch.collectAsState()
 
     // Per-group toggle state — absent key = true (all start expanded)
     val monthExpandedStates = remember { mutableStateMapOf<String, Boolean>() }
@@ -80,102 +93,82 @@ fun TransactionsScreen(
         },
     ) { innerPadding ->
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(top = DashboardDimens.spaceLg),
-            contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxl),
-        ) {
+        // If there are no transactions, render the empty content using the shared component
+        if (monthGroupsVal.isEmpty()) {
+            TransactionsEmptyContent(
+                modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    .padding(horizontal = DashboardDimens.screenPaddingH),
+                onAddTransaction = onAddTransaction,
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(top = DashboardDimens.spaceLg),
+                contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxl),
+            ) {
 
-            // ── ① Period tab row ──────────────────────────────────────────────
-            item {
-                PeriodTabRow(
-                    selected = selectedPeriod,
-                    onSelect = { vm.selectPeriod(it) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
-                )
-            }
-            item { Spacer(Modifier.height(DashboardDimens.spaceLg)) }
-
-            // ── ② Date navigator ─────────────────────────────────────────────
-            item {
-                DateNavigatorRow(
-                    label = periodNavLabel,
-                    canBack = canNavBack,
-                    canForward = canNavForward,
-                    onBack = { vm.navBack() },
-                    onForward = { vm.navForward() },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
-                )
-            }
-
-            item { Spacer(Modifier.height(DashboardDimens.spaceLg)) }
-
-            // ── ③ Search bar + Active filter chips (sticky) ───────────────────
-            stickyHeader {
-                // Keep same background as scaffold so the header appears seamless
-                Surface(
-                    color = MaterialTheme.colorScheme.background,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp,
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        SearchAndFilterRow(
-                            query = searchQuery,
-                            onQueryChange = { vm.setSearchQuery(it) },
-                            onClearSearch = {
-                                vm.clearSearch()
-                                focusManager.clearFocus()
-                            },
-                            activeFilterCount = activeFilterCount,
-                            onFilterClick = { showFilterSheet = true },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
-                        )
-
-                        AnimatedVisibility(
-                            visible = selectedCategory != null || selectedPayment != null,
-                            enter = expandVertically(),
-                            exit = shrinkVertically(),
-                        ) {
-                            ActiveFilterChipsRow(
-                                selectedCategory = selectedCategory,
-                                selectedPayment = selectedPayment,
-                                onClearCategory = { vm.setCategory(null) },
-                                onClearPayment = { vm.setPaymentMethod(null) },
-                                modifier = Modifier.fillMaxWidth().padding(
-                                    start = DashboardDimens.screenPaddingH,
-                                    end = DashboardDimens.screenPaddingH,
-                                    top = DashboardDimens.spaceMd,
-                                ),
+                // ── ① Search bar + Active filter chips (sticky) ───────────────────
+                stickyHeader {
+                    // Keep same background as scaffold so the header appears seamless
+                    Surface(
+                        color = MaterialTheme.colorScheme.background,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp,
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            SearchAndFilterRow(
+                                query = searchQuery,
+                                onQueryChange = { vm.setSearchQuery(it) },
+                                onClearSearch = {
+                                    vm.clearSearch()
+                                    focusManager.clearFocus()
+                                },
+                                activeFilterCount = activeFilterCount,
+                                onFilterClick = { showFilterSheet = true },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
                             )
-                        }
 
-                        Spacer(Modifier.height(DashboardDimens.spaceMd))
+                            AnimatedVisibility(
+                                visible = selectedCategory != null || selectedPayment != null || selectedMonth != null || dateFrom != null || dateTo != null,
+                                enter = expandVertically(),
+                                exit = shrinkVertically(),
+                            ) {
+                                ActiveFilterChipsRow(
+                                    selectedCategory = selectedCategory,
+                                    selectedPayment = selectedPayment,
+                                    selectedMonth = selectedMonth,
+                                    dateFrom = dateFrom,
+                                    dateTo = dateTo,
+                                    onClearCategory = { vm.setCategory(null) },
+                                    onClearPayment = { vm.setPaymentMethod(null) },
+                                    onClearMonth = { vm.setMonth(null) },
+                                    onClearDateRange = { vm.clearDateRange() },
+                                    modifier = Modifier.fillMaxWidth().padding(
+                                        start = DashboardDimens.screenPaddingH,
+                                        end = DashboardDimens.screenPaddingH,
+                                        top = DashboardDimens.spaceMd,
+                                    ),
+                                )
+                            }
+
+                            Spacer(Modifier.height(DashboardDimens.spaceMd))
+                        }
                     }
                 }
-            }
 
-            item { Spacer(Modifier.height(DashboardDimens.spaceXxl)) }
+                item { Spacer(Modifier.height(DashboardDimens.spaceXxl)) }
 
-            // ── ⑥ Empty state ────────────────────────────────────────────────
-            if (monthGroupsVal.isEmpty()) {
-                item {
-                    TransactionsEmptyState(
-                        hasFilter = hasActiveFilter,
-                        onClearAll = { vm.clearAllFilters() },
-                        modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
-                    )
-                }
-            } else {
                 // ── ⑦ Month groups ───────────────────────────────────────────
-                monthGroupsVal.forEach { monthGroup ->
-                    val isMonthExpanded = monthExpandedStates[monthGroup.monthLabel] ?: true
+                monthGroupsVal.forEachIndexed { monthIndex, monthGroup ->
+                    val headerKey = "month-$monthIndex"
+                    val isMonthExpanded = monthExpandedStates[headerKey] ?: true
 
-                    item(key = "header_${monthGroup.monthLabel}") {
+                    item(key = headerKey) {
                         MonthGroupHeader(
                             monthLabel = monthGroup.monthLabel,
                             totalSpent = monthGroup.totalSpent,
                             expanded = isMonthExpanded,
                             onToggle = {
-                                monthExpandedStates[monthGroup.monthLabel] = !isMonthExpanded
+                                monthExpandedStates[headerKey] = !isMonthExpanded
                             },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH)
                                 .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceXs),
@@ -183,12 +176,12 @@ fun TransactionsScreen(
                     }
 
                     if (isMonthExpanded) {
-                        monthGroup.days.forEach { dayGroup ->
-                            val dayKey = "${monthGroup.monthLabel}_${dayGroup.dayLabel}"
+                        monthGroup.days.forEachIndexed { dayIndex, dayGroup ->
+                            val dayKey = "day-$monthIndex-$dayIndex"
                             val isDayExpanded = dayExpandedStates[dayKey] ?: true
                             val dayTotal = dayGroup.items.sumOf { kotlin.math.abs(it.amount) }
 
-                            item(key = "day_$dayKey") {
+                            item(key = dayKey) {
                                 DayGroupHeader(
                                     dayLabel = dayGroup.dayLabel,
                                     totalSpent = dayTotal,
@@ -204,39 +197,36 @@ fun TransactionsScreen(
                                 )
                             }
 
-                            // All rows for this day in one item so AnimatedVisibility works cleanly
-                            item(key = "items_$dayKey") {
-                                AnimatedVisibility(
-                                    visible = isDayExpanded,
-                                    enter = expandVertically(),
-                                    exit = shrinkVertically(),
-                                ) {
-                                    Column {
-                                        dayGroup.items.forEachIndexed { index, tx ->
-                                            TransactionRow(
-                                                tx = tx,
-                                                query = searchQuery,
-                                                modifier = Modifier.fillMaxWidth().clickable(
-                                                        indication = null,
-                                                        interactionSource = remember { MutableInteractionSource() },
-                                                    ) { onTransactionClick(tx.id) }
-                                                    .padding(horizontal = DashboardDimens.screenPaddingH),
-                                            )
-                                            // Only show divider if this is not the last item of the day
-                                            if (index < dayGroup.items.lastIndex) {
-                                                HorizontalDivider(
-                                                    thickness = DashboardDimens.dividerThin,
-                                                    modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
-                                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                                )
-                                            }
-                                        }
+                            // Emit each transaction as its own lazy item.
+                            // Key is prefixed with dayKey so it stays globally unique
+                            // across all day-groups even if the same id somehow appeared twice.
+                            if (isDayExpanded) {
+                                itemsIndexed(
+                                    items = dayGroup.items,
+                                    key = { _, tx -> "$dayKey-${tx.id}" },
+                                ) { index, tx ->
+                                    TransactionRow(
+                                        tx = tx,
+                                        query = searchQuery,
+                                        modifier = Modifier.fillMaxWidth().clickable(
+                                            indication = null,
+                                            interactionSource = remember { MutableInteractionSource() },
+                                        ) { onTransactionClick(tx.id) }
+                                            .padding(horizontal = DashboardDimens.screenPaddingH),
+                                    )
+                                    // Only show divider if this is not the last item of the day
+                                    if (index < dayGroup.items.lastIndex) {
+                                        HorizontalDivider(
+                                            thickness = DashboardDimens.dividerThin,
+                                            modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
+                                        )
                                     }
                                 }
                             }
                         }
 
-                        item(key = "foot_${monthGroup.monthLabel}") {
+                        item(key = "foot-$monthIndex") {
                             Spacer(Modifier.height(DashboardDimens.spaceLg))
                         }
                     }
@@ -252,9 +242,20 @@ fun TransactionsScreen(
                 availablePayments = availablePayments,
                 selectedCategory = selectedCategory,
                 selectedPayment = selectedPayment,
+                selectedMonth = selectedMonth,
+                dateFrom = dateFrom,
+                dateTo = dateTo,
                 onSelectCategory = { vm.setCategory(it) },
                 onSelectPayment = { vm.setPaymentMethod(it) },
-                onClearAll = { vm.setCategory(null); vm.setPaymentMethod(null) },
+                onSelectMonth = { vm.setMonth(it) },
+                onDateFromChange = { vm.setDateFrom(it) },
+                onDateToChange = { vm.setDateTo(it) },
+                onClearAll = {
+                    vm.setCategory(null)
+                    vm.setPaymentMethod(null)
+                    vm.setMonth(null)
+                    vm.clearDateRange()
+                },
                 onDismiss = { showFilterSheet = false },
             )
         }
@@ -385,10 +386,11 @@ private fun FilterButton(
     val primary = MaterialTheme.colorScheme.primary
     val onSurfaceVar = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box(modifier = modifier) {
+    // Overlay container so we can precisely position the circular badge without Badge padding
+    Box(modifier = modifier.size(width = 56.dp, height = 56.dp)) {
         IconButton(
             onClick = onClick,
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(DashboardDimens.cornerCard))
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(DashboardDimens.cornerCard))
                 .background(if (activeCount > 0) primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer),
         ) {
             Icon(
@@ -398,18 +400,26 @@ private fun FilterButton(
                 modifier = Modifier.size(DashboardDimens.iconMd),
             )
         }
-        // Badge
+
         if (activeCount > 0) {
-            Box(
-                modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(16.dp).clip(CircleShape)
-                    .background(primary),
-                contentAlignment = Alignment.Center,
+            Badge(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp),
+                containerColor = primary,
             ) {
-                Text(
-                    text = "$activeCount",
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
+                AndroidView(
+                    factory = { ctx ->
+                        TextView(ctx).apply {
+                            text = "$activeCount"
+                            setTextColor(android.graphics.Color.WHITE)
+                            textSize = 12f
+                            typeface = Typeface.DEFAULT_BOLD
+                            gravity = Gravity.CENTER
+                            includeFontPadding = false
+                        }
+                    },
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -418,12 +428,26 @@ private fun FilterButton(
 
 // ─── ④ Active Filter Chips ────────────────────────────────────────────────────
 
+private val MONTH_LABELS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+private fun formatDateChip(ts: Long): String {
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = ts }
+    val d = cal.get(java.util.Calendar.DAY_OF_MONTH)
+    val m = MONTH_LABELS[cal.get(java.util.Calendar.MONTH)]
+    return "$d $m"
+}
+
 @Composable
 private fun ActiveFilterChipsRow(
     selectedCategory: String?,
     selectedPayment: String?,
+    selectedMonth: Int?,
+    dateFrom: Long?,
+    dateTo: Long?,
     onClearCategory: () -> Unit,
     onClearPayment: () -> Unit,
+    onClearMonth: () -> Unit,
+    onClearDateRange: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyRow(
@@ -445,6 +469,29 @@ private fun ActiveFilterChipsRow(
                     label = selectedPayment,
                     prefix = "via",
                     onClear = onClearPayment,
+                )
+            }
+        }
+        if (selectedMonth != null) {
+            item {
+                ActiveFilterChip(
+                    label = MONTH_LABELS[selectedMonth - 1],
+                    prefix = "Month",
+                    onClear = onClearMonth,
+                )
+            }
+        }
+        if (dateFrom != null || dateTo != null) {
+            item {
+                val label = when {
+                    dateFrom != null && dateTo != null -> "${formatDateChip(dateFrom)} – ${formatDateChip(dateTo)}"
+                    dateFrom != null -> "From ${formatDateChip(dateFrom)}"
+                    else -> "Until ${formatDateChip(dateTo!!)}"
+                }
+                ActiveFilterChip(
+                    label = label,
+                    prefix = "Date",
+                    onClear = onClearDateRange,
                 )
             }
         }
@@ -496,8 +543,14 @@ private fun FilterBottomSheet(
     availablePayments: List<String>,
     selectedCategory: String?,
     selectedPayment: String?,
+    selectedMonth: Int?,
+    dateFrom: Long?,
+    dateTo: Long?,
     onSelectCategory: (String?) -> Unit,
     onSelectPayment: (String?) -> Unit,
+    onSelectMonth: (Int?) -> Unit,
+    onDateFromChange: (Long?) -> Unit,
+    onDateToChange: (Long?) -> Unit,
     onClearAll: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -505,6 +558,56 @@ private fun FilterBottomSheet(
     val sheetHandleColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     val errorColor = MaterialTheme.colorScheme.error
 
+    // Date picker dialog visibility
+    var showFromPicker by remember { mutableStateOf(false) }
+    var showToPicker by remember { mutableStateOf(false) }
+
+    // Material3 DatePicker states (initialSelectedDateMillis optional)
+    val fromPickerState = rememberDatePickerState(initialSelectedDateMillis = dateFrom)
+    val toPickerState = rememberDatePickerState(initialSelectedDateMillis = dateTo)
+
+    if (showFromPicker) {
+        DatePickerDialog(
+            onDismissRequest = { showFromPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDateFromChange(fromPickerState.selectedDateMillis)
+                    showFromPicker = false
+                }) { Text("OK", color = MaterialTheme.colorScheme.primary) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFromPicker = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+        ) {
+            DatePicker(state = fromPickerState)
+        }
+    }
+
+    if (showToPicker) {
+        DatePickerDialog(
+            onDismissRequest = { showToPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    // Set to end of that day (23:59:59.999) so "to" is inclusive
+                    val endOfDay = toPickerState.selectedDateMillis?.let { it + 86_399_999L }
+                    onDateToChange(endOfDay)
+                    showToPicker = false
+                }) { Text("OK", color = MaterialTheme.colorScheme.primary) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showToPicker = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+        ) {
+            DatePicker(state = toPickerState)
+        }
+    }
+
+    val hasAnyFilter =
+        selectedCategory != null || selectedPayment != null || selectedMonth != null || dateFrom != null || dateTo != null
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -533,7 +636,7 @@ private fun FilterBottomSheet(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                if (selectedCategory != null || selectedPayment != null) {
+                if (hasAnyFilter) {
                     TextButton(onClick = onClearAll) {
                         Text(
                             text = "Clear all",
@@ -559,7 +662,6 @@ private fun FilterBottomSheet(
                     contentPadding = PaddingValues(horizontal = DashboardDimens.screenPaddingH),
                     horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
                 ) {
-                    // "All" chip
                     item {
                         SheetFilterChip(
                             label = "All",
@@ -591,7 +693,6 @@ private fun FilterBottomSheet(
                     contentPadding = PaddingValues(horizontal = DashboardDimens.screenPaddingH),
                     horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
                 ) {
-                    // "All" chip
                     item {
                         SheetFilterChip(
                             label = "All",
@@ -611,10 +712,91 @@ private fun FilterBottomSheet(
                 Spacer(Modifier.height(DashboardDimens.spaceXl))
             }
 
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, color = dividerColor)
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
+
+            // ── Month filter section ──────────────────────────────────────────
+            FilterSectionLabel(
+                text = "Month",
+                modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
+            )
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = DashboardDimens.screenPaddingH),
+                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
+            ) {
+                item {
+                    SheetFilterChip(
+                        label = "All",
+                        isSelected = selectedMonth == null,
+                        onClick = { onSelectMonth(null) },
+                    )
+                }
+                items(12) { idx ->
+                    val monthNum = idx + 1
+                    SheetFilterChip(
+                        label = MONTH_LABELS[idx],
+                        isSelected = selectedMonth == monthNum,
+                        onClick = { onSelectMonth(if (selectedMonth == monthNum) null else monthNum) },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(DashboardDimens.spaceXl))
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, color = dividerColor)
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
+
+            // ── Date range section ────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilterSectionLabel(text = "Date range")
+                if (dateFrom != null || dateTo != null) {
+                    TextButton(
+                        onClick = { onDateFromChange(null); onDateToChange(null) },
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Text(
+                            text = "Clear",
+                            color = errorColor,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
+                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
+            ) {
+                // From date button
+                DateRangeButton(
+                    label = "From",
+                    dateText = dateFrom?.let { formatDateChip(it) } ?: "Any date",
+                    isSet = dateFrom != null,
+                    onClick = { showFromPicker = true },
+                    modifier = Modifier.weight(1f),
+                )
+                // To date button
+                DateRangeButton(
+                    label = "To",
+                    dateText = dateTo?.let { formatDateChip(it) } ?: "Any date",
+                    isSet = dateTo != null,
+                    onClick = { showToPicker = true },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(DashboardDimens.spaceXl))
+
             // ── Empty state for the sheet ─────────────────────────────────────
             if (availableCategories.isEmpty() && availablePayments.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -638,6 +820,50 @@ private fun FilterBottomSheet(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DateRangeButton(
+    label: String,
+    dateText: String,
+    isSet: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(DashboardDimens.cornerCard))
+            .background(if (isSet) primary.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onClick,
+            ).padding(horizontal = DashboardDimens.spaceMd, vertical = DashboardDimens.spaceMdL),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSet) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs),
+        ) {
+            Icon(
+                imageVector = Icons.Default.DateRange,
+                contentDescription = null,
+                tint = if (isSet) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(DashboardDimens.iconSm),
+            )
+            Text(
+                text = dateText,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (isSet) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSet) primary else MaterialTheme.colorScheme.onBackground,
+            )
         }
     }
 }
@@ -760,8 +986,7 @@ private fun DayGroupHeader(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceMd),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -904,9 +1129,7 @@ private fun TransactionsEmptyState(
 @Preview(showBackground = true, widthDp = 390, heightDp = 844, name = "TransactionsScreen Preview")
 @Composable
 fun TransactionsScreenPreview() {
-    // Local preview state to quickly toggle filters/search
     var query by remember { mutableStateOf("") }
-    var selectedPeriod by remember { mutableStateOf(TransactionPeriod.MONTH) }
     var selectedCat by remember { mutableStateOf<String?>(null) }
 
     MaterialTheme {
@@ -919,15 +1142,6 @@ fun TransactionsScreenPreview() {
                 contentPadding = PaddingValues(bottom = DashboardDimens.fabClearance),
                 verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
             ) {
-                // Period tabs
-                item {
-                    PeriodTabRow(
-                        selected = selectedPeriod,
-                        onSelect = { selectedPeriod = it },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH),
-                    )
-                }
-
                 // Search + filter
                 item {
                     SearchAndFilterRow(
@@ -946,8 +1160,13 @@ fun TransactionsScreenPreview() {
                         ActiveFilterChipsRow(
                             selectedCategory = selectedCat,
                             selectedPayment = null,
+                            selectedMonth = null,
+                            dateFrom = null,
+                            dateTo = null,
                             onClearCategory = { selectedCat = null },
                             onClearPayment = {},
+                            onClearMonth = {},
+                            onClearDateRange = {},
                             modifier = Modifier.fillMaxWidth().padding(
                                 horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceMd
                             ),

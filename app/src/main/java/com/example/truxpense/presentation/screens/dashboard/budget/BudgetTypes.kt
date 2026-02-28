@@ -4,7 +4,8 @@ package com.example.truxpense.presentation.screens.dashboard.budget
 
 enum class PeriodTab { WEEK, MONTH }
 
-data class SpendPoint(val dayLabel: String, val amount: Double)
+// Add tooltipDate with a default empty string to keep existing call-sites compiling
+data class SpendPoint(val dayLabel: String, val amount: Double, val tooltipDate: String = "")
 
 data class BudgetTransaction(
     val id: String,

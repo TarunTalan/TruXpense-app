@@ -17,6 +17,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.*
@@ -87,11 +90,22 @@ fun HomeTabContent(
     // Budget VM for real budget data
     val budgetVm: BudgetViewModel = hiltViewModel()
     val budgetItems by budgetVm.categoryDisplayItems.collectAsState(initial = emptyList())
+    val hasBudgets by budgetVm.hasBudgets.collectAsState(initial = false)
     val totalBudget by budgetVm.totalBudget.collectAsState()
     val totalSpentInBudgets by budgetVm.totalSpent.collectAsState()
-    // compute overall progress as Float (avoid using remember inside LazyColumn DSL)
-    val overallProgress: Float =
+    // compute overall progress as Float only when budgets exist
+    val overallProgress: Float = if (hasBudgets) {
         if (totalBudget > 0) (totalSpentInBudgets.toFloat() / totalBudget.toFloat()).coerceIn(0f, 1f) else 0f
+    } else 0f
+
+    // One-shot progress bar fill — fires once when this screen is navigated to
+    var progTriggered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { progTriggered = true }
+    val progMultiplier by animateFloatAsState(
+        targetValue = if (progTriggered) 1f else 0f,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "home_progress",
+    )
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -136,7 +150,7 @@ fun HomeTabContent(
             }
 
             // Budget summary — show only when user has created budgets
-            if (budgetItems.isNotEmpty()) {
+            if (hasBudgets && budgetItems.isNotEmpty()) {
                 // overall budget progress computed from BudgetViewModel totals
                 item {
                     SectionCard(
@@ -172,7 +186,7 @@ fun HomeTabContent(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Spacer(Modifier.height(DashboardDimens.spaceMdL))
-                        BudgetProgressBar(progress = overallProgress)
+                        BudgetProgressBar(progress = overallProgress, progressMultiplier = progMultiplier)
                     }
                 }
             }
@@ -196,6 +210,7 @@ fun HomeTabContent(
                     category = category,
                     fmt = fmt,
                     errorColor = MaterialTheme.colorScheme.error,
+                    progressMultiplier = progMultiplier,
                 )
             }
 

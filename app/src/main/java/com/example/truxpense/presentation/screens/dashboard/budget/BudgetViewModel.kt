@@ -37,6 +37,11 @@ class BudgetViewModel @Inject constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // New: single source of truth whether any budget exists
+    val hasBudgets: StateFlow<Boolean> =
+        categories.map { it.isNotEmpty() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     // ── Display items (pre-formatted for the UI row) ──────────────────────────
 
     val categoryDisplayItems: StateFlow<List<BudgetCategoryDisplay>> =

@@ -35,17 +35,16 @@ import com.example.truxpense.presentation.navigation.safeNavigate
 import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
-import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsViewModel
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
+import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 
 // Dashboard shell: owns the NavController and tab routing
 
@@ -160,13 +159,17 @@ fun DashboardScreen(
             }
 
             // Transactions tab
-            composable(Screen.Dashboard.Transactions.Root) {
+            composable(Screen.Dashboard.Transactions.Root) { backStackEntry ->
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     TransactionsScreen(
+                        navBackStackEntry = backStackEntry,
                         onTransactionClick = { transactionId ->
                             dashboardNavController.safeNavigate(
                                 Screen.Dashboard.Transactions.detailRoute(transactionId)
                             )
+                        },
+                        onAddTransaction = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
                         },
                     )
                 }
@@ -174,12 +177,10 @@ fun DashboardScreen(
 
             // Transaction detail
             composable(
-                route = Screen.Dashboard.Transactions.Detail,
-                arguments = listOf(
+                route = Screen.Dashboard.Transactions.Detail, arguments = listOf(
                     navArgument("transactionId") {
                         type = NavType.StringType
-                    }
-                )
+                    })
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
                 TransactionDetailScreen(
@@ -201,10 +202,8 @@ fun DashboardScreen(
 
             // Transaction edit (reuse AddExpenseScreen for editing)
             composable(
-                route = Screen.Dashboard.Transactions.Edit,
-                arguments = listOf(
-                    navArgument("transactionId") { type = NavType.StringType }
-                )
+                route = Screen.Dashboard.Transactions.Edit, arguments = listOf(
+                    navArgument("transactionId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
                 // Show EditExpenseScreen which reuses AddExpenseScreenContent and provides Save/Cancel
@@ -216,8 +215,7 @@ fun DashboardScreen(
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                             popUpTo(Screen.Dashboard.Transactions.Root) { inclusive = false }
                         }
-                    }
-                )
+                    })
             }
 
             // Budget tab
@@ -269,6 +267,36 @@ fun DashboardScreen(
                     monthlyLimit = limit,
                     spent = spent,
                     onBack = { dashboardNavController.popBackStack() },
+                    onDeleted = { dashboardNavController.popBackStack() },
+                    onSeeAll = { category ->
+                        val cat = category?.trim()
+                        // Navigate to transactions tab/root first
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+
+                        // Then set the preselect on transactions backStackEntry so its SavedStateHandle is populated
+                        if (!cat.isNullOrBlank()) {
+                            try {
+                                val destEntry =
+                                    dashboardNavController.getBackStackEntry(Screen.Dashboard.Transactions.Root)
+                                destEntry.savedStateHandle.set("preselectCategory", cat)
+                            } catch (e: Exception) {
+                                // Fallback: set on current back stack entry if destination not available yet
+                                dashboardNavController.currentBackStackEntry?.savedStateHandle?.set(
+                                    "preselectCategory", cat
+                                )
+                            }
+                        }
+                    },
+                    onTransactionClick = { txId ->
+                        // Navigate to the transaction detail route for the tapped transaction
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Transactions.detailRoute(txId)
+                        )
+                    },
                 )
             }
 
@@ -310,11 +338,6 @@ fun DashboardScreen(
 
 @Composable
 private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
-    val analyticsVm: AnalyticsViewModel = hiltViewModel()
-    val categories by analyticsVm.categories.collectAsState()
-    val totalSpent by analyticsVm.totalSpent.collectAsState()
-    val totalBudget by analyticsVm.totalBudget.collectAsState()
-
     val homeVm: HomeViewModel = hiltViewModel()
     val recentTx by homeVm.recentTransactions.collectAsState()
 
@@ -324,11 +347,9 @@ private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
             onAddExpense = onAddExpense,
         )
     } else {
-        AnalyticsScreen(
-            totalSpent = totalSpent,
-            totalBudget = totalBudget,
-            categories = categories,
-        )
+        // AnalyticsScreen owns its own AnalyticsViewModel via hiltViewModel()
+        // and reads all state internally — no need to pass data from here.
+        AnalyticsScreen()
     }
 }
 
@@ -377,14 +398,24 @@ private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
             shape = RoundedCornerShape(DashboardDimens.cornerCard),
             containerColor = MaterialTheme.colorScheme.surface,
             title = { Text("Permission blocked", color = MaterialTheme.colorScheme.onBackground) },
-            text = { Text("SMS permission has been permanently denied. Open app settings to grant access.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            text = {
+                Text(
+                    "SMS permission has been permanently denied. Open app settings to grant access.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             confirmButton = {
-                Button(onClick = {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", context.packageName, null)
-                    }
-                    context.startActivity(intent)
-                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Open settings") }
+                Button(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(intent)
+                    }, colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) { Text("Open settings") }
             },
             dismissButton = {
                 TextButton(onClick = { }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }

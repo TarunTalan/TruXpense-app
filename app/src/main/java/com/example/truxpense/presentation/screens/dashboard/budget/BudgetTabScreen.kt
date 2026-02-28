@@ -9,13 +9,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
@@ -57,18 +63,23 @@ fun BudgetTab(
     val totalBudgetStr = totalBudget.toDouble().toCurrency(fmt)
     val totalSpentStr = totalSpent.toDouble().toCurrency(fmt)
 
-    BudgetTabContent(
-        budgetsToShow = budgetsToShow,
-        totalBudget = totalBudgetStr,
-        totalSpent = totalSpentStr,
-        currentMonth = currentMonth,
-        canGoBack = canGoBack,
-        canGoForward = canGoForward,
-        onPrevious = { vm.previousMonth() },
-        onNext = { vm.nextMonth() },
-        onNavigateToAddBudget = onNavigateToAddBudget,
-        onNavigateToBudgetDetail = onNavigateToBudgetDetail,
-    )
+    // Show empty screen when there are no budgets or total budget is zero
+    if (budgetsToShow.isEmpty() || totalBudget <= 0) {
+        BudgetsEmptyScreen(onAddBudget = onNavigateToAddBudget)
+    } else {
+        BudgetTabContent(
+            budgetsToShow = budgetsToShow,
+            totalBudget = totalBudgetStr,
+            totalSpent = totalSpentStr,
+            currentMonth = currentMonth,
+            canGoBack = canGoBack,
+            canGoForward = canGoForward,
+            onPrevious = { vm.previousMonth() },
+            onNext = { vm.nextMonth() },
+            onNavigateToAddBudget = onNavigateToAddBudget,
+            onNavigateToBudgetDetail = onNavigateToBudgetDetail,
+        )
+    }
 }
 
 // Stateless UI extracted for preview and reuse
@@ -86,6 +97,15 @@ fun BudgetTabContent(
     onNavigateToAddBudget: () -> Unit,
     onNavigateToBudgetDetail: (BudgetCategory) -> Unit,
 ) {
+    // One-shot progress bar fill — fires once when this screen is navigated to
+    var progTriggered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { progTriggered = true }
+    val progMultiplier by animateFloatAsState(
+        targetValue = if (progTriggered) 1f else 0f,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "budget_progress",
+    )
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ScreenTopBar(headerTitle = "Budgets", showBack = false) },
@@ -128,8 +148,8 @@ fun BudgetTabContent(
                     titleColor = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.fillMaxWidth().clickable { onNavigateToBudgetDetail(display.category) },
                     errorColor = display.category.barColor,
+                    progressMultiplier = progMultiplier,
                 )
-
             }
         }
     }
@@ -163,7 +183,7 @@ private fun MonthNavigatorRow(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
 
-        )
+            )
         IconButton(onClick = onNext, enabled = canGoForward) {
             Icon(
                 painter = painterResource(R.drawable.right_arrow),
