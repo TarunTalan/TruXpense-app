@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- lightbulb icon -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M9,21h6v-1.5H9V21zM12,2C9.24,2 7,4.24 7,7c0,2.54 1.84,4.69 4.25,4.96V13c0,0.55 -0.45,1 -1,1H13.8c-0.55,0 -1,-0.45 -1,-1v-1.04C15.16,11.69 17,9.54 17,7c0,-2.76 -2.24,-5 -5,-5z"/>
+</vector>

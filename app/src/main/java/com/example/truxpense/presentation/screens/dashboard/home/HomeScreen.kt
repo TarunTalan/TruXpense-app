@@ -34,12 +34,14 @@ import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
 import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
+import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsPeriod
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
+import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
 import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
@@ -60,6 +62,7 @@ fun DashboardScreen(
     val currentDestination = navBackStackEntry?.destination
 
     // Top-level tab roots (these show the bottom bar). Sub-screens hide it.
+    // NOTE: Notifications is intentionally absent — the bottom bar auto-hides there.
     val topLevelRoutes = remember {
         setOf(
             Screen.Dashboard.Home.Root,
@@ -119,7 +122,7 @@ fun DashboardScreen(
             popExitTransition = { ExitTransition.None },
         ) {
 
-            // Home tab
+            // ── Home tab ──────────────────────────────────────────────────────
             composable(Screen.Dashboard.Home.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     HomeTabScreen(
@@ -141,6 +144,9 @@ fun DashboardScreen(
                                 restoreState = true
                             }
                         },
+                        onNotificationsClick = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Notifications.Root)
+                        },
                     )
                 }
             }
@@ -149,8 +155,8 @@ fun DashboardScreen(
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onSave = { _ ->
-                        // The AddExpenseViewModel already persisted the transaction to the shared repository.
-                        // Just navigate to the Home tab so the user returns to dashboard (no duplicate add).
+                        // The AddExpenseViewModel already persisted the transaction to the shared
+                        // repository. Just navigate to the Home tab so the user returns to dashboard.
                         dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
                             popUpTo(Screen.Dashboard.Root) { inclusive = false }
                         }
@@ -158,7 +164,7 @@ fun DashboardScreen(
                 )
             }
 
-            // Transactions tab
+            // ── Transactions tab ──────────────────────────────────────────────
             composable(Screen.Dashboard.Transactions.Root) { backStackEntry ->
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     TransactionsScreen(
@@ -177,17 +183,15 @@ fun DashboardScreen(
 
             // Transaction detail
             composable(
-                route = Screen.Dashboard.Transactions.Detail, arguments = listOf(
-                    navArgument("transactionId") {
-                        type = NavType.StringType
-                    })
+                route = Screen.Dashboard.Transactions.Detail,
+                arguments = listOf(
+                    navArgument("transactionId") { type = NavType.StringType }),
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
                 TransactionDetailScreen(
                     transactionId = transactionId,
                     onBack = { dashboardNavController.popBackStack() },
                     onEdit = {
-                        // Navigate to the edit screen for this transaction id
                         dashboardNavController.safeNavigate(
                             Screen.Dashboard.Transactions.editRoute(transactionId)
                         )
@@ -200,25 +204,25 @@ fun DashboardScreen(
                 )
             }
 
-            // Transaction edit (reuse AddExpenseScreen for editing)
+            // Transaction edit (reuses AddExpenseScreen for editing)
             composable(
-                route = Screen.Dashboard.Transactions.Edit, arguments = listOf(
-                    navArgument("transactionId") { type = NavType.StringType })
+                route = Screen.Dashboard.Transactions.Edit,
+                arguments = listOf(
+                    navArgument("transactionId") { type = NavType.StringType }),
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
-                // Show EditExpenseScreen which reuses AddExpenseScreenContent and provides Save/Cancel
                 EditExpenseScreen(
                     transactionId = transactionId,
                     onCancel = { dashboardNavController.popBackStack() },
                     onSaved = {
-                        // After save, navigate to transactions root to show updated list
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                             popUpTo(Screen.Dashboard.Transactions.Root) { inclusive = false }
                         }
-                    })
+                    },
+                )
             }
 
-            // Budget tab
+            // ── Budget tab ────────────────────────────────────────────────────
             composable(Screen.Dashboard.Budget.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     BudgetTab(
@@ -255,7 +259,6 @@ fun DashboardScreen(
                 ),
             ) { backStackEntry ->
                 val args = backStackEntry.arguments
-                // Percent-decode the name since we URL-encoded it when navigating
                 val name = java.net.URLDecoder.decode(
                     args?.getString("budgetName") ?: "Budget", "UTF-8"
                 )
@@ -269,7 +272,8 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onDeleted = { dashboardNavController.popBackStack() },
                     onSeeAll = { category ->
-                        val cat = category?.trim()
+                        val cat = category.trim()
+
                         // Navigate to transactions tab/root first
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                             popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
@@ -277,14 +281,14 @@ fun DashboardScreen(
                             restoreState = true
                         }
 
-                        // Then set the preselect on transactions backStackEntry so its SavedStateHandle is populated
+                        // Then set the preselect on transactions backStackEntry so its
+                        // SavedStateHandle is populated
                         if (!cat.isNullOrBlank()) {
                             try {
                                 val destEntry =
                                     dashboardNavController.getBackStackEntry(Screen.Dashboard.Transactions.Root)
                                 destEntry.savedStateHandle.set("preselectCategory", cat)
-                            } catch (e: Exception) {
-                                // Fallback: set on current back stack entry if destination not available yet
+                            } catch (_: Exception) {
                                 dashboardNavController.currentBackStackEntry?.savedStateHandle?.set(
                                     "preselectCategory", cat
                                 )
@@ -292,7 +296,6 @@ fun DashboardScreen(
                         }
                     },
                     onTransactionClick = { txId ->
-                        // Navigate to the transaction detail route for the tapped transaction
                         dashboardNavController.safeNavigate(
                             Screen.Dashboard.Transactions.detailRoute(txId)
                         )
@@ -300,7 +303,7 @@ fun DashboardScreen(
                 )
             }
 
-            // Analytics tab
+            // ── Analytics tab ─────────────────────────────────────────────────
             composable(Screen.Dashboard.Analytics.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     AnalyticsTab(
@@ -315,7 +318,6 @@ fun DashboardScreen(
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onSave = { _ ->
-                        // repo already updated by AddExpenseViewModel; navigate to Home tab
                         dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
                             popUpTo(Screen.Dashboard.Root) { inclusive = false }
                         }
@@ -323,11 +325,80 @@ fun DashboardScreen(
                 )
             }
 
-            // Settings tab
+            // ── Settings tab ──────────────────────────────────────────────────
             composable(Screen.Dashboard.Settings.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     SettingsTab(onLogout = onLogout)
                 }
+            }
+
+            // ── Notifications screen ──────────────────────────────────────────
+            // Not a bottom-nav tab — bottom bar hides automatically because this
+            // route is absent from topLevelRoutes.
+            composable(Screen.Dashboard.Notifications.Root) {
+                NotificationScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+
+                    // "Food budget exceeded" / "Food budget almost reached"
+                    // → opens BudgetDetailScreen for that category
+                    onNavigateToBudgetDetail = { budgetName, monthlyLimit, spent ->
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Budget.detailRoute(
+                                budgetName = budgetName,
+                                monthlyLimit = monthlyLimit,
+                                spent = spent,
+                            )
+                        )
+                    },
+
+                    // "Your spend more this weekend" / "Your weekly spending summary is ready"
+                    // → opens Analytics screen pre-set to WEEK view
+                    onNavigateToWeeklyAnalytics = {
+                        dashboardNavController.navigate(Screen.Dashboard.Analytics.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                        // Signal the AnalyticsViewModel to switch to WEEK period.
+                        // We write the request into the destination's SavedStateHandle so the
+                        // screen can read it on first composition (same pattern used for
+                        // preselectCategory in TransactionsViewModel).
+                        try {
+                            dashboardNavController.getBackStackEntry(Screen.Dashboard.Analytics.Root).savedStateHandle.set(
+                                "preselectPeriod", AnalyticsPeriod.WEEK.name
+                            )
+                        } catch (_: Exception) { /* destination not yet in back-stack */
+                        }
+                    },
+
+                    // "Unusual expense detected"
+                    // → opens TransactionDetailScreen for the flagged transaction
+                    onNavigateToTransactionDetail = { transactionId ->
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Transactions.detailRoute(transactionId)
+                        )
+                    },
+
+                    // "Haven't logged expense lately"
+                    // → opens AddExpense sheet
+                    onNavigateToAddExpense = {
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
+                    },
+
+                    // "Transaction synced successfully"
+                    // → opens Transactions list
+                    onNavigateToTransactions = {
+                        dashboardNavController.navigate(Screen.Dashboard.Transactions.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
         }
     }
@@ -335,6 +406,8 @@ fun DashboardScreen(
     SmsPermissionDialogHandler(vm = vm)
 }
 
+
+// ── Private tab helpers ───────────────────────────────────────────────────────
 
 @Composable
 private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
@@ -347,8 +420,6 @@ private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
             onAddExpense = onAddExpense,
         )
     } else {
-        // AnalyticsScreen owns its own AnalyticsViewModel via hiltViewModel()
-        // and reads all state internally — no need to pass data from here.
         AnalyticsScreen()
     }
 }
@@ -387,7 +458,6 @@ private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
         }
     }
 
-    // Collect one-shot events emitted by the VM when any child calls emitRequestSmsPermission()
     LaunchedEffect(vm) {
         vm.requestSmsPermission.collect { permissionLauncher.launch(Manifest.permission.READ_SMS) }
     }
@@ -401,7 +471,7 @@ private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
             text = {
                 Text(
                     "SMS permission has been permanently denied. Open app settings to grant access.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
             confirmButton = {
@@ -411,21 +481,24 @@ private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
                             data = Uri.fromParts("package", context.packageName, null)
                         }
                         context.startActivity(intent)
-                    }, colors = ButtonDefaults.buttonColors(
+                    },
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 ) { Text("Open settings") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
+                TextButton(onClick = { }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                }
             },
         )
     }
 }
 
 
-// Previews
+// ── Previews ──────────────────────────────────────────────────────────────────
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
