@@ -1,6 +1,6 @@
 package com.example.truxpense.presentation.screens.dashboard.components
 
-import android.graphics.fonts.Font
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,7 +17,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.truxpense.R
-import android.graphics.Color as AndroidColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +27,8 @@ fun ScreenTopBar(
     onBack: (() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
     showProfileIcons: Boolean = false,
+    onNotificationsClick: (() -> Unit)? = null,
+    unreadCount: Int = 0,
 ) {
     TopAppBar(
         title = {
@@ -86,12 +87,26 @@ fun ScreenTopBar(
                     }
                 }
 
-                IconButton(onClick = { /* notifications */ }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.notifications_icon),
-                        contentDescription = "Notifications",
-                        tint = MaterialTheme.colorScheme.onBackground,
-                    )
+                // Show a badge when unreadCount > 0
+                if (unreadCount > 0) {
+                    BadgedBox(badge = { Badge { /* dot */ } }) {
+                        IconButton(onClick = { onNotificationsClick?.invoke() }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.notifications_icon),
+                                contentDescription = "Notifications",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
+                    }
+                } else {
+                    IconButton(onClick = { onNotificationsClick?.invoke() }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.notifications_icon),
+                            contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
                 }
             }
         },

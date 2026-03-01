@@ -28,6 +28,7 @@ import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyVi
 import com.example.truxpense.util.currencyFormat
 import com.example.truxpense.util.formatAmountParts
 import com.example.truxpense.util.toCurrency
+import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationViewModel
 
 
 @Composable
@@ -36,6 +37,7 @@ fun HomeTabScreen(
     onAddExpense: (() -> Unit)? = null,
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
+    onNotificationsClick: (() -> Unit)? = null,
 ) {
     // Keep empty/content decision based on expenseCount (VM-driven)
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
@@ -69,6 +71,7 @@ fun HomeTabScreen(
         vm = vm,
         onNavigateToBudget = onNavigateToBudget,
         onViewAll = onViewAll,
+        onNotificationsClick = onNotificationsClick,
     )
 }
 
@@ -83,8 +86,11 @@ fun HomeTabContent(
     vm: HomeViewModel = hiltViewModel(),
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
+    onNotificationsClick: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
+    val notificationVm: NotificationViewModel = hiltViewModel()
+    val unreadCount by notificationVm.unreadCount.collectAsState()
     val topCategories by vm.topCategories.collectAsState(initial = emptyList())
     val recentTx by vm.recentTransactions.collectAsState(initial = emptyList<HomeTransactionItem>())
     // Budget VM for real budget data
@@ -110,7 +116,13 @@ fun HomeTabContent(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            ScreenTopBar(headerTitle = "TruXpense", showBack = false, showProfileIcons = true)
+            ScreenTopBar(
+                headerTitle = "TruXpense",
+                showBack = false,
+                showProfileIcons = true,
+                onNotificationsClick = { onNotificationsClick?.invoke() },
+                unreadCount = unreadCount
+            )
         },
         floatingActionButton = {
             AddFab(onClick = { onAddExpense?.invoke() })
@@ -476,10 +488,15 @@ fun HomeTabScreenPreview() {
 
     MaterialTheme {
         Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
-            ScreenTopBar(headerTitle = "TruXpense", showBack = false, showProfileIcons = true)
+            ScreenTopBar(
+                headerTitle = "TruXpense",
+                showBack = false,
+                showProfileIcons = true,
+                onNotificationsClick = { /* preview stub */ }
+            )
         }, floatingActionButton = {
-            AddFab(onClick = {})
-        }) { inner ->
+             AddFab(onClick = {})
+         }) { inner ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(inner),
                 contentPadding = PaddingValues(
