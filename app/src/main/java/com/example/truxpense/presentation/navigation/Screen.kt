@@ -70,6 +70,7 @@ object Screen {
         // ── Settings tab ──────────────────────────────────────────────────────
         object Settings {
             const val Root = "settings"
+            const val NotificationSettings = "settings/notification_settings"
         }
 
         // ── Notifications (not a bottom-nav tab; shown as a full screen) ──────

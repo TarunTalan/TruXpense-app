@@ -44,10 +44,21 @@ fun HomeTabScreen(
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
 
     val expenseCount by vm.expenseCount.collectAsState()
+    val isLoaded by vm.isLoaded.collectAsState()
+
     val monthlySpend by vm.monthlySpend.collectAsState()
     // val budgetLimit by vm.budgetLimit.collectAsState()
     // val budgetLeft by vm.budgetLeft.collectAsState()
     // val budgetProgress by vm.budgetProgress.collectAsState()   // ← from VM, was computed here
+
+    // If data hasn't loaded yet, show a small loading placeholder to avoid
+    // briefly rendering the empty home content while the repository is warming up.
+    if (!isLoaded) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by remember {

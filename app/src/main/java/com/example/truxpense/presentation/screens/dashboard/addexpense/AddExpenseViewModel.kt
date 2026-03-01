@@ -2,8 +2,11 @@ package com.example.truxpense.presentation.screens.dashboard.addexpense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
 import com.example.truxpense.data.repository.dashboard.ExpenseRepository
 import com.example.truxpense.data.repository.dashboard.Transaction
+import com.example.truxpense.notification.BudgetThresholdWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -12,6 +15,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AddExpenseViewModel @Inject constructor(
     private val repository: ExpenseRepository,
+    private val workManager: WorkManager,
 ) : ViewModel() {
 
     // ── 1. Raw inputs ─────────────────────────────────────────────────────────
@@ -103,6 +107,14 @@ class AddExpenseViewModel @Inject constructor(
                         paymentMethod = paymentMethod,
                         merchant = merchantName,
                     )
+                )
+                // Trigger an immediate one-shot budget threshold check so the
+                // user gets a notification right away if a budget hits 90%+,
+                // without waiting up to 6 hours for the periodic worker.
+                workManager.enqueueUniqueWork(
+                    "budget_check_immediate",
+                    ExistingWorkPolicy.REPLACE,
+                    BudgetThresholdWorker.buildOneTimeRequest(),
                 )
                 _saveComplete.emit(Unit)
                 resetForm()

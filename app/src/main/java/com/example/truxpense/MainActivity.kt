@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,14 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var sessionManager: AuthSessionManager
+
+    // Request POST_NOTIFICATIONS permission (Android 13+ / API 33+).
+    // Must be registered before onCreate per Activity Result API contract.
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            Log.d("MainActivity", "POST_NOTIFICATIONS permission granted=$granted")
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Determine whether this is a cold start. If not (e.g. theme change), don't keep system splash.
         val isColdStart = savedInstanceState == null
@@ -54,6 +63,21 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val alreadyGranted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!alreadyGranted) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            // Android ≤ 12: no runtime dialog needed; log if disabled in system settings
+            val enabled = androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()
+            if (!enabled) {
+                Log.w("MainActivity", "Notifications disabled in system settings (API < 33). " +
+                        "Open NotificationSettingsScreen to guide the user.")
+            }
+        }
 
         splashScreen.setKeepOnScreenCondition { isColdStart && keepSplashOn }
 

@@ -16,6 +16,9 @@ class NotificationViewModel @Inject constructor(
 
     val notifications: StateFlow<List<NotificationItem>> = repository.notifications
 
+    // Expose load status so UI can avoid flashes while persistence initializes
+    val isLoaded: StateFlow<Boolean> = repository.isLoaded
+
     val unreadCount: StateFlow<Int> =
         repository.notifications.map { list: List<NotificationItem> -> list.count { item -> !item.isRead } }.stateIn(
             scope = viewModelScope,
@@ -59,8 +62,7 @@ class NotificationViewModel @Inject constructor(
     }
 
     fun toggleSelectAll() {
-        val allIds = repository.notifications.value.
-        map { it.id }.toSet()
+        val allIds = repository.notifications.value.map { it.id }.toSet()
         _selectedIds.update { current ->
             if (current.size == allIds.size) emptySet() else allIds
         }

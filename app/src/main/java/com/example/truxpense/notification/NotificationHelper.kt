@@ -3,118 +3,129 @@ package com.example.truxpense.notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.example.truxpense.R
 import com.example.truxpense.MainActivity
+import com.example.truxpense.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 
 /**
- * Centralised helper that constructs and posts every push notification in Truxpense.
+ * Centralised helper that constructs and posts every push notification.
  *
- * All notification content — titles, bodies, channel routing, PendingIntents — lives here.
- * Workers and other callers just call the typed notify*() methods.
+ * Bug fixed: previously used [NotificationConstants.CHANNEL_*] which had different
+ * string values from [NotificationChannels.*], so the OS silently discarded every
+ * notification because the channel didn't exist.  All builders now reference
+ * [NotificationChannels] directly through the fixed [NotificationConstants] aliases.
  *
- * Permission note: Android 13+ (API 33) requires POST_NOTIFICATIONS.
- * The permission is requested at runtime by [NotificationScheduler] / the settings UI
- * before any notification is scheduled; callers here assume permission is granted.
+ * Tap navigation: every notification carries [NotificationConstants.EXTRA_DESTINATION]
+ * (and optionally [NotificationConstants.EXTRA_CATEGORY]) in its PendingIntent.
+ * [MainActivity.handleNotificationIntent] reads these and forwards them to
+ * [NotificationDeepLinkManager], which in turn drives [DashboardScreen] navigation.
  */
 @Singleton
 class NotificationHelper @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    private val TAG = "NotificationHelper"
 
-    private val pendingIntentFlags
+    private val pendingFlags
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         else PendingIntent.FLAG_UPDATE_CURRENT
 
+    /**
+     * Returns true if the app is allowed to post notifications.
+     * On Android 13+ (API 33) this requires POST_NOTIFICATIONS runtime permission.
+     * Logs a clear warning when blocked so it shows up in Logcat.
+     */
+    private fun canNotify(): Boolean {
+        // Check OS-level notification permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                Log.w(TAG, "POST_NOTIFICATIONS permission not granted — notification blocked. " +
+                        "Grant the permission in app Settings or via the runtime dialog.")
+                return false
+            }
+        }
+        // Check that notifications aren't disabled at the app or channel level
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) {
+            Log.w(TAG, "Notifications disabled for this app in system settings.")
+            return false
+        }
+        return true
+    }
+
     // ── Daily reminder ─────────────────────────────────────────────────────────
 
     fun notifyDailyReminder() {
-        val pending = PendingIntent.getActivity(
-            context, NotificationConstants.NOTIF_DAILY_REMINDER,
-            mainActivityIntent(NotificationConstants.DEST_ADD_EXPENSE),
-            pendingIntentFlags,
-        )
-        val notification = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_DAILY_REMINDER)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Don't forget your expenses! \uD83D\uDCB8")
-            .setContentText("Tap to quickly log what you spent today.")
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("It only takes a few seconds. Keep your budget on track by logging every expense!")
-            )
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_DAILY_REMINDER, notification)
+        if (!canNotify()) return
+        val pi = pendingIntent(NotificationConstants.NOTIF_DAILY_REMINDER, NotificationConstants.DEST_ADD_EXPENSE)
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_DAILY_REMINDER)   // ← fixed
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle("Don't forget your expenses! \uD83D\uDCB8")
+            .setContentText("Tap to quickly log what you spent today.").setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "It only takes a few seconds. Keep your budget on track by logging every expense!"
+                )
+            ).setContentIntent(pi).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
+        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_DAILY_REMINDER, n)
     }
 
     // ── Budget 90 % warning ────────────────────────────────────────────────────
 
     fun notifyBudget90Percent(category: String, spent: Double, limit: Double) {
+        if (!canNotify()) return
         val remaining = limit - spent
         val pct = ((spent / limit) * 100).toInt()
-        val pending = PendingIntent.getActivity(
-            context,
-            NotificationConstants.NOTIF_BUDGET_90 + category.hashCode(),
-            mainActivityIntent(NotificationConstants.DEST_BUDGET_DETAIL, category),
-            pendingIntentFlags,
+        val pi = pendingIntent(
+            requestCode = NotificationConstants.NOTIF_BUDGET_90 + category.hashCode(),
+            destination = NotificationConstants.DEST_BUDGET_DETAIL,
+            category = category,
         )
-        val notification = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)     // ← fixed
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("\u26A0\uFE0F $category budget almost full ($pct%)")
-            .setContentText("${formatINR(remaining)} remaining of ${formatINR(limit)}")
-            .setStyle(
+            .setContentText("${fmt(remaining)} remaining of ${fmt(limit)}").setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "You've used ${formatINR(spent)} out of your ${formatINR(limit)} $category budget. " +
-                    "Only ${formatINR(remaining)} left \u2014 consider slowing down spending!"
+                    "You've used ${fmt(spent)} out of your ${fmt(limit)} $category budget. " + "Only ${fmt(remaining)} left — consider slowing down spending!"
                 )
-            )
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVibrate(longArrayOf(0L, 150L, 100L, 300L))
-            .build()
-        NotificationManagerCompat.from(context)
-            .notify(NotificationConstants.NOTIF_BUDGET_90 + category.hashCode(), notification)
+            ).setContentIntent(pi).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVibrate(longArrayOf(0L, 150L, 100L, 300L)).build()
+        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_BUDGET_90 + category.hashCode(), n)
     }
 
     // ── Budget exceeded (100 %) ────────────────────────────────────────────────
 
     fun notifyBudgetExceeded(category: String, spent: Double, limit: Double) {
+        if (!canNotify()) return
         val overspend = spent - limit
-        val pending = PendingIntent.getActivity(
-            context,
-            NotificationConstants.NOTIF_BUDGET_100 + category.hashCode(),
-            mainActivityIntent(NotificationConstants.DEST_BUDGET_DETAIL, category),
-            pendingIntentFlags,
+        val pi = pendingIntent(
+            requestCode = NotificationConstants.NOTIF_BUDGET_100 + category.hashCode(),
+            destination = NotificationConstants.DEST_BUDGET_DETAIL,
+            category = category,
         )
-        val notification = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("\uD83D\uDEA8 $category budget exceeded!")
-            .setContentText("Over by ${formatINR(overspend)}")
-            .setStyle(
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)     // ← fixed
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle("\uD83D\uDEA8 $category budget exceeded!")
+            .setContentText("Over by ${fmt(overspend)}").setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "You've spent ${formatINR(spent)}, which is ${formatINR(overspend)} over your " +
-                    "${formatINR(limit)} $category budget. Tap to review and adjust."
+                    "You've spent ${fmt(spent)}, which is ${fmt(overspend)} over your " + "${fmt(limit)} $category budget. Tap to review and adjust."
                 )
-            )
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVibrate(longArrayOf(0L, 200L, 100L, 200L, 100L, 400L))
-            .build()
-        NotificationManagerCompat.from(context)
-            .notify(NotificationConstants.NOTIF_BUDGET_100 + category.hashCode(), notification)
+            ).setContentIntent(pi).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVibrate(longArrayOf(0L, 200L, 100L, 200L, 100L, 400L)).build()
+        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_BUDGET_100 + category.hashCode(), n)
     }
 
     // ── Monthly summary ────────────────────────────────────────────────────────
+    // Destination fixed: was DEST_DASHBOARD, now goes to DEST_ANALYTICS so the
+    // user lands directly on the analytics breakdown.
 
     fun notifyMonthlySummary(
         monthLabel: String,
@@ -122,108 +133,94 @@ class NotificationHelper @Inject constructor(
         totalBudget: Double,
         topCategory: String?,
     ) {
-        val utilLine = if (totalBudget > 0) {
-            val pct = ((totalSpent / totalBudget) * 100).toInt()
-            "That's $pct% of your ${formatINR(totalBudget)} budget."
-        } else ""
+        if (!canNotify()) return
+        val utilLine =
+            if (totalBudget > 0) "That's ${((totalSpent / totalBudget) * 100).toInt()}% of your ${fmt(totalBudget)} budget."
+            else ""
         val topLine = if (topCategory != null) "Top category: $topCategory." else ""
-        val pending = PendingIntent.getActivity(
-            context, NotificationConstants.NOTIF_MONTHLY_SUMMARY,
-            mainActivityIntent(NotificationConstants.DEST_DASHBOARD),
-            pendingIntentFlags,
-        )
-        val notification = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_MONTHLY_SUMMARY)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("\uD83D\uDCCA $monthLabel recap")
-            .setContentText("You spent ${formatINR(totalSpent)} this month.")
-            .setStyle(
+        val pi = pendingIntent(NotificationConstants.NOTIF_MONTHLY_SUMMARY, NotificationConstants.DEST_ANALYTICS)
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_MONTHLY_SUMMARY)  // ← fixed
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle("\uD83D\uDCCA $monthLabel recap")
+            .setContentText("You spent ${fmt(totalSpent)} this month.").setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "You spent ${formatINR(totalSpent)} in $monthLabel. $utilLine $topLine " +
-                    "Tap to see the full breakdown."
+                    "You spent ${fmt(totalSpent)} in $monthLabel. $utilLine $topLine Tap to see the full breakdown."
                 )
-            )
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_MONTHLY_SUMMARY, notification)
+            ).setContentIntent(pi).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
+        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_MONTHLY_SUMMARY, n)
     }
 
     // ── Budget reset reminder ──────────────────────────────────────────────────
+    // Destination fixed: was DEST_DASHBOARD, now goes to DEST_BUDGET_TAB.
 
     fun notifyBudgetResetReminder(monthLabel: String) {
-        val pending = PendingIntent.getActivity(
-            context, NotificationConstants.NOTIF_RESET_REMINDER,
-            mainActivityIntent(NotificationConstants.DEST_DASHBOARD),
-            pendingIntentFlags,
-        )
-        val notification = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_MONTHLY_SUMMARY)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("\uD83D\uDDD3\uFE0F New month, fresh budgets!")
-            .setContentText("Review and reset your budgets for $monthLabel.")
-            .setStyle(
+        if (!canNotify()) return
+        val pi = pendingIntent(NotificationConstants.NOTIF_RESET_REMINDER, NotificationConstants.DEST_BUDGET_TAB)
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_MONTHLY_SUMMARY)  // ← fixed
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle("\uD83D\uDDD3\uFE0F New month, fresh budgets!")
+            .setContentText("Review and reset your budgets for $monthLabel.").setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "A new month has started! Head over to your budgets to review your limits, " +
-                    "reset spending, or set up new categories for $monthLabel."
+                    "A new month has started! Head over to your budgets to review your limits, " + "reset spending, or set up new categories for $monthLabel."
                 )
-            )
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_RESET_REMINDER, notification)
+            ).setContentIntent(pi).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
+        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_RESET_REMINDER, n)
     }
 
-    // ── Backwards-compatible wrappers used by older callsites in workers ──────
+    // ── Backwards-compatible wrappers used by workers ─────────────────────────
 
-    fun showDailyReminder() { notifyDailyReminder() }
+    fun showDailyReminder() = notifyDailyReminder()
 
-    fun showBudgetThresholdAlert(categoryName: String, percentUsed: Int, remaining: String, categoryIndex: Int) {
-        // Build a notification similar to notifyBudget90Percent but using percent & remaining string
-        val pending = PendingIntent.getActivity(
-            context,
-            NotificationConstants.NOTIF_BUDGET_90 + categoryName.hashCode(),
-            mainActivityIntent(NotificationConstants.DEST_BUDGET_DETAIL, categoryName),
-            pendingIntentFlags,
+    fun showBudgetThresholdAlert(
+        categoryName: String,
+        percentUsed: Int,
+        remaining: String,
+        categoryIndex: Int,
+    ) {
+        if (!canNotify()) return
+        val pi = pendingIntent(
+            requestCode = NotificationConstants.NOTIF_BUDGET_90 + categoryName.hashCode(),
+            destination = NotificationConstants.DEST_BUDGET_DETAIL,
+            category = categoryName,
         )
-        val notification = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("\u26A0\uFE0F $categoryName budget almost full ($percentUsed%)")
-            .setContentText("$remaining remaining")
-            .setStyle(
+            .setContentText("$remaining remaining").setStyle(
                 NotificationCompat.BigTextStyle().bigText(
                     "You've used $percentUsed% of your $categoryName budget. Only $remaining left — consider slowing down spending!"
                 )
-            )
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
+            ).setContentIntent(pi).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH).build()
         NotificationManagerCompat.from(context)
-            .notify(NotificationConstants.NOTIF_BUDGET_90 + categoryName.hashCode(), notification)
+            .notify(NotificationConstants.NOTIF_BUDGET_90 + categoryName.hashCode(), n)
     }
 
-    fun showBudgetExceeded(categoryName: String, spent: Double, limit: Double, categoryIndex: Int) {
+    fun showBudgetExceeded(categoryName: String, spent: Double, limit: Double, categoryIndex: Int) =
         notifyBudgetExceeded(categoryName, spent, limit)
-    }
 
-    fun showMonthlyResetReminder(monthLabel: String) { notifyBudgetResetReminder(monthLabel) }
+    fun showMonthlyResetReminder(monthLabel: String) = notifyBudgetResetReminder(monthLabel)
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
-    private fun mainActivityIntent(destination: String, category: String? = null): Intent =
+    private fun pendingIntent(
+        requestCode: Int,
+        destination: String,
+        category: String? = null,
+    ): PendingIntent = PendingIntent.getActivity(
+        context,
+        requestCode,
         Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(NotificationConstants.EXTRA_DESTINATION, destination)
             if (category != null) putExtra(NotificationConstants.EXTRA_CATEGORY, category)
-        }
+        },
+        pendingFlags,
+    )
 
-    private fun formatINR(amount: Double): String {
-        val abs = kotlin.math.abs(amount)
+    private fun fmt(amount: Double): String {
+        val a = abs(amount)
         return when {
-            abs >= 1_00_000.0 -> "₹${"%.1f".format(abs / 1_00_000.0)}L"
-            abs >= 1_000.0    -> "₹${"%.1f".format(abs / 1_000.0)}K"
-            else              -> "₹${"%,.0f".format(abs)}"
+            a >= 1_00_000.0 -> "₹${"%.1f".format(a / 1_00_000.0)}L"
+            a >= 1_000.0 -> "₹${"%.1f".format(a / 1_000.0)}K"
+            else -> "₹${"%,.0f".format(a)}"
         }
     }
 }

@@ -1,142 +1,130 @@
 package com.example.truxpense.notification
 
 import android.content.Context
-import androidx.work.*
-import com.example.truxpense.notification.workers.BudgetAlertWorker
-import com.example.truxpense.notification.workers.DailyReminderWorker
-import com.example.truxpense.notification.workers.MonthlySummaryWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.util.Calendar
-import java.util.concurrent.TimeUnit
+import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
-
+/**
+ * Schedules and cancels all background workers for push notifications.
+ *
+ * Bug fixed: previously used stub workers from the `.workers` sub-package
+ * ([DailyReminderWorker], [BudgetAlertWorker], [MonthlySummaryWorker]) which
+ * did nothing in doWork().  Now uses the real implemented workers:
+ *
+ *   Stub (was)                     →  Real (now)
+ *   DailyReminderWorker            →  DailyExpenseReminderWorker
+ *   BudgetAlertWorker              →  BudgetThresholdWorker
+ *   MonthlySummaryWorker           →  MonthlyBudgetResetWorker
+ *
+ * Daily reminder scheduling: also fixed from PeriodicWork to a chain of
+ * [OneTimeWorkRequest]s as required by [DailyExpenseReminderWorker], which
+ * self-reschedules to maintain exact per-minute accuracy.
+ */
 @Singleton
 class NotificationScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-
     private val workManager get() = WorkManager.getInstance(context)
 
-    private val defaultConstraints = Constraints.Builder()
-        .setRequiresBatteryNotLow(false)
-        .build()
-
     // ── Public API ─────────────────────────────────────────────────────────────
+
+    /** Applies the full [NotificationSettings] snapshot — idempotent, safe to call on app start. */
+    fun applySettings(settings: NotificationSettings) {
+        if (settings.dailyReminderEnabled) scheduleDailyReminder(
+            settings.dailyReminderHour,
+            settings.dailyReminderMinute
+        )
+        else cancelDailyReminder()
+
+        if (settings.budgetThresholdEnabled) scheduleBudgetThresholdCheck()
+        else cancelBudgetThresholdCheck()
+
+        if (settings.monthlyResetEnabled) scheduleMonthlyResetCheck()
+        else cancelMonthlyResetCheck()
+    }
 
     fun scheduleAll(
         reminderHour: Int = NotificationConstants.DEFAULT_REMINDER_HOUR,
         reminderMinute: Int = NotificationConstants.DEFAULT_REMINDER_MINUTE,
     ) {
         scheduleDailyReminder(reminderHour, reminderMinute)
-        scheduleBudgetChecker()
-        scheduleMonthlySummary()
+        scheduleBudgetThresholdCheck()
+        scheduleMonthlyResetCheck()
     }
 
     fun cancelAll() {
-        workManager.cancelUniqueWork(NotificationConstants.WORK_DAILY_REMINDER)
-        workManager.cancelUniqueWork(NotificationConstants.WORK_BUDGET_CHECKER)
-        workManager.cancelUniqueWork(NotificationConstants.WORK_MONTHLY_SUMMARY)
+        cancelDailyReminder()
+        cancelBudgetThresholdCheck()
+        cancelMonthlyResetCheck()
     }
 
-    fun rescheduleDailyReminder(hour: Int, minute: Int) {
-        workManager.cancelUniqueWork(NotificationConstants.WORK_DAILY_REMINDER)
-        scheduleDailyReminder(hour, minute)
-    }
+    // ── Daily reminder ─────────────────────────────────────────────────────────
+    // Uses DailyExpenseReminderWorker (OneTimeWork self-rescheduling chain).
+    // The real worker computes the delay to the user's exact preferred time.
 
-    // Expose public APIs required by ViewModel
-    fun scheduleDailyReminder(hour: Int, minute: Int) { scheduleDailyReminderInternal(hour, minute) }
-    fun cancelDailyReminder() { cancelDailyReminderInternal() }
-
-    fun scheduleBudgetThresholdCheck() { scheduleBudgetChecker() }
-    fun cancelBudgetThresholdCheck() { cancelBudgetChecker() }
-
-    fun scheduleMonthlyResetCheck() { scheduleMonthlySummary() }
-    fun cancelMonthlyResetCheck() { cancelMonthlyNotifications() }
-
-    // Apply persisted settings: idempotent
-    fun applySettings(settings: NotificationSettings) {
-        if (settings.dailyReminderEnabled) {
-            scheduleDailyReminder(settings.dailyReminderHour, settings.dailyReminderMinute)
-        } else {
-            cancelDailyReminder()
-        }
-
-        if (settings.budgetThresholdEnabled) {
-            scheduleBudgetThresholdCheck()
-        } else {
-            cancelBudgetThresholdCheck()
-        }
-
-        if (settings.monthlyResetEnabled) {
-            scheduleMonthlyResetCheck()
-        } else {
-            cancelMonthlyResetCheck()
-        }
-    }
-
-    // ── Private ────────────────────────────────────────────────────────────────
-
-    private fun scheduleDailyReminderInternal(hour: Int, minute: Int) {
-        val request = PeriodicWorkRequestBuilder<DailyReminderWorker>(24, TimeUnit.HOURS)
-            .setInitialDelay(calculateInitialDelay(hour, minute), TimeUnit.MILLISECONDS)
-            .setConstraints(defaultConstraints)
-            .addTag(NotificationConstants.WORK_DAILY_REMINDER)
-            .build()
-        workManager.enqueueUniquePeriodicWork(
+    fun scheduleDailyReminder(hour: Int, minute: Int) {
+        val delayMs = delayUntil(hour, minute)
+        workManager.enqueueUniqueWork(
             NotificationConstants.WORK_DAILY_REMINDER,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request,
+            ExistingWorkPolicy.REPLACE,
+            DailyExpenseReminderWorker.buildRequest(delayMs),
         )
     }
 
-    private fun cancelDailyReminderInternal() { workManager.cancelUniqueWork(NotificationConstants.WORK_DAILY_REMINDER) }
+    fun cancelDailyReminder() {
+        workManager.cancelUniqueWork(NotificationConstants.WORK_DAILY_REMINDER)
+    }
 
-    private fun scheduleBudgetChecker() {
-        val request = PeriodicWorkRequestBuilder<BudgetAlertWorker>(6, TimeUnit.HOURS)
-            .setConstraints(defaultConstraints)
-            .addTag(NotificationConstants.WORK_BUDGET_CHECKER)
-            .build()
+    fun rescheduleDailyReminder(hour: Int, minute: Int) = scheduleDailyReminder(hour, minute)
+
+    // ── Budget threshold check ─────────────────────────────────────────────────
+    // Uses BudgetThresholdWorker (PeriodicWork every 6 h).
+
+    fun scheduleBudgetThresholdCheck() {
         workManager.enqueueUniquePeriodicWork(
             NotificationConstants.WORK_BUDGET_CHECKER,
             ExistingPeriodicWorkPolicy.KEEP,
-            request,
+            BudgetThresholdWorker.buildRequest(),
         )
     }
 
-    private fun scheduleMonthlySummary() {
-        val request = PeriodicWorkRequestBuilder<MonthlySummaryWorker>(24, TimeUnit.HOURS)
-            .setInitialDelay(calculateInitialDelay(hour = 1, minute = 5), TimeUnit.MILLISECONDS)
-            .setConstraints(defaultConstraints)
-            .addTag(NotificationConstants.WORK_MONTHLY_SUMMARY)
-            .build()
-        workManager.enqueueUniquePeriodicWork(
-            NotificationConstants.WORK_MONTHLY_SUMMARY,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request,
-        )
-    }
-
-    private fun cancelBudgetChecker() {
+    fun cancelBudgetThresholdCheck() {
         workManager.cancelUniqueWork(NotificationConstants.WORK_BUDGET_CHECKER)
     }
 
-    private fun cancelMonthlyNotifications() { workManager.cancelUniqueWork(NotificationConstants.WORK_MONTHLY_SUMMARY) }
+    // ── Monthly budget-reset check ─────────────────────────────────────────────
+    // Uses MonthlyBudgetResetWorker (PeriodicWork every 24 h, fires notification on day 1).
 
-    /**
-     * Returns ms until the next occurrence of [hour]:[minute].
-     * If that time has already passed today, targets tomorrow.
-     */
-    private fun calculateInitialDelay(hour: Int, minute: Int): Long {
+    fun scheduleMonthlyResetCheck() {
+        workManager.enqueueUniquePeriodicWork(
+            NotificationConstants.WORK_MONTHLY_SUMMARY,
+            ExistingPeriodicWorkPolicy.KEEP,
+            MonthlyBudgetResetWorker.buildRequest(),
+        )
+    }
+
+    fun cancelMonthlyResetCheck() {
+        workManager.cancelUniqueWork(NotificationConstants.WORK_MONTHLY_SUMMARY)
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /** Returns the millisecond delay from now until the next [hour]:[minute]. */
+    private fun delayUntil(hour: Int, minute: Int): Long {
         val now = Calendar.getInstance()
         val target = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
+            if (before(now)) add(Calendar.DAY_OF_YEAR, 1)
         }
-        if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
         return (target.timeInMillis - now.timeInMillis).coerceAtLeast(0L)
     }
 }

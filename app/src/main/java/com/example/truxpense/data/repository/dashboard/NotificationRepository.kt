@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.*
@@ -59,6 +60,10 @@ class NotificationRepository @Inject constructor(
     private val _notifications = MutableStateFlow<List<NotificationItem>>(emptyList())
     val notifications: StateFlow<List<NotificationItem>> = _notifications
 
+    // Expose load status so UI doesn't flash transient seed/empty states
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
     init {
         // ── Step 1: restore persisted sets from disk ──────────────────────────
         scope.launch {
@@ -77,7 +82,10 @@ class NotificationRepository @Inject constructor(
                 _readIds,
             ) { txList, budgetList, dismissed, readIds ->
                 buildNotifications(txList, budgetList, dismissed, readIds)
-            }.collect { _notifications.value = it }
+            }.collect { _notifications.value = it
+                // Mark repository as loaded after first emission
+                if (!_isLoaded.value) _isLoaded.value = true
+            }
         }
     }
 

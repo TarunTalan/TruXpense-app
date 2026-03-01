@@ -77,6 +77,12 @@ class HomeViewModel @Inject constructor(
         expenseRepository.transactions.map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** True once the repository has emitted its first value (avoids UI flashing). */
+    val isLoaded: StateFlow<Boolean> =
+        expenseRepository.transactions
+            .map { true }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     val budgetLimit: StateFlow<Double> =
         budgetRepository.budgets.map { it.sumOf { b -> b.amount } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
