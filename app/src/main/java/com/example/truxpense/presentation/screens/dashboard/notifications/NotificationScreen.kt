@@ -1,12 +1,15 @@
 package com.example.truxpense.presentation.screens.dashboard.notifications
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,20 +41,7 @@ private val AmberAccent = Color(0xFFF59E0B)
 // Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Full-screen notification list.
- *
- * Read/unread behaviour
- * ──────────────────────
- * • Tapping any row immediately calls [vm.markRead] then navigates.
- * • The row background, title weight, body colour, icon saturation and the
- *   teal dot all animate smoothly from their unread → read states.
- * • The "Mark all read" button in the top bar fades out once every notification
- *   is read; the unread-count badge transitions with a cross-fade.
- * • "Mark all read" fires [vm.markAllRead] which flips every item at once;
- *   each row independently animates to its read state.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NotificationScreen(
     vm: NotificationViewModel = hiltViewModel(),
@@ -63,18 +55,56 @@ fun NotificationScreen(
     val notifications by vm.notifications.collectAsState()
     val unreadCount by vm.unreadCount.collectAsState()
     val hasUnread by vm.hasUnread.collectAsState()
+    val selectedIds by vm.selectedIds.collectAsState()
+    val isSelectionMode by vm.isSelectionMode.collectAsState()
+    val isAllSelected by vm.isAllSelected.collectAsState()
+    val selectedCount by vm.selectedCount.collectAsState()
+
+    val haptic = LocalHapticFeedback.current
+
+    // Back press in selection mode exits selection instead of leaving the screen
+    BackHandler(enabled = isSelectionMode) { vm.clearSelection() }
 
     val groups = remember(notifications) { buildGroups(notifications) }
+
+    // ── Delete-all confirmation dialog ────────────────────────────────────────
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
+    if (showDeleteAllDialog) {
+        DeleteConfirmDialog(
+            message = "Delete all notifications? This cannot be undone.",
+            onConfirm = { vm.deleteAll(); showDeleteAllDialog = false },
+            onDismiss = { showDeleteAllDialog = false },
+        )
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            NotificationTopBar(
-                unreadCount = unreadCount,
-                hasUnread = hasUnread,
-                onBack = onBack,
-                onMarkAllRead = { vm.markAllRead() },
-            )
+            AnimatedContent(
+                targetState = isSelectionMode,
+                transitionSpec = {
+                    fadeIn(tween(180)) togetherWith fadeOut(tween(180))
+                },
+                label = "topbar_mode",
+            ) { inSelectionMode ->
+                if (inSelectionMode) {
+                    SelectionTopBar(
+                        selectedCount = selectedCount,
+                        isAllSelected = isAllSelected,
+                        onClose = { vm.clearSelection() },
+                        onToggleSelectAll = { vm.toggleSelectAll() },
+                        onDeleteSelected = { vm.deleteSelected() },
+                        onDeleteAll = { showDeleteAllDialog = true },
+                    )
+                } else {
+                    NotificationTopBar(
+                        unreadCount = unreadCount,
+                        hasUnread = hasUnread,
+                        onBack = onBack,
+                        onMarkAllRead = { vm.markAllRead() },
+                    )
+                }
+            }
         },
     ) { innerPadding ->
 
@@ -104,24 +134,36 @@ fun NotificationScreen(
                     )
                 }
 
-                // ── Notification rows ─────────────────────────────────────────
+                // ── Rows ──────────────────────────────────────────────────────
                 items(items, key = { it.id }) { item ->
+                    val isSelected = item.id in selectedIds
+
                     NotificationRow(
                         item = item,
+                        isSelected = isSelected,
+                        isSelectionMode = isSelectionMode,
                         onClick = {
-                            vm.markRead(item.id)
-                            handleNavigation(
-                                destination = item.destination,
-                                onBudgetDetail = onNavigateToBudgetDetail,
-                                onWeeklyAnalytics = onNavigateToWeeklyAnalytics,
-                                onTransactionDetail = onNavigateToTransactionDetail,
-                                onAddExpense = onNavigateToAddExpense,
-                                onTransactions = onNavigateToTransactions,
-                            )
+                            if (isSelectionMode) {
+                                vm.toggleSelection(item.id)
+                            } else {
+                                vm.markRead(item.id)
+                                handleNavigation(
+                                    destination = item.destination,
+                                    onBudgetDetail = onNavigateToBudgetDetail,
+                                    onWeeklyAnalytics = onNavigateToWeeklyAnalytics,
+                                    onTransactionDetail = onNavigateToTransactionDetail,
+                                    onAddExpense = onNavigateToAddExpense,
+                                    onTransactions = onNavigateToTransactions,
+                                )
+                            }
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            vm.startSelection(item.id)
                         },
                     )
                     HorizontalDivider(
-                        modifier = Modifier.padding(start = 72.dp),
+                        modifier = Modifier.padding(start = if (isSelectionMode) 72.dp else 72.dp),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                         thickness = 0.5.dp,
                     )
@@ -132,7 +174,7 @@ fun NotificationScreen(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Top bar
+// Normal top bar
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,18 +208,14 @@ private fun NotificationTopBar(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
-                // Animated unread-count badge — disappears when count reaches 0
                 AnimatedVisibility(
                     visible = unreadCount > 0,
                     enter = fadeIn(tween(200)) + scaleIn(tween(200)),
                     exit = fadeOut(tween(200)) + scaleOut(tween(200)),
                 ) {
-                    // Cross-fade the number itself when it decrements
                     AnimatedContent(
                         targetState = unreadCount,
-                        transitionSpec = {
-                            fadeIn(tween(150)) togetherWith fadeOut(tween(150))
-                        },
+                        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
                         label = "unread_count",
                     ) { count ->
                         Box(
@@ -196,7 +234,6 @@ private fun NotificationTopBar(
             }
         },
         actions = {
-            // "Mark all read" button fades out once every notification is read
             AnimatedVisibility(
                 visible = hasUnread,
                 enter = fadeIn(tween(200)),
@@ -215,27 +252,100 @@ private fun NotificationTopBar(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Selection-mode top bar
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectionTopBar(
+    selectedCount: Int,
+    isAllSelected: Boolean,
+    onClose: () -> Unit,
+    onToggleSelectAll: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onDeleteAll: () -> Unit,
+) {
+    TopAppBar(
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        navigationIcon = {
+            // X button — exits selection mode
+            IconButton(onClick = onClose) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = "Cancel selection",
+                    modifier = Modifier.size(DashboardDimens.iconMd),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        },
+        title = {
+            // Animates the number as selection changes
+            AnimatedContent(
+                targetState = selectedCount,
+                transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(120)) },
+                label = "sel_count",
+            ) { count ->
+                Text(
+                    text = "$count selected",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        },
+        actions = {
+            // "Select all" / "Deselect all" text button
+            TextButton(onClick = onToggleSelectAll) {
+                Text(
+                    text = if (isAllSelected) "Deselect all" else "Select all",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TealAccent,
+                )
+            }
+
+            // Delete selected icon
+            IconButton(onClick = onDeleteSelected, enabled = selectedCount > 0) {
+                Icon(
+                    painter = painterResource(R.drawable.delete),
+                    contentDescription = "Delete selected",
+                    tint = if (selectedCount > 0) RedAccent
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    modifier = Modifier.size(DashboardDimens.iconMd),
+                )
+            }
+        },
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Row
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NotificationRow(
     item: NotificationItem,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
-    // ── Animated colours / alpha driven by isRead ─────────────────────────────
-    val animSpec = tween<Color>(durationMillis = 350)
-    val floatSpec = tween<Float>(durationMillis = 350)
+    val animSpec = tween<Color>(durationMillis = 250)
+    val floatSpec = tween<Float>(durationMillis = 250)
 
-    // Row background: subtle tint → transparent
+    // Row background: unread tint  →  selected highlight  →  transparent (read)
     val bgColor by animateColorAsState(
-        targetValue = if (!item.isRead) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.45f)
-        else Color.Transparent,
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            !item.isRead -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.45f)
+            else -> Color.Transparent
+        },
         animationSpec = animSpec,
         label = "row_bg_${item.id}",
     )
 
-    // Title colour: full contrast → dimmed
     val titleColor by animateColorAsState(
         targetValue = if (!item.isRead) MaterialTheme.colorScheme.onBackground
         else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
@@ -243,7 +353,6 @@ private fun NotificationRow(
         label = "title_color_${item.id}",
     )
 
-    // Body colour: standard variant → more muted
     val bodyColor by animateColorAsState(
         targetValue = if (!item.isRead) MaterialTheme.colorScheme.onSurfaceVariant
         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -251,14 +360,12 @@ private fun NotificationRow(
         label = "body_color_${item.id}",
     )
 
-    // Icon alpha: full → dimmed when read
     val iconAlpha by animateFloatAsState(
         targetValue = if (!item.isRead) 1f else 0.45f,
         animationSpec = floatSpec,
         label = "icon_alpha_${item.id}",
     )
 
-    // Dot alpha: visible → gone
     val dotAlpha by animateFloatAsState(
         targetValue = if (!item.isRead) 1f else 0f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
@@ -266,25 +373,41 @@ private fun NotificationRow(
     )
 
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).background(bgColor).padding(
-            horizontal = DashboardDimens.screenPaddingH,
-            vertical = DashboardDimens.spaceMd,
-        ),
+        modifier = Modifier.fillMaxWidth().combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ).background(bgColor).padding(
+                horizontal = DashboardDimens.screenPaddingH,
+                vertical = DashboardDimens.spaceMd,
+            ),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
     ) {
-        // Icon (alpha-fades when read)
-        Box(modifier = Modifier.alpha(iconAlpha)) {
-            NotificationIcon(type = item.iconType, isRead = item.isRead)
+        // ── Leading slot: checkbox (selection mode) or notification icon ──────
+        AnimatedContent(
+            targetState = isSelectionMode,
+            transitionSpec = {
+                (fadeIn(tween(180)) + scaleIn(
+                    tween(180),
+                    initialScale = 0.8f
+                )) togetherWith (fadeOut(tween(180)) + scaleOut(tween(180), targetScale = 0.8f))
+            },
+            label = "leading_slot_${item.id}",
+        ) { inSelectionMode ->
+            if (inSelectionMode) {
+                SelectionCircle(isSelected = isSelected)
+            } else {
+                Box(modifier = Modifier.alpha(iconAlpha)) {
+                    NotificationIcon(type = item.iconType, isRead = item.isRead)
+                }
+            }
         }
 
-        // Text block
+        // ── Text block ────────────────────────────────────────────────────────
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.bodyMedium,
-                // Bold for unread, normal for read — no animation on FontWeight itself
-                // (Compose doesn't interpolate weight), but the colour change gives enough cue.
                 fontWeight = if (!item.isRead) FontWeight.SemiBold else FontWeight.Normal,
                 color = titleColor,
                 maxLines = 1,
@@ -300,66 +423,106 @@ private fun NotificationRow(
             )
         }
 
-        // Unread dot — animates from opaque → invisible rather than abruptly
-        // removing from layout (avoids row width jank).
-        Box(
-            modifier = Modifier.padding(top = 4.dp).size(8.dp).alpha(dotAlpha).clip(CircleShape).background(TealAccent),
-        )
+        // ── Trailing slot: unread dot (hidden in selection mode) ──────────────
+        AnimatedVisibility(
+            visible = !isSelectionMode,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(180)),
+        ) {
+            Box(
+                modifier = Modifier.padding(top = 4.dp).size(8.dp).alpha(dotAlpha).clip(CircleShape)
+                    .background(TealAccent),
+            )
+        }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Icon
+// Selection circle (replaces icon in selection mode)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SelectionCircle(isSelected: Boolean) {
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.85f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "sel_circle_scale",
+    )
+
+    Box(
+        modifier = Modifier.size(44.dp),              // same footprint as NotificationIcon so rows don't shift
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isSelected) {
+            // Filled teal circle with white tick
+            Box(
+                modifier = Modifier.size((44 * scale).dp).clip(CircleShape).background(TealAccent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_check),
+                    contentDescription = "Selected",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        } else {
+            // Empty circle outline
+            Box(
+                modifier = Modifier.size((44 * scale).dp).clip(CircleShape).border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = CircleShape,
+                    ),
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification icon (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun NotificationIcon(type: NotificationIconType, isRead: Boolean) {
-    val baseIconAlpha = if (isRead) 0.5f else 1f   // extra tint reduction on read
+    val baseAlpha = if (isRead) 0.5f else 1f
 
     data class IconStyle(val bgColor: Color, val iconColor: Color, val iconRes: Int)
 
     val style = when (type) {
         NotificationIconType.BUDGET_EXCEEDED -> IconStyle(
             bgColor = RedAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = RedAccent.copy(alpha = baseIconAlpha),
+            iconColor = RedAccent.copy(alpha = baseAlpha),
             iconRes = R.drawable.ic_warning,
         )
 
         NotificationIconType.BUDGET_WARNING -> IconStyle(
             bgColor = AmberAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = AmberAccent.copy(alpha = baseIconAlpha),
+            iconColor = AmberAccent.copy(alpha = baseAlpha),
             iconRes = R.drawable.ic_warning,
         )
 
         NotificationIconType.SPENDING_INSIGHT -> IconStyle(
             bgColor = TealAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = TealAccent.copy(alpha = baseIconAlpha),
+            iconColor = TealAccent.copy(alpha = baseAlpha),
             iconRes = R.drawable.ic_trending_up,
         )
 
         NotificationIconType.ADD_EXPENSE_PROMPT -> IconStyle(
             bgColor = TealAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = TealAccent.copy(alpha = baseIconAlpha),
+            iconColor = TealAccent.copy(alpha = baseAlpha),
             iconRes = R.drawable.ic_lightbulb,
         )
 
         NotificationIconType.SYNC_SUCCESS -> IconStyle(
             bgColor = TealAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = TealAccent.copy(alpha = baseIconAlpha),
+            iconColor = TealAccent.copy(alpha = baseAlpha),
             iconRes = R.drawable.ic_sync,
         )
     }
 
-    val animBg by animateColorAsState(
-        targetValue = style.bgColor,
-        animationSpec = tween(350),
-        label = "icon_bg",
-    )
-    val animTint by animateColorAsState(
-        targetValue = style.iconColor,
-        animationSpec = tween(350),
-        label = "icon_tint",
-    )
+    val animBg by animateColorAsState(style.bgColor, tween(350), "icon_bg_$type")
+    val animTint by animateColorAsState(style.iconColor, tween(350), "icon_tint_$type")
 
     Box(
         modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(animBg),
@@ -372,6 +535,48 @@ private fun NotificationIcon(type: NotificationIconType, isRead: Boolean) {
             modifier = Modifier.size(22.dp),
         )
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete confirmation dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DeleteConfirmDialog(
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = "Delete notifications",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+            )
+        },
+        text = {
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = RedAccent),
+            ) { Text("Delete") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = MaterialTheme.colorScheme.primary)
+            }
+        },
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -405,7 +610,6 @@ private fun EmptyNotifications(modifier: Modifier = Modifier) {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Groups notifications by their [timeLabel], preserving insertion order. */
 private fun buildGroups(
     notifications: List<NotificationItem>,
 ): List<Pair<String, List<NotificationItem>>> {
@@ -414,7 +618,6 @@ private fun buildGroups(
     return map.entries.map { (label, items) -> label to items }
 }
 
-/** Routes a [NotificationDestination] to the appropriate callback. */
 private fun handleNavigation(
     destination: NotificationDestination,
     onBudgetDetail: (String, Double, Double) -> Unit,
@@ -424,7 +627,9 @@ private fun handleNavigation(
     onTransactions: () -> Unit,
 ) = when (destination) {
     is NotificationDestination.BudgetDetail -> onBudgetDetail(
-        destination.budgetName, destination.monthlyLimit, destination.spent
+        destination.budgetName,
+        destination.monthlyLimit,
+        destination.spent
     )
 
     NotificationDestination.WeeklyAnalytics -> onWeeklyAnalytics()
