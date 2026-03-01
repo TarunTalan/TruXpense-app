@@ -1,6 +1,8 @@
 package com.example.truxpense.notification
 
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -23,9 +25,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+
+// ── Permission state ──────────────────────────────────────────────────────────
+
+
+private sealed interface NotifPermissionState {
+    object Granted          : NotifPermissionState
+    object NeedsRuntimeAsk  : NotifPermissionState   // API 33+ only
+    object DisabledInSystem : NotifPermissionState   // all API levels
+}
+
+private fun resolvePermissionState(context: android.content.Context): NotifPermissionState {
+    val manager = NotificationManagerCompat.from(context)
+    // First check the coarse "are notifications enabled for this app" flag — works on all APIs
+    if (!manager.areNotificationsEnabled()) return NotifPermissionState.DisabledInSystem
+    // On Android 13+ also check the runtime permission
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val granted = context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!granted) return NotifPermissionState.NeedsRuntimeAsk
+    }
+    return NotifPermissionState.Granted
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -38,20 +63,44 @@ fun NotificationSettingsScreen(
     val settings by vm.settings.collectAsState()
     val context  = LocalContext.current
 
-    // Android 13+ POST_NOTIFICATIONS runtime permission
-    var permissionDenied by remember { mutableStateOf(false) }
-    val permissionLauncher = rememberLauncherForActivityResult(
+    // Resolve permission state and re-check every time the screen is (re-)composed
+    // so it updates correctly after the user returns from system settings.
+    var permState by remember { mutableStateOf(resolvePermissionState(context)) }
+
+    // Android 13+ runtime permission launcher
+    val runtimePermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        permissionDenied = !granted
+        // Re-resolve after the dialog result — covers grant, deny, and "don't ask again"
+        permState = resolvePermissionState(context)
+        if (!granted) {
+            // If denied, re-check whether we should now show "open system settings" banner
+            permState = if (!NotificationManagerCompat.from(context).areNotificationsEnabled())
+                NotifPermissionState.DisabledInSystem
+            else
+                NotifPermissionState.NeedsRuntimeAsk
+        }
     }
 
-    // Ask for POST_NOTIFICATIONS when screen opens (Android 13+)
+    // Launcher that opens the system app-notification settings page (all API levels)
+    val systemSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Re-resolve when user comes back from system settings
+        permState = resolvePermissionState(context)
+    }
+
+    // On first composition: if permission is missing, proactively request it
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!granted) permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        when (permState) {
+            is NotifPermissionState.NeedsRuntimeAsk -> {
+                // Android 13+: show the OS runtime dialog automatically
+                runtimePermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+            is NotifPermissionState.DisabledInSystem -> {
+                // Already disabled — banner will guide user, don't auto-open settings
+            }
+            is NotifPermissionState.Granted -> { /* nothing to do */ }
         }
     }
 
@@ -77,9 +126,22 @@ fun NotificationSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
 
-            // ── Permission banner ─────────────────────────────────────────────
-            if (permissionDenied) {
-                item { PermissionBanner() }
+            // ── Permission banner (shown for all non-Granted states) ───────────
+            if (permState != NotifPermissionState.Granted) {
+                item {
+                    PermissionBanner(
+                        state = permState,
+                        onRequestPermission = {
+                            runtimePermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        onOpenSystemSettings = {
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            systemSettingsLauncher.launch(intent)
+                        },
+                    )
+                }
             }
 
             // ── Daily reminder ────────────────────────────────────────────────
@@ -124,10 +186,29 @@ fun NotificationSettingsScreen(
 // ── Permission banner ─────────────────────────────────────────────────────────
 
 @Composable
-private fun PermissionBanner() {
+private fun PermissionBanner(
+    state: NotifPermissionState,
+    onRequestPermission: () -> Unit,
+    onOpenSystemSettings: () -> Unit,
+) {
+    val (message, buttonLabel, onClick) = when (state) {
+        is NotifPermissionState.NeedsRuntimeAsk -> Triple(
+            "Allow TruXpense to send budget alerts and reminders.",
+            "Allow notifications",
+            onRequestPermission,
+        )
+        is NotifPermissionState.DisabledInSystem -> Triple(
+            "Notifications are turned off for this app. " +
+                    "Enable them in system settings to receive budget alerts.",
+            "Open settings",
+            onOpenSystemSettings,
+        )
+        is NotifPermissionState.Granted -> Triple("", "", {})
+    }
+
     Surface(
-        shape  = RoundedCornerShape(DashboardDimens.cornerCard),
-        color  = MaterialTheme.colorScheme.errorContainer,
+        shape    = RoundedCornerShape(DashboardDimens.cornerCard),
+        color    = MaterialTheme.colorScheme.errorContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -138,21 +219,34 @@ private fun PermissionBanner() {
             Icon(
                 imageVector = Icons.Default.Notifications,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
+                tint     = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.size(20.dp),
             )
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = "Notification permission required",
+                    text  = "Notifications off",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text  = "Grant the permission in Settings → Apps → Truxpense → Notifications.",
+                    text  = message,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
                 )
+                Spacer(Modifier.height(DashboardDimens.spaceMd))
+                OutlinedButton(
+                    onClick = onClick,
+                    colors  = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                    border  = ButtonDefaults.outlinedButtonBorder(enabled = true),
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                ) {
+                    Text(buttonLabel, style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }

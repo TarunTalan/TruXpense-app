@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// Application class
 @HiltAndroidApp
 class TruXpenseApplication : Application(), Configuration.Provider {
 
@@ -29,18 +28,18 @@ class TruXpenseApplication : Application(), Configuration.Provider {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    // Implement the Configuration.Provider interface method
     override fun getWorkManagerConfiguration(): Configuration =
-        Configuration.Builder()
-            .setWorkerFactory(workerFactory)
-            .build()
+        Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     override fun onCreate() {
         super.onCreate()
 
-        // Register notification channels (safe to call every launch)
+        // Register all notification channels on every launch (safe — no-op if already registered)
         NotificationChannels.registerAll(this)
 
-        // Restore scheduled workers from persisted settings
+        // Restore WorkManager workers from the user's persisted notification settings.
+        // Without this, workers are lost if the app is force-stopped or the device reboots.
         appScope.launch {
             val settings = prefs.settings.first()
             scheduler.applySettings(settings)

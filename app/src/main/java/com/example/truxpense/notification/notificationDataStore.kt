@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
@@ -145,22 +146,22 @@ class NotificationPreferences @Inject constructor(
         context.notificationDataStore.edit { it[Keys.NOTIFIED_BUDGETS] = emptySet() }
 
     /** One-shot suspend read — use in Workers where Flow collection isn't appropriate. */
-    suspend fun getSnapshot(): NotificationSettings {
-        var snapshot = NotificationSettings()
-        context.notificationDataStore.data.catch { e ->
-            if (e is IOException) emit(emptyPreferences()) else throw e
-        }.map { prefs ->
-            NotificationSettings(
-                dailyReminderEnabled   = prefs[Keys.DAILY_ENABLED]         ?: false,
-                dailyReminderHour      = prefs[Keys.DAILY_HOUR]            ?: 21,
-                dailyReminderMinute    = prefs[Keys.DAILY_MINUTE]          ?: 0,
-                budgetThresholdEnabled = prefs[Keys.THRESHOLD_ENABLED]     ?: true,
-                thresholdPercent       = prefs[Keys.THRESHOLD_PERCENT]     ?: 90,
-                monthlyResetEnabled    = prefs[Keys.MONTHLY_RESET_ENABLED] ?: true,
-                fcmToken               = prefs[Keys.FCM_TOKEN]             ?: "",
-                notifiedBudgets        = prefs[Keys.NOTIFIED_BUDGETS]      ?: emptySet(),
-            )
-        }.collect { snapshot = it; return@collect }
-        return snapshot
-    }
+    suspend fun getSnapshot(): NotificationSettings =
+        context.notificationDataStore.data
+            .catch { e ->
+                if (e is IOException) emit(emptyPreferences()) else throw e
+            }
+            .map { prefs ->
+                NotificationSettings(
+                    dailyReminderEnabled   = prefs[Keys.DAILY_ENABLED]         ?: false,
+                    dailyReminderHour      = prefs[Keys.DAILY_HOUR]            ?: 21,
+                    dailyReminderMinute    = prefs[Keys.DAILY_MINUTE]          ?: 0,
+                    budgetThresholdEnabled = prefs[Keys.THRESHOLD_ENABLED]     ?: true,
+                    thresholdPercent       = prefs[Keys.THRESHOLD_PERCENT]     ?: 90,
+                    monthlyResetEnabled    = prefs[Keys.MONTHLY_RESET_ENABLED] ?: true,
+                    fcmToken               = prefs[Keys.FCM_TOKEN]             ?: "",
+                    notifiedBudgets        = prefs[Keys.NOTIFIED_BUDGETS]      ?: emptySet(),
+                )
+            }
+            .first() // properly suspends until one value is emitted, then returns
 }

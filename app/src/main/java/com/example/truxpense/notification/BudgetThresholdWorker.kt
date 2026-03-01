@@ -5,8 +5,6 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.example.truxpense.data.repository.dashboard.BudgetRepository
 import com.example.truxpense.data.repository.dashboard.ExpenseRepository
-import com.example.truxpense.notification.NotificationHelper
-import com.example.truxpense.notification.NotificationPreferences
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -15,20 +13,6 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-/**
- * Runs every 6 hours and checks whether any budget category has met or exceeded
- * the user's configured alert threshold (default 90 %).
- *
- * Deduplication
- * ─────────────
- * Once a notification is sent for a category in a given month, the category is
- * recorded in [NotificationPreferences.notifiedBudgets] ("Category:YYYY-MM").
- * The worker skips already-notified entries, so the user sees at most one alert
- * per category per calendar month.
- *
- * The dedup set is cleared by [MonthlyBudgetResetWorker] at the start of each
- * new month, allowing alerts to fire again.
- */
 @HiltWorker
 class BudgetThresholdWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -50,24 +34,27 @@ class BudgetThresholdWorker @AssistedInject constructor(
                         .build()
                 )
                 .addTag(WORK_NAME)
-                // Back-off: retry after 15 min if the worker fails (e.g. DB not ready)
                 .setBackoffCriteria(BackoffPolicy.LINEAR, 15, TimeUnit.MINUTES)
+                .build()
+
+        /** One-shot request used for immediate checks (e.g. after adding an expense). */
+        fun buildOneTimeRequest(): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<BudgetThresholdWorker>()
+                .addTag(WORK_NAME)
                 .build()
     }
 
     override suspend fun doWork(): Result {
-        val settings = prefs.getSnapshot()
+        val settings = prefs.getSnapshot()          // fixed: now uses .first() properly
         if (!settings.budgetThresholdEnabled) return Result.success()
 
-        val threshold   = settings.thresholdPercent / 100.0
-        val yearMonth   = currentYearMonth()
-        val alreadySent = settings.notifiedBudgets  // e.g. {"Food:2026-03"}
+        val threshold    = settings.thresholdPercent / 100.0   // e.g. 0.90
+        val yearMonth    = currentYearMonth()
+        val alreadySent  = settings.notifiedBudgets
 
-        // One-shot reads from Room (Flow.first())
         val budgets      = budgetRepository.budgets.first()
         val transactions = expenseRepository.transactions.first()
 
-        // Group total spending per category for the current month
         val currentMonthStart = monthStartMs()
         val spentByCategory = transactions
             .filter { it.timestamp >= currentMonthStart }
@@ -79,19 +66,35 @@ class BudgetThresholdWorker @AssistedInject constructor(
             if (budget.amount <= 0) return@forEachIndexed
 
             val ratio = spent / budget.amount
-            val key   = "${budget.category}:$yearMonth"
 
-            // Skip if already notified this month OR below threshold
-            if (ratio < threshold || key in alreadySent) return@forEachIndexed
+            // ── Budget exceeded (100 %+) ──────────────────────────────────────
+            if (ratio >= 1.0) {
+                val exceededKey = "${budget.category}:exceeded:$yearMonth"
+                if (exceededKey !in alreadySent) {
+                    notificationHelper.notifyBudgetExceeded(
+                        category = budget.category,
+                        spent    = spent,
+                        limit    = budget.amount,
+                    )
+                    prefs.markBudgetNotified(budget.category + ":exceeded", yearMonth)
+                }
+                return@forEachIndexed  // already exceeded — skip warning check
+            }
 
-            val remaining = (budget.amount - spent).coerceAtLeast(0.0)
-            notificationHelper.showBudgetThresholdAlert(
-                categoryName   = budget.category,
-                percentUsed    = (ratio * 100).toInt(),
-                remaining      = formatINR(remaining),
-                categoryIndex  = index,
-            )
-            prefs.markBudgetNotified(budget.category, yearMonth)
+            // ── Budget warning (>= threshold, e.g. 90 %) ─────────────────────
+            if (ratio >= threshold) {
+                val warningKey = "${budget.category}:warning:$yearMonth"
+                if (warningKey !in alreadySent) {
+                    val remaining = (budget.amount - spent).coerceAtLeast(0.0)
+                    notificationHelper.showBudgetThresholdAlert(
+                        categoryName  = budget.category,
+                        percentUsed   = (ratio * 100).toInt(),
+                        remaining     = formatINR(remaining),
+                        categoryIndex = index,
+                    )
+                    prefs.markBudgetNotified(budget.category + ":warning", yearMonth)
+                }
+            }
         }
 
         return Result.success()
@@ -99,16 +102,11 @@ class BudgetThresholdWorker @AssistedInject constructor(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** "2026-03" */
     private fun currentYearMonth(): String {
         val cal = Calendar.getInstance()
-        return "%d-%02d".format(
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH) + 1,
-        )
+        return "%d-%02d".format(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
     }
 
-    /** Unix ms of the first millisecond of the current calendar month. */
     private fun monthStartMs(): Long =
         Calendar.getInstance().apply {
             set(Calendar.DAY_OF_MONTH, 1)
@@ -119,7 +117,6 @@ class BudgetThresholdWorker @AssistedInject constructor(
         }.timeInMillis
 
     private fun formatINR(amount: Double): String = runCatching {
-        val fmt = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-        fmt.format(amount)
+        NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(amount)
     }.getOrDefault("₹${"%,.0f".format(amount)}")
 }
