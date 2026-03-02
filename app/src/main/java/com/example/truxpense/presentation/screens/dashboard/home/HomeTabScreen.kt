@@ -28,6 +28,7 @@ import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyVi
 import com.example.truxpense.util.currencyFormat
 import com.example.truxpense.util.formatAmountParts
 import com.example.truxpense.util.toCurrency
+import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationViewModel
 
 
 @Composable
@@ -36,16 +37,28 @@ fun HomeTabScreen(
     onAddExpense: (() -> Unit)? = null,
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
+    onNotificationsClick: (() -> Unit)? = null,
 ) {
     // Keep empty/content decision based on expenseCount (VM-driven)
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
 
     val expenseCount by vm.expenseCount.collectAsState()
+    val isLoaded by vm.isLoaded.collectAsState()
+
     val monthlySpend by vm.monthlySpend.collectAsState()
     // val budgetLimit by vm.budgetLimit.collectAsState()
     // val budgetLeft by vm.budgetLeft.collectAsState()
     // val budgetProgress by vm.budgetProgress.collectAsState()   // ← from VM, was computed here
+
+    // If data hasn't loaded yet, show a small loading placeholder to avoid
+    // briefly rendering the empty home content while the repository is warming up.
+    if (!isLoaded) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by remember {
@@ -69,6 +82,7 @@ fun HomeTabScreen(
         vm = vm,
         onNavigateToBudget = onNavigateToBudget,
         onViewAll = onViewAll,
+        onNotificationsClick = onNotificationsClick,
     )
 }
 
@@ -83,8 +97,11 @@ fun HomeTabContent(
     vm: HomeViewModel = hiltViewModel(),
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
+    onNotificationsClick: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
+    val notificationVm: NotificationViewModel = hiltViewModel()
+    val unreadCount by notificationVm.unreadCount.collectAsState()
     val topCategories by vm.topCategories.collectAsState(initial = emptyList())
     val recentTx by vm.recentTransactions.collectAsState(initial = emptyList<HomeTransactionItem>())
     // Budget VM for real budget data
@@ -110,7 +127,13 @@ fun HomeTabContent(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            ScreenTopBar(headerTitle = "TruXpense", showBack = false, showProfileIcons = true)
+            ScreenTopBar(
+                headerTitle = "TruXpense",
+                showBack = false,
+                showProfileIcons = true,
+                onNotificationsClick = { onNotificationsClick?.invoke() },
+                unreadCount = unreadCount
+            )
         },
         floatingActionButton = {
             AddFab(onClick = { onAddExpense?.invoke() })
@@ -476,10 +499,15 @@ fun HomeTabScreenPreview() {
 
     MaterialTheme {
         Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
-            ScreenTopBar(headerTitle = "TruXpense", showBack = false, showProfileIcons = true)
+            ScreenTopBar(
+                headerTitle = "TruXpense",
+                showBack = false,
+                showProfileIcons = true,
+                onNotificationsClick = { /* preview stub */ }
+            )
         }, floatingActionButton = {
-            AddFab(onClick = {})
-        }) { inner ->
+             AddFab(onClick = {})
+         }) { inner ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(inner),
                 contentPadding = PaddingValues(

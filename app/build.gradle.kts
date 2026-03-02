@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.kapt)
+    id("com.google.gms.google-services")
 }
 
 // Force consistent coroutines version to avoid layoutlib ServiceLoader conflicts
@@ -93,6 +94,11 @@ android {
     // Remove composeOptions - handled by kotlin-compose plugin now
 }
 
+// KAPT configuration to be more lenient about missing types during annotation processing
+kapt {
+    correctErrorTypes = true
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -111,7 +117,10 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.foundation)
     implementation(libs.androidx.ui)
-    kapt(libs.hilt.compiler)
+    //kapt(libs.hilt.compiler) // removed: use explicit hilt-android-compiler to match version in libs.versions.toml
+
+    // Ensure Dagger Hilt Android compiler is present explicitly (matches libs.toml hilt version)
+    kapt("com.google.dagger:hilt-android-compiler:2.54")
 
     // Room (local database)
     implementation(libs.androidx.room.runtime)
@@ -139,6 +148,7 @@ dependencies {
 
     // DataStore
     implementation(libs.datastore.preferences)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Google Fonts
     implementation(libs.google.fonts.compose)
@@ -154,4 +164,16 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
+    implementation("com.google.firebase:firebase-analytics")
+
+    // Add Firebase Cloud Messaging (KTX) and AndroidX Startup
+    implementation("com.google.firebase:firebase-messaging-ktx:23.2.0")
+    implementation("androidx.startup:startup-runtime:1.2.0")
+
+    // WorkManager + Hilt integration for workers referenced in notification features
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
+    implementation("androidx.hilt:hilt-work:1.0.0")
+    kapt("androidx.hilt:hilt-compiler:1.0.0")
 }
