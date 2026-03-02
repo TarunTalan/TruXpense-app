@@ -1,5 +1,7 @@
 package com.example.truxpense.presentation.screens.dashboard.settings
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,10 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 
@@ -38,6 +42,7 @@ fun SettingsScreen(
     onSecurity: () -> Unit = {},
     onSmsToggle: (Boolean) -> Unit = {},
     onNotificationsToggle: (Boolean) -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     onHelp: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTerms: () -> Unit = {},
@@ -155,15 +160,15 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Notifications row with a slightly smaller switch and consistent height
+                    // Notifications row — tap row → NotificationSettingsScreen
+                    // Toggle ON when system disabled → open system notification settings
+                    val context = LocalContext.current
                     val notifInteraction = remember { MutableInteractionSource() }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable(interactionSource = notifInteraction, indication = null) {
-                                val new = !notifications
-                                notifications = new
-                                onNotificationsToggle(new)
+                                onNotificationsClick()
                             }
                             .padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -174,22 +179,26 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
                             modifier = Modifier.size(20.dp)
                         )
-
                         Spacer(Modifier.width(12.dp))
-
                         Text(
                             text = "Notifications",
                             color = MaterialTheme.colorScheme.tertiary,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f)
                         )
-
                         Box(modifier = Modifier.width(72.dp), contentAlignment = Alignment.CenterEnd) {
                             Toggle(
                                 checked = notifications,
                                 onCheckedChange = { checked ->
-                                    notifications = checked
-                                    onNotificationsToggle(checked)
+                                    if (checked && !NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                                        // System notifications are off — send user to system settings
+                                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        context.startActivity(intent)
+                                    } else {
+                                        notifications = checked
+                                        onNotificationsToggle(checked)
+                                    }
                                 }
                             )
                         }

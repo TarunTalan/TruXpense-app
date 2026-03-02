@@ -49,7 +49,6 @@ object Screen {
             const val Root = "budget"
             const val Add = "budget/add"
 
-
             const val Detail = "budget/detail/{budgetName}/{monthlyLimit}/{spent}"
 
             fun detailRoute(
@@ -59,8 +58,7 @@ object Screen {
             ): String = "budget/detail/${budgetName.encodeForRoute()}/$monthlyLimit/$spent"
 
             /** Percent-encode chars that would break URL segment parsing. */
-            private fun String.encodeForRoute(): String =
-                java.net.URLEncoder.encode(this, "UTF-8")
+            private fun String.encodeForRoute(): String = java.net.URLEncoder.encode(this, "UTF-8")
         }
 
         // ── Analytics tab ─────────────────────────────────────────────────────
@@ -72,7 +70,12 @@ object Screen {
         // ── Settings tab ──────────────────────────────────────────────────────
         object Settings {
             const val Root = "settings"
+            const val NotificationSettings = "settings/notification_settings"
+        }
+
+        // ── Notifications (not a bottom-nav tab; shown as a full screen) ──────
+        object Notifications {
+            const val Root = "notifications"
         }
     }
-
 }
