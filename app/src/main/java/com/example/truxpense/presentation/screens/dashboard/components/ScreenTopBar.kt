@@ -28,6 +28,7 @@ fun ScreenTopBar(
     actions: (@Composable RowScope.() -> Unit)? = null,
     showProfileIcons: Boolean = false,
     onNotificationsClick: (() -> Unit)? = null,
+    onProfileClick: (() -> Unit)? = null,
     unreadCount: Int = 0,
 ) {
     TopAppBar(
@@ -72,7 +73,7 @@ fun ScreenTopBar(
 
                 val contentColor = if (bgColor.luminance() < 0.5f) Color.White else Color.Black
 
-                IconButton(onClick = { /* profile */ }) {
+                IconButton(onClick = { onProfileClick?.invoke() }) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)

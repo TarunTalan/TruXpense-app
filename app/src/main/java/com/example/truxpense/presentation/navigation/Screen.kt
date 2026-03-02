@@ -70,7 +70,15 @@ object Screen {
         // ── Settings tab ──────────────────────────────────────────────────────
         object Settings {
             const val Root = "settings"
-            const val NotificationSettings = "settings/notification_settings"
+            const val PersonalInfo = "settings/personal_info"
+            const val LinkedAccounts = "settings/linked_accounts"
+            const val Security = "settings/security"
+            const val Notifications = "settings/notifications"
+            const val Help = "settings/help"
+            const val PrivacyPolicy = "settings/privacy_policy"
+            const val Terms = "settings/terms"
+            const val About = "settings/about"
+            const val DeleteAccount = "settings/delete_account"
         }
 
         // ── Notifications (not a bottom-nav tab; shown as a full screen) ──────

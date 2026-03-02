@@ -1,10 +1,9 @@
 package com.example.truxpense.presentation.screens.dashboard.settings
 
-import android.content.Intent
-import android.provider.Settings
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -12,17 +11,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 
+// ─── Model ────────────────────────────────────────────────────────────────────
 
 data class SettingsMenuItem(
     val iconRes: Int,
@@ -30,200 +30,128 @@ data class SettingsMenuItem(
     val subtitle: String? = null,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 @Composable
 fun SettingsScreen(
     username: String = "Tamanna",
     phone: String = "+91 98XXXXXXXX",
-    smsEnabled: Boolean = true,
-    notificationsEnabled: Boolean = true,
     onPersonalInfo: () -> Unit = {},
     onLinkedAccounts: () -> Unit = {},
     onSecurity: () -> Unit = {},
-    onSmsToggle: (Boolean) -> Unit = {},
-    onNotificationsToggle: (Boolean) -> Unit = {},
-    onNotificationsClick: () -> Unit = {},
+    onNotifications: () -> Unit = {},
     onHelp: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTerms: () -> Unit = {},
     onAbout: () -> Unit = {},
     onLogout: () -> Unit = {},
+    onDeleteAccount: () -> Unit = {},
 ) {
-    var smsAccess by remember { mutableStateOf(smsEnabled) }
-    var notifications by remember { mutableStateOf(notificationsEnabled) }
-
+    // Account section rows
     val accountItems = listOf(
-        SettingsMenuItem(R.drawable.account, "Personal information", "Edit name, email, phone"),
-        SettingsMenuItem(R.drawable.linked_accounts, "Linked accounts", "Bank/ SMS source status"),
-        SettingsMenuItem(R.drawable.security, "Security", "Login method, OTP info"),
-        SettingsMenuItem(R.drawable.personal_info, "Personal information", "Edit name, email, phone"),
+        SettingsMenuItem(R.drawable.linked_accounts, "Linked accounts", "Bank / SMS source status"),
+        SettingsMenuItem(R.drawable.security,        "Security",        "Password and login method"),
     )
+    val accountActions = listOf(onLinkedAccounts, onSecurity)
 
+    // Preferences section rows
+    val prefItems = listOf(
+        SettingsMenuItem(R.drawable.notifications, "Notifications & Reminders", "Alerts, reports, quiet hours"),
+    )
+    val prefActions = listOf(onNotifications)
+
+    // Support section rows
     val supportItems = listOf(
-        SettingsMenuItem(R.drawable.help, "Help & Support"),
-        SettingsMenuItem(R.drawable.privacy_policy, "Privacy policy"),
-        SettingsMenuItem(R.drawable.description, "Terms of service"),
-        SettingsMenuItem(R.drawable.folder_icon, "About TruXpense"),
+        SettingsMenuItem(R.drawable.help,          "Help & Support"),
+        SettingsMenuItem(R.drawable.privacy_policy,"Privacy policy"),
+        SettingsMenuItem(R.drawable.description,   "Terms of service"),
+        SettingsMenuItem(R.drawable.folder_icon,   "About TruXpense"),
     )
-
     val supportActions = listOf(onHelp, onPrivacyPolicy, onTerms, onAbout)
+
+    // Dialog state for logout confirmation
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ScreenTopBar(headerTitle = "Settings", showBack = false) }
     ) { innerPadding ->
-
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 32.dp),
+            contentPadding = PaddingValues(bottom = 40.dp),
         ) {
 
-            // User header
+            // ── User header card ─────────────────────────────────────────
             item {
                 UserHeader(
                     username = username,
                     phone = phone,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    onEditProfile = onPersonalInfo
                 )
-                Spacer(Modifier.height(20.dp))
             }
 
-            // Account section
+            // ── Account ──────────────────────────────────────────────────
             item {
-                Spacer(Modifier.height(8.dp))
-                MenuSection {
-                    SectionLabel("Account")
-                    accountItems.forEachIndexed { index, item ->
-                        val clickAction = when (index) {
-                            0 -> onPersonalInfo
-                            1 -> onLinkedAccounts
-                            2 -> onSecurity
-                            else -> onPersonalInfo
-                        }
+                MenuSection(label = "Account") {
+                    accountItems.forEachIndexed { i, item ->
                         MenuRow(
-                            iconRes = item.iconRes,
-                            title = item.title,
+                            iconRes  = item.iconRes,
+                            title    = item.title,
                             subtitle = item.subtitle,
-                            onClick = clickAction
+                            onClick  = accountActions[i]
                         )
+                        if (i < accountItems.lastIndex) SectionDivider()
                     }
+                    SectionDivider()
+                    // Destructive: Delete account
+                    MenuRow(
+                        iconRes      = R.drawable.account,
+                        title        = "Delete account",
+                        subtitle     = "Permanently remove your account and data",
+                        onClick      = onDeleteAccount,
+                        titleColor   = MaterialTheme.colorScheme.error,
+                        iconTint     = MaterialTheme.colorScheme.error,
+                        subtitleColor= MaterialTheme.colorScheme.error.copy(alpha = 0.75f),
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
             }
 
-            // Permissions section
+            // ── Preferences ───────────────────────────────────────────────
             item {
-                MenuSection {
-                    SectionLabel("Permissions")
-                    // SMS access row — tap to toggle. Includes a subtitle explaining purpose.
-                    val smsInteraction = remember { MutableInteractionSource() }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(interactionSource = smsInteraction, indication = null) {
-                                val new = !smsAccess
-                                smsAccess = new
-                                onSmsToggle(new)
-                            }
-                            .padding(horizontal = 16.dp), // row controls horizontal inset now
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.sms),
-                            contentDescription = "SMS access",
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-
-                        Spacer(Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "SMS access",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-
-                        }
-
-                        // Narrower fixed width container so toggles align vertically across rows
-                        Box(modifier = Modifier.width(56.dp), contentAlignment = Alignment.CenterEnd) {
-                            Toggle(
-                                checked = smsAccess,
-                                onCheckedChange = { checked ->
-                                    smsAccess = checked
-                                    onSmsToggle(checked)
-                                }
-                            )
-                        }
-                    }
-
-                    // Notifications row — tap row → NotificationSettingsScreen
-                    // Toggle ON when system disabled → open system notification settings
-                    val context = LocalContext.current
-                    val notifInteraction = remember { MutableInteractionSource() }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(interactionSource = notifInteraction, indication = null) {
-                                onNotificationsClick()
-                            }
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.notifications),
-                            contentDescription = "Notifications",
-                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = "Notifications",
-                            color = MaterialTheme.colorScheme.tertiary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Box(modifier = Modifier.width(72.dp), contentAlignment = Alignment.CenterEnd) {
-                            Toggle(
-                                checked = notifications,
-                                onCheckedChange = { checked ->
-                                    if (checked && !NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-                                        // System notifications are off — send user to system settings
-                                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                        context.startActivity(intent)
-                                    } else {
-                                        notifications = checked
-                                        onNotificationsToggle(checked)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-
-            // Support section
-            item {
-                MenuSection {
-                    SectionLabel("Support")
-                    supportItems.forEachIndexed { index, item ->
+                MenuSection(label = "Preferences") {
+                    prefItems.forEachIndexed { i, item ->
                         MenuRow(
-                            iconRes = item.iconRes,
-                            title = item.title,
-                            subtitle = null,
-                            onClick = supportActions[index]
+                            iconRes  = item.iconRes,
+                            title    = item.title,
+                            subtitle = item.subtitle,
+                            onClick  = prefActions[i]
                         )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            // ── Support ───────────────────────────────────────────────────
+            item {
+                MenuSection(label = "Support") {
+                    supportItems.forEachIndexed { i, item ->
+                        MenuRow(
+                            iconRes  = item.iconRes,
+                            title    = item.title,
+                            subtitle = item.subtitle,
+                            onClick  = supportActions[i]
+                        )
+                        if (i < supportItems.lastIndex) SectionDivider()
                     }
                 }
                 Spacer(Modifier.height(24.dp))
             }
 
-            // Log out
+            // ── Log out ───────────────────────────────────────────────────
             item {
                 Text(
                     text = "Log out",
@@ -231,149 +159,209 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .clickable(onClick = onLogout)
+                        .padding(horizontal = 20.dp)
+                        .clickable(onClick = { showLogoutDialog = true })
                 )
-                Spacer(Modifier.height(32.dp))
             }
+        }
+
+        // Confirmation dialog shown when user taps Log out
+        if (showLogoutDialog) {
+            AlertDialog(
+                onDismissRequest = { showLogoutDialog = false },
+                title = { Text(text = "Log out") },
+                text = { Text(text = "Are you sure you want to log out?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    }) {
+                        Text(text = "Log out", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutDialog = false }) {
+                        Text(text = "Cancel")
+                    }
+                }
+            )
         }
     }
 }
 
-// Reusable components
+// ─── Private composables ─────────────────────────────────────────────────────
 
 @Composable
 private fun UserHeader(
     username: String,
     phone: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onEditProfile: () -> Unit = {},
 ) {
-    Row(
+    val avatarBgColor = remember(username) {
+        val hue = (username.hashCode() and 0xFFFF) % 360f
+        Color(AndroidColor.HSVToColor(floatArrayOf(hue, 0.55f, 0.85f)))
+    }
+    val avatarContentColor = if (avatarBgColor.luminance() < 0.5f) Color.White else Color.Black
+
+    Card(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = MaterialTheme.shapes.medium
     ) {
-        Column {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(color = avatarBgColor, shape = CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                val initial = username.trim().let {
+                    if (it.isNotEmpty()) it[0].uppercaseChar().toString() else "?"
+                }
+                Text(
+                    text = initial,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = avatarContentColor
+                )
+            }
+            Spacer(Modifier.height(12.dp))
             Text(
                 text = username,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.tertiary
             )
-            Spacer(Modifier.height(2.dp))
-            val phoneText = phone.takeIf { it.isNotBlank() } ?: "+91 98XXXXXXXX"
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = phoneText,
+                text = phone.takeIf { it.isNotBlank() } ?: "+91 98XXXXXXXX",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onEditProfile,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .border((1.5).dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(text = "Edit profile")
+            }
         }
+    }
+}
 
-        // Avatar circle with initial
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
+@Composable
+private fun MenuSection(
+    label: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            elevation = CardDefaults.cardElevation(0.dp),
+            shape = MaterialTheme.shapes.medium
         ) {
-            // Safely derive the initial from username. Protect against empty/blank username
-            val initial = username.trim().let { if (it.isNotEmpty()) it[0].uppercaseChar().toString() else "?" }
-
-            Text(
-                text = initial,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(modifier = Modifier.padding(vertical = 4.dp), content = content)
         }
     }
 }
 
 @Composable
-private fun SectionLabel(label: String) {
-    // Accept a modifier so callers can control horizontal inset; default keeps close spacing
-    Text(
-        text = label,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.tertiary,
-        modifier = Modifier.padding(top = 12.dp, start = 12.dp, bottom = 4.dp)
+private fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
     )
-}
-
-@Composable
-private fun MenuSection(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-            content()
-        }
-    }
 }
 
 @Composable
 private fun MenuRow(
     iconRes: Int,
     title: String,
-    subtitle: String?,
-    onClick: () -> Unit
+    subtitle: String? = null,
+    onClick: () -> Unit,
+    titleColor: Color? = null,
+    subtitleColor: Color? = null,
+    iconTint: Color? = null,
 ) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            tint = iconTint ?: MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            Icon(
-                painter = painterResource(id = iconRes),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(20.dp)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = titleColor ?: MaterialTheme.colorScheme.tertiary
             )
-            Spacer(Modifier.width(14.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (subtitle != null) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-//                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.tertiary
-
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = subtitleColor ?: MaterialTheme.colorScheme.secondary
                 )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
             }
+        }
+        // Chevron — only on non-destructive rows
+        if (titleColor == null) {
+            Icon(
+                painter = painterResource(R.drawable.right_arrow),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
 
+// Exported for use from SecurityScreen / NotificationsScreen
 @Composable
 fun Toggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    // Scale down the Switch to make it smaller and visually consistent
     Box(modifier = modifier.scale(0.75f)) {
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                checkedThumbColor   = Color.White,
+                checkedTrackColor   = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
             )
@@ -381,11 +369,8 @@ fun Toggle(
     }
 }
 
-// Preview
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun ProfileScreenPreview() {
-    MaterialTheme {
-        SettingsScreen()
-    }
+fun SettingsScreenPreview() {
+    MaterialTheme { SettingsScreen() }
 }
