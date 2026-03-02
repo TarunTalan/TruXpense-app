@@ -38,6 +38,7 @@ fun HomeTabScreen(
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
+    onProfileClick: (() -> Unit)? = null,
 ) {
     // Keep empty/content decision based on expenseCount (VM-driven)
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
@@ -83,6 +84,7 @@ fun HomeTabScreen(
         onNavigateToBudget = onNavigateToBudget,
         onViewAll = onViewAll,
         onNotificationsClick = onNotificationsClick,
+        onProfileClick = onProfileClick,
     )
 }
 
@@ -98,6 +100,7 @@ fun HomeTabContent(
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
+    onProfileClick: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
     val notificationVm: NotificationViewModel = hiltViewModel()
@@ -132,6 +135,7 @@ fun HomeTabContent(
                 showBack = false,
                 showProfileIcons = true,
                 onNotificationsClick = { onNotificationsClick?.invoke() },
+                onProfileClick = { onProfileClick?.invoke() },
                 unreadCount = unreadCount
             )
         },
