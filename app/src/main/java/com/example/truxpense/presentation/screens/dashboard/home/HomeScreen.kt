@@ -71,41 +71,79 @@ fun DashboardScreen(
     LaunchedEffect(deepLinkVm) {
         deepLinkVm.pendingDeepLink.collect { link ->
             when (link) {
-                is NotificationDeepLink.AddExpense -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
 
-                is NotificationDeepLink.BudgetTab -> dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
-                }
+                // Daily expense reminder → Add Expense screen
+                is NotificationDeepLink.AddExpense ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
 
-                is NotificationDeepLink.BudgetDetail -> {
+                // Budget reset / budget tab notification → Budget list screen
+                is NotificationDeepLink.BudgetTab ->
                     dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
                         popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
                         launchSingleTop = true; restoreState = true
                     }
-                    try {
-                        dashboardNavController.getBackStackEntry(Screen.Dashboard.Budget.Root).savedStateHandle.set(
-                            "highlightCategory",
-                            link.category
+
+                // Budget alert (90% / exceeded) → look up live data, push Budget Detail screen
+                is NotificationDeepLink.BudgetDetailByCategory -> {
+                    val args = vm.getBudgetDetailArgs(link.category)
+                    if (args != null) {
+                        val (name, limit, spent) = args
+                        // First ensure Budget tab is on the back-stack
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                        // Then push directly to the detail screen
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Budget.detailRoute(name, limit, spent)
                         )
-                    } catch (_: Exception) {
+                    } else {
+                        // Budget not found (deleted?) — fall back to budget list
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
                     }
                 }
 
-                is NotificationDeepLink.Analytics -> dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
+                // Legacy BudgetDetail (category already known with nav args) — kept for compat
+                is NotificationDeepLink.BudgetDetail -> {
+                    val args = vm.getBudgetDetailArgs(link.category)
+                    if (args != null) {
+                        val (name, limit, spent) = args
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Budget.detailRoute(name, limit, spent)
+                        )
+                    } else {
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    }
                 }
 
-                is NotificationDeepLink.Transactions -> dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
-                }
+                // Spending insights → Analytics screen
+                is NotificationDeepLink.Analytics ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
+                    }
 
-                is NotificationDeepLink.Home -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
-                }
+                is NotificationDeepLink.Transactions ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
+                    }
+
+                is NotificationDeepLink.Home ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
+                    }
             }
             deepLinkVm.consume()
         }
@@ -431,13 +469,8 @@ fun DashboardScreen(
 
             // ── Settings → Notifications & Reminders ──────────────────────────
             composable(Screen.Dashboard.Settings.Notifications) {
-                val settingsVm: SettingsViewModel = hiltViewModel()
-                val notifPrefs by settingsVm.notifPrefs.collectAsStateWithLifecycle()
-
                 NotificationsScreen(
-                    prefs = notifPrefs,
                     onBack = { dashboardNavController.popBackStack() },
-                    onPrefsChanged = settingsVm::updateNotifPrefs,
                 )
             }
 

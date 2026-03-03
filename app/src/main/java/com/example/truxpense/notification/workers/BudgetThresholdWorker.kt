@@ -47,12 +47,14 @@ class BudgetThresholdWorker @AssistedInject constructor(
     }
 
     override suspend fun doWork(): Result {
-        val settings = prefs.getSnapshot()          // fixed: now uses .first() properly
+        val settings = prefs.getSnapshot()
         if (!settings.budgetThresholdEnabled) return Result.success()
 
-        val threshold    = settings.thresholdPercent / 100.0   // e.g. 0.90
-        val yearMonth    = currentYearMonth()
-        val alreadySent  = settings.notifiedBudgets
+        val useCustomLimit   = settings.budgetAlertCustomLimitEnabled
+        val customLimitINR   = settings.budgetAlertCustomLimit.toDouble()  // e.g. 1000.0
+        val thresholdRatio   = settings.thresholdPercent / 100.0           // e.g. 0.90
+        val yearMonth        = currentYearMonth()
+        val alreadySent      = settings.notifiedBudgets
 
         val budgets      = budgetRepository.budgets.first()
         val transactions = expenseRepository.transactions.first()
@@ -64,12 +66,13 @@ class BudgetThresholdWorker @AssistedInject constructor(
             .mapValues { (_, txs) -> txs.sumOf { it.amount } }
 
         budgets.forEachIndexed { index, budget ->
-            val spent = spentByCategory[budget.category] ?: 0.0
+            val spent     = spentByCategory[budget.category] ?: 0.0
+            val remaining = (budget.amount - spent).coerceAtLeast(0.0)
             if (budget.amount <= 0) return@forEachIndexed
 
             val ratio = spent / budget.amount
 
-            // ── Budget exceeded (100 %+) ──────────────────────────────────────
+            // ── Budget exceeded (100 %+) — always fires regardless of mode ────
             if (ratio >= 1.0) {
                 val exceededKey = "${budget.category}:exceeded:$yearMonth"
                 if (exceededKey !in alreadySent) {
@@ -80,14 +83,19 @@ class BudgetThresholdWorker @AssistedInject constructor(
                     )
                     prefs.markBudgetNotified(budget.category + ":exceeded", yearMonth)
                 }
-                return@forEachIndexed  // already exceeded — skip warning check
+                return@forEachIndexed
             }
 
-            // ── Budget warning (>= threshold, e.g. 90 %) ─────────────────────
-            if (ratio >= threshold) {
+            // ── Warning: branch on custom-limit vs percentage ─────────────────
+            val shouldWarn = if (useCustomLimit) {
+                remaining <= customLimitINR
+            } else {
+                ratio >= thresholdRatio
+            }
+
+            if (shouldWarn) {
                 val warningKey = "${budget.category}:warning:$yearMonth"
                 if (warningKey !in alreadySent) {
-                    val remaining = (budget.amount - spent).coerceAtLeast(0.0)
                     notificationHelper.showBudgetThresholdAlert(
                         categoryName  = budget.category,
                         percentUsed   = (ratio * 100).toInt(),
@@ -119,6 +127,6 @@ class BudgetThresholdWorker @AssistedInject constructor(
         }.timeInMillis
 
     private fun formatINR(amount: Double): String = runCatching {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(amount)
+        NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).format(amount)
     }.getOrDefault("₹${"%,.0f".format(amount)}")
 }

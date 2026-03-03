@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.truxpense.data.session.AuthSessionManager
+import com.example.truxpense.notification.deeplink.NotificationDeepLinkManager
 import com.example.truxpense.presentation.navigation.AppNavHost
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
@@ -36,6 +37,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var sessionManager: AuthSessionManager
 
+    @Inject
+    lateinit var deepLinkManager: NotificationDeepLinkManager
+
     // ── Permission launchers ──────────────────────────────────────────────
     // Must be registered before onCreate per the Activity Result API contract.
 
@@ -45,20 +49,7 @@ class MainActivity : ComponentActivity() {
             Log.d(TAG, "POST_NOTIFICATIONS granted=$granted")
         }
 
-    /**
-     * RECEIVE_SMS + READ_SMS runtime permissions.
-     *
-     * Both are required for SMS auto-parsing:
-     * - RECEIVE_SMS → real-time parsing via SmsBroadcastReceiver
-     * - READ_SMS    → Re-scan History (S-05) bulk inbox parse
-     *
-     * We request them together using [RequestMultiplePermissions] so the user sees
-     * a single dialog rather than two back-to-back dialogs.
-     *
-     * Note: These are "PROTECTION_NORMAL" permissions on some OEM ROMs, but on stock Android
-     * they require runtime consent. If the user denies, the feature degrades gracefully —
-     * manual expense entry still works; the SMS banner (S-01) is simply hidden.
-     */
+
     private val smsPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             val receiveSms = grants[android.Manifest.permission.RECEIVE_SMS] ?: false
@@ -89,6 +80,9 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // ── Handle notification deep-link on cold start ────────────────────
+        deepLinkManager.handle(intent)
 
         // ── Request POST_NOTIFICATIONS (Android 13+) ──────────────────────
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -184,6 +178,12 @@ class MainActivity : ComponentActivity() {
         } catch (t: Throwable) {
             Log.w(TAG, "Failed to add decorView pre-draw listener: ${t.message}")
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkManager.handle(intent)
     }
 
     companion object {

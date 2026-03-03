@@ -41,7 +41,6 @@ class NotificationSettingsViewModel @Inject constructor(
     fun setDailyReminderTime(hour: Int, minute: Int) {
         viewModelScope.launch {
             prefs.setDailyReminderTime(hour, minute)
-            // Reschedule to the new time immediately (only if enabled)
             if (settings.value.dailyReminderEnabled)
                 scheduler.scheduleDailyReminder(hour, minute)
         }
@@ -60,9 +59,32 @@ class NotificationSettingsViewModel @Inject constructor(
     fun setThresholdPercent(percent: Int) {
         viewModelScope.launch {
             prefs.setThresholdPercent(percent)
-            // Clear already-sent records so the new threshold is evaluated fresh
             prefs.clearNotifiedBudgets()
         }
+    }
+
+    fun setBudgetAlertCustomLimitEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setBudgetAlertCustomLimitEnabled(enabled)
+            prefs.clearNotifiedBudgets()
+        }
+    }
+
+    fun setBudgetAlertCustomLimit(amount: Int) {
+        viewModelScope.launch {
+            prefs.setBudgetAlertCustomLimit(amount)
+            prefs.clearNotifiedBudgets()
+        }
+    }
+
+    // ── Spending Insights & Unusual Spending ──────────────────────────────────
+
+    fun setSpendingInsightsEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setSpendingInsightsEnabled(enabled) }
+    }
+
+    fun setUnusualSpendingEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setUnusualSpendingEnabled(enabled) }
     }
 
     // ── Monthly reset ─────────────────────────────────────────────────────────
