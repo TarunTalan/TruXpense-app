@@ -50,6 +50,7 @@ import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
+import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
 import androidx.core.net.toUri
 
 // Dashboard shell: owns the NavController and tab routing
@@ -189,6 +190,9 @@ fun DashboardScreen(
                         },
                         onProfileClick = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Settings.PersonalInfo)
+                        },
+                        onPendingReviewClick = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
                     )
                 }
@@ -527,6 +531,14 @@ fun DashboardScreen(
                             launchSingleTop = true; restoreState = true
                         }
                     },
+                )
+            }
+            // ══════════════════════════════════════════════════════════════════
+            // SMS PENDING REVIEW (full-screen, no bottom bar)
+            // ══════════════════════════════════════════════════════════════════
+            composable(Screen.Dashboard.Sms.PendingReview) {
+                PendingTransactionsScreen(
+                    onBack = { dashboardNavController.popBackStack() }
                 )
             }
         }

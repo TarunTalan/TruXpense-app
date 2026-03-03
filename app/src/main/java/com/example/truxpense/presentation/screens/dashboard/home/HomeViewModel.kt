@@ -11,6 +11,7 @@ import com.example.truxpense.data.repository.budget.BudgetRepository
 import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
+import com.example.truxpense.data.repository.sms.PendingTransactionRepository
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -23,6 +24,7 @@ class HomeViewModel @Inject constructor(
     private val prefs: AuthPreferences,
     private val expenseRepository: ExpenseRepository,
     private val budgetRepository: BudgetRepository,
+    private val pendingTransactionRepository: PendingTransactionRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -50,6 +52,24 @@ class HomeViewModel @Inject constructor(
 
     fun emitRequestSmsPermission() {
         viewModelScope.launch { _requestSmsPermission.emit(Unit) }
+    }
+
+    // ── Pending SMS transactions ──────────────────────────────────────────────
+
+    val pendingCount: StateFlow<Int> =
+        pendingTransactionRepository.pendingCount
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val pendingTransactions =
+        pendingTransactionRepository.pendingTransactions
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun confirmPending(id: String) {
+        viewModelScope.launch { pendingTransactionRepository.confirm(id) }
+    }
+
+    fun rejectPending(id: String) {
+        viewModelScope.launch { pendingTransactionRepository.reject(id) }
     }
 
     // ── Recent transactions (top 4) ───────────────────────────────────────────
