@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import kotlin.math.*
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

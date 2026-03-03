@@ -27,9 +27,10 @@ import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SpendingCategoryCard
 import com.example.truxpense.presentation.screens.dashboard.components.AddFab
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
-import com.example.truxpense.util.currencyFormat
-import com.example.truxpense.util.toCurrency
+import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.currencyFormat
+import com.example.truxpense.presentation.utils.toCurrency
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)

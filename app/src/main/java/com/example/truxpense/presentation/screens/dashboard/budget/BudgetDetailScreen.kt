@@ -42,9 +42,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.BudgetProgressBar
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
-import com.example.truxpense.util.currencyFormat
-import com.example.truxpense.util.progressColor
+import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.currencyFormat
+import com.example.truxpense.presentation.utils.progressColor
+
 
 private fun formatINR(amount: Double): String = runCatching {
     currencyFormat("INR").format(amount)

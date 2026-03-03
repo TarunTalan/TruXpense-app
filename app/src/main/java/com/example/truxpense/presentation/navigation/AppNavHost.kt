@@ -12,6 +12,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.truxpense.presentation.screens.auth.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.intro.IntroScreen
 import com.example.truxpense.presentation.screens.auth.intro.IntroViewModel
 import com.example.truxpense.presentation.screens.auth.login.LoginScreen
@@ -101,10 +102,10 @@ fun AppNavHost(
                             popUpTo(Screen.Login) { inclusive = true }
                         }
                     },
-                    onNavigateToOtp = { email, flow ->
+                    onNavigateToOtp = { email, flow: AuthFlowType ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
-                            set(NavKeys.AUTH_EMAIL, email)
-                            set(NavKeys.AUTH_FLOW, flow.name)
+                            set<String>(NavKeys.AUTH_EMAIL, email)
+                            set<String>(NavKeys.AUTH_FLOW, flow.name)
                         }
                         navController.safeNavigate(Screen.Otp)
                     },
@@ -138,10 +139,10 @@ fun AppNavHost(
                             popUpTo(Screen.Signup) { inclusive = true }
                         }
                     },
-                    onNavigateToOtp = { email, flow ->
+                    onNavigateToOtp = { email, flow: AuthFlowType ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
-                            set(NavKeys.AUTH_EMAIL, email)
-                            set(NavKeys.AUTH_FLOW, flow.name)
+                            set<String>(NavKeys.AUTH_EMAIL, email)
+                            set<String>(NavKeys.AUTH_FLOW, flow.name)
                         }
                         navController.safeNavigate(Screen.Otp)
                     },

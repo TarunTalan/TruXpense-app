@@ -5,8 +5,8 @@ import android.content.Intent
 import android.content.IntentSender
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.prefs.AuthPreferences
-import com.example.truxpense.data.repository.AuthRepository
+import com.example.truxpense.data.local.datastore.AuthPreferences
+import com.example.truxpense.data.repository.auth.AuthRepository
 import com.example.truxpense.presentation.utils.ResponseHandler
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity

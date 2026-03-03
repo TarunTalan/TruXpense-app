@@ -85,5 +85,10 @@ object Screen {
         object Notifications {
             const val Root = "notifications"
         }
+
+        // ── SMS Pending review ────────────────────────────────────────────────
+        object Sms {
+            const val PendingReview = "sms/pending_review"
+        }
     }
 }

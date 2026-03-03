@@ -1,6 +1,7 @@
 package com.example.truxpense.presentation.screens.dashboard.home
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -30,8 +31,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.truxpense.notification.NotificationDeepLink
-import com.example.truxpense.notification.NotificationDeepLinkViewModel
+import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
@@ -43,15 +43,19 @@ import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailS
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
+import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationDeepLinkViewModel
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
 import com.example.truxpense.presentation.screens.dashboard.settings.*
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
+import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
+import androidx.core.net.toUri
 
 // Dashboard shell: owns the NavController and tab routing
 
+@SuppressLint("UseKtx")
 @Composable
 fun DashboardScreen(
     onLogout: () -> Unit = {},
@@ -67,41 +71,79 @@ fun DashboardScreen(
     LaunchedEffect(deepLinkVm) {
         deepLinkVm.pendingDeepLink.collect { link ->
             when (link) {
-                is NotificationDeepLink.AddExpense -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
 
-                is NotificationDeepLink.BudgetTab -> dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
-                }
+                // Daily expense reminder → Add Expense screen
+                is NotificationDeepLink.AddExpense ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
 
-                is NotificationDeepLink.BudgetDetail -> {
+                // Budget reset / budget tab notification → Budget list screen
+                is NotificationDeepLink.BudgetTab ->
                     dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
                         popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
                         launchSingleTop = true; restoreState = true
                     }
-                    try {
-                        dashboardNavController.getBackStackEntry(Screen.Dashboard.Budget.Root).savedStateHandle.set(
-                            "highlightCategory",
-                            link.category
+
+                // Budget alert (90% / exceeded) → look up live data, push Budget Detail screen
+                is NotificationDeepLink.BudgetDetailByCategory -> {
+                    val args = vm.getBudgetDetailArgs(link.category)
+                    if (args != null) {
+                        val (name, limit, spent) = args
+                        // First ensure Budget tab is on the back-stack
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                        // Then push directly to the detail screen
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Budget.detailRoute(name, limit, spent)
                         )
-                    } catch (_: Exception) {
+                    } else {
+                        // Budget not found (deleted?) — fall back to budget list
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
                     }
                 }
 
-                is NotificationDeepLink.Analytics -> dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
+                // Legacy BudgetDetail (category already known with nav args) — kept for compat
+                is NotificationDeepLink.BudgetDetail -> {
+                    val args = vm.getBudgetDetailArgs(link.category)
+                    if (args != null) {
+                        val (name, limit, spent) = args
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Budget.detailRoute(name, limit, spent)
+                        )
+                    } else {
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    }
                 }
 
-                is NotificationDeepLink.Transactions -> dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
-                }
+                // Spending insights → Analytics screen
+                is NotificationDeepLink.Analytics ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
+                    }
 
-                is NotificationDeepLink.Home -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
-                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true; restoreState = true
-                }
+                is NotificationDeepLink.Transactions ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
+                    }
+
+                is NotificationDeepLink.Home ->
+                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
+                    }
             }
             deepLinkVm.consume()
         }
@@ -186,6 +228,9 @@ fun DashboardScreen(
                         },
                         onProfileClick = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Settings.PersonalInfo)
+                        },
+                        onPendingReviewClick = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
                     )
                 }
@@ -424,13 +469,8 @@ fun DashboardScreen(
 
             // ── Settings → Notifications & Reminders ──────────────────────────
             composable(Screen.Dashboard.Settings.Notifications) {
-                val settingsVm: SettingsViewModel = hiltViewModel()
-                val notifPrefs by settingsVm.notifPrefs.collectAsStateWithLifecycle()
-
                 NotificationsScreen(
-                    prefs = notifPrefs,
                     onBack = { dashboardNavController.popBackStack() },
-                    onPrefsChanged = settingsVm::updateNotifPrefs,
                 )
             }
 
@@ -441,7 +481,7 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onEmailSupport = {
                         val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:support@truxpense.app")
+                            data = "mailto:support@truxpense.app".toUri()
                             putExtra(Intent.EXTRA_SUBJECT, "TruXpense Support Request")
                         }
                         context.startActivity(intent)
@@ -524,6 +564,14 @@ fun DashboardScreen(
                             launchSingleTop = true; restoreState = true
                         }
                     },
+                )
+            }
+            // ══════════════════════════════════════════════════════════════════
+            // SMS PENDING REVIEW (full-screen, no bottom bar)
+            // ══════════════════════════════════════════════════════════════════
+            composable(Screen.Dashboard.Sms.PendingReview) {
+                PendingTransactionsScreen(
+                    onBack = { dashboardNavController.popBackStack() }
                 )
             }
         }

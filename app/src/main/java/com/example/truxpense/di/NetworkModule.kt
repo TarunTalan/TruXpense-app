@@ -4,11 +4,11 @@ package com.example.truxpense.di
 
 import android.content.Context
 import com.example.truxpense.R
-import com.example.truxpense.data.auth.AuthAuthenticator
-import com.example.truxpense.data.auth.AuthSessionManager
-import com.example.truxpense.data.auth.TokenManager
-import com.example.truxpense.data.auth.TokenRefresher
-import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.remote.authenticator.AuthAuthenticator
+import com.example.truxpense.data.session.AuthSessionManager
+import com.example.truxpense.data.session.TokenManager
+import com.example.truxpense.data.session.TokenRefresher
+import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
 import com.example.truxpense.data.remote.api.OnboardingApi
 import com.example.truxpense.data.remote.interceptor.AuthInterceptor

@@ -2,7 +2,7 @@ package com.example.truxpense.presentation.screens.dashboard.notifications
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.repository.dashboard.NotificationRepository
+import com.example.truxpense.data.repository.notification.NotificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject

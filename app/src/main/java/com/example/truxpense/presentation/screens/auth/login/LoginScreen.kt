@@ -20,7 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.truxpense.R
-import com.example.truxpense.presentation.navigation.AuthFlowType
+import com.example.truxpense.presentation.screens.auth.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
 import com.example.truxpense.presentation.utils.blockTouchesWhen
