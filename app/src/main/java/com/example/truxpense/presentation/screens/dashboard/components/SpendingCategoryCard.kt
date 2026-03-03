@@ -12,9 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.truxpense.util.progressColor
+import com.example.truxpense.presentation.utils.progressColor
+import com.example.truxpense.presentation.utils.toCurrency
 import com.example.truxpense.presentation.screens.dashboard.home.HomeSpendingCategory
-import com.example.truxpense.util.toCurrency
 import java.text.NumberFormat
 
 

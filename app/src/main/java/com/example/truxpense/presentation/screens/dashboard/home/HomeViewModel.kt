@@ -7,15 +7,17 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.R
-import com.example.truxpense.data.repository.dashboard.BudgetRepository
-import com.example.truxpense.data.prefs.AuthPreferences
-import com.example.truxpense.data.repository.dashboard.ExpenseRepository
-import com.example.truxpense.data.repository.dashboard.Transaction
+import com.example.truxpense.data.repository.budget.BudgetRepository
+import com.example.truxpense.data.local.datastore.AuthPreferences
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
+import com.example.truxpense.data.repository.sms.PendingTransactionRepository
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 @HiltViewModel
@@ -23,6 +25,7 @@ class HomeViewModel @Inject constructor(
     private val prefs: AuthPreferences,
     private val expenseRepository: ExpenseRepository,
     private val budgetRepository: BudgetRepository,
+    private val pendingTransactionRepository: PendingTransactionRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -50,6 +53,24 @@ class HomeViewModel @Inject constructor(
 
     fun emitRequestSmsPermission() {
         viewModelScope.launch { _requestSmsPermission.emit(Unit) }
+    }
+
+    // ── Pending SMS transactions ──────────────────────────────────────────────
+
+    val pendingCount: StateFlow<Int> =
+        pendingTransactionRepository.pendingCount
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val pendingTransactions =
+        pendingTransactionRepository.pendingTransactions
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun confirmPending(id: String) {
+        viewModelScope.launch { pendingTransactionRepository.confirm(id) }
+    }
+
+    fun rejectPending(id: String) {
+        viewModelScope.launch { pendingTransactionRepository.reject(id) }
     }
 
     // ── Recent transactions (top 4) ───────────────────────────────────────────
@@ -107,6 +128,34 @@ class HomeViewModel @Inject constructor(
                 }
                 .sortedByDescending { it.amount }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Deep-link helpers ─────────────────────────────────────────────────────
+
+    /**
+     * Returns (budgetName, monthlyLimit, spent) for the given [category],
+     * or null if no budget is found. Called from the notification deep-link
+     * handler to build the correct Budget.detailRoute.
+     */
+    suspend fun getBudgetDetailArgs(category: String): Triple<String, Double, Double>? {
+        val budgets = budgetRepository.budgets.first()
+        val budget  = budgets.firstOrNull { it.category.equals(category, ignoreCase = true) }
+                       ?: return null
+
+        val monthStart = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val txns  = expenseRepository.transactions.first()
+        val spent = txns
+            .filter { it.category.equals(category, ignoreCase = true) && it.timestamp >= monthStart }
+            .sumOf { it.amount }
+
+        return Triple(budget.category, budget.amount, spent)
+    }
 
     // ── Actions ───────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.local.datastore.AuthPreferences
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(private val prefs: AuthPreferences): ViewModel() {

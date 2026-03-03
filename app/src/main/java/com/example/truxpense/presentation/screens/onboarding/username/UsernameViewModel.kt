@@ -7,11 +7,11 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.presentation.utils.InputValidators
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import com.example.truxpense.data.repository.OnboardingRepository
+import com.example.truxpense.data.repository.onboarding.OnboardingRepository
 import kotlinx.coroutines.withContext
 import com.example.truxpense.presentation.utils.ResponseHandler
 import kotlinx.coroutines.flow.first
