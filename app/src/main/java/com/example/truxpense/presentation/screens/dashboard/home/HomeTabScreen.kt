@@ -1,6 +1,8 @@
 package com.example.truxpense.presentation.screens.dashboard.home
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -17,18 +19,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.*
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
-import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
-import com.example.truxpense.util.currencyFormat
-import com.example.truxpense.util.formatAmountParts
-import com.example.truxpense.util.toCurrency
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationViewModel
+import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
+import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.currencyFormat
+import com.example.truxpense.presentation.utils.formatAmountParts
+import com.example.truxpense.presentation.utils.toCurrency
 
 
 @Composable

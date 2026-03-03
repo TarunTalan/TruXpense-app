@@ -2,8 +2,8 @@ package com.example.truxpense.presentation.screens.auth.signup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.prefs.AuthPreferences
-import com.example.truxpense.data.repository.AuthRepository
+import com.example.truxpense.data.local.datastore.AuthPreferences
+import com.example.truxpense.data.repository.auth.AuthRepository
 import com.example.truxpense.presentation.utils.InputValidators
 import com.example.truxpense.presentation.utils.ResponseHandler
 import dagger.hilt.android.lifecycle.HiltViewModel

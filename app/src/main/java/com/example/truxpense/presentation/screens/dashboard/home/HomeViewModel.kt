@@ -7,10 +7,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.R
-import com.example.truxpense.data.repository.dashboard.BudgetRepository
-import com.example.truxpense.data.prefs.AuthPreferences
-import com.example.truxpense.data.repository.dashboard.ExpenseRepository
-import com.example.truxpense.data.repository.dashboard.Transaction
+import com.example.truxpense.data.repository.budget.BudgetRepository
+import com.example.truxpense.data.local.datastore.AuthPreferences
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

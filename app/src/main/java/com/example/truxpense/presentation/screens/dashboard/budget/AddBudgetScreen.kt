@@ -13,7 +13,7 @@ import com.example.truxpense.R
 import com.example.truxpense.presentation.components.NumberField
 import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 

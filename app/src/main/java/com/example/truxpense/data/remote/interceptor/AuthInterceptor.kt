@@ -1,6 +1,6 @@
 package com.example.truxpense.data.remote.interceptor
 
-import com.example.truxpense.data.auth.TokenManager
+import com.example.truxpense.data.session.TokenManager
 import okhttp3.Interceptor
 import okhttp3.Response
 

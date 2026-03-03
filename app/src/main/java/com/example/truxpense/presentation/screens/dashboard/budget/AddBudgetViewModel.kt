@@ -4,8 +4,8 @@ import androidx.annotation.DrawableRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.R
-import com.example.truxpense.data.repository.dashboard.Budget
-import com.example.truxpense.data.repository.dashboard.BudgetRepository
+import com.example.truxpense.data.repository.budget.Budget
+import com.example.truxpense.data.repository.budget.BudgetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch

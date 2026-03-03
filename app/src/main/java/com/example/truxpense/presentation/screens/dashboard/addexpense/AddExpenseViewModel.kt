@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
-import com.example.truxpense.data.repository.dashboard.ExpenseRepository
-import com.example.truxpense.data.repository.dashboard.Transaction
-import com.example.truxpense.notification.BudgetThresholdWorker
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
+import com.example.truxpense.notification.workers.BudgetThresholdWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch

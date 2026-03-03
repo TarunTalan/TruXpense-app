@@ -33,7 +33,7 @@ import com.example.truxpense.presentation.screens.dashboard.components.AccountDr
 import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import java.text.SimpleDateFormat
 import java.util.*
 

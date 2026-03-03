@@ -1,6 +1,7 @@
 package com.example.truxpense.presentation.screens.dashboard.home
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -30,8 +31,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.truxpense.notification.NotificationDeepLink
-import com.example.truxpense.notification.NotificationDeepLinkViewModel
+import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
@@ -43,15 +43,18 @@ import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailS
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
+import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationDeepLinkViewModel
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
 import com.example.truxpense.presentation.screens.dashboard.settings.*
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
+import androidx.core.net.toUri
 
 // Dashboard shell: owns the NavController and tab routing
 
+@SuppressLint("UseKtx")
 @Composable
 fun DashboardScreen(
     onLogout: () -> Unit = {},
@@ -441,7 +444,7 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onEmailSupport = {
                         val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:support@truxpense.app")
+                            data = "mailto:support@truxpense.app".toUri()
                             putExtra(Intent.EXTRA_SUBJECT, "TruXpense Support Request")
                         }
                         context.startActivity(intent)
