@@ -41,22 +41,21 @@ data class NotificationSettings(
      */
     val thresholdPercent: Int = 90,
 
+    /** Whether to use a custom INR amount as the budget alert trigger instead of a percentage. */
+    val budgetAlertCustomLimitEnabled: Boolean = false,
+    /** Custom INR amount — alert fires when remaining budget drops below this value. */
+    val budgetAlertCustomLimit: Int = 1000,
+
+    /** Whether "Spending Insights" weekly-summary alerts are enabled. */
+    val spendingInsightsEnabled: Boolean = true,
+
+    /** Whether "Unusual Spending" anomaly alerts are enabled. */
+    val unusualSpendingEnabled: Boolean = true,
+
     /** Whether the end-of-month budget review reminder is enabled. */
     val monthlyResetEnabled: Boolean = true,
 
-    /**
-     * FCM registration token for this device.
-     * Blank until the first FCM token arrives via [TruxpenseFirebaseMessagingService].
-     * Send this to your backend so it can target push notifications at this device.
-     */
     val fcmToken: String = "",
-
-    /**
-     * Tracks which budget categories have already been notified this month so
-     * repeated threshold checks don't spam the user.
-     *
-     * Format: "CategoryName:YYYY-MM" — e.g. "Food:2026-03"
-     */
     val notifiedBudgets: Set<String> = emptySet(),
 )
 
@@ -70,14 +69,18 @@ class NotificationPreferences @Inject constructor(
     // ── Keys ──────────────────────────────────────────────────────────────────
 
     private object Keys {
-        val DAILY_ENABLED         = booleanPreferencesKey("daily_reminder_enabled")
-        val DAILY_HOUR            = intPreferencesKey("daily_reminder_hour")
-        val DAILY_MINUTE          = intPreferencesKey("daily_reminder_minute")
-        val THRESHOLD_ENABLED     = booleanPreferencesKey("budget_threshold_enabled")
-        val THRESHOLD_PERCENT     = intPreferencesKey("threshold_percent")
-        val MONTHLY_RESET_ENABLED = booleanPreferencesKey("monthly_reset_enabled")
-        val FCM_TOKEN             = stringPreferencesKey("fcm_token")
-        val NOTIFIED_BUDGETS      = stringSetPreferencesKey("notified_budgets")
+        val DAILY_ENABLED              = booleanPreferencesKey("daily_reminder_enabled")
+        val DAILY_HOUR                 = intPreferencesKey("daily_reminder_hour")
+        val DAILY_MINUTE               = intPreferencesKey("daily_reminder_minute")
+        val THRESHOLD_ENABLED          = booleanPreferencesKey("budget_threshold_enabled")
+        val THRESHOLD_PERCENT          = intPreferencesKey("threshold_percent")
+        val BUDGET_CUSTOM_LIMIT_ENABLED= booleanPreferencesKey("budget_custom_limit_enabled")
+        val BUDGET_CUSTOM_LIMIT        = intPreferencesKey("budget_custom_limit")
+        val SPENDING_INSIGHTS_ENABLED  = booleanPreferencesKey("spending_insights_enabled")
+        val UNUSUAL_SPENDING_ENABLED   = booleanPreferencesKey("unusual_spending_enabled")
+        val MONTHLY_RESET_ENABLED      = booleanPreferencesKey("monthly_reset_enabled")
+        val FCM_TOKEN                  = stringPreferencesKey("fcm_token")
+        val NOTIFIED_BUDGETS           = stringSetPreferencesKey("notified_budgets")
     }
 
     // ── Observing ─────────────────────────────────────────────────────────────
@@ -91,14 +94,18 @@ class NotificationPreferences @Inject constructor(
             }
             .map { prefs ->
                 NotificationSettings(
-                    dailyReminderEnabled  = prefs[Keys.DAILY_ENABLED]         ?: false,
-                    dailyReminderHour     = prefs[Keys.DAILY_HOUR]            ?: 21,
-                    dailyReminderMinute   = prefs[Keys.DAILY_MINUTE]          ?: 0,
-                    budgetThresholdEnabled= prefs[Keys.THRESHOLD_ENABLED]     ?: true,
-                    thresholdPercent      = prefs[Keys.THRESHOLD_PERCENT]     ?: 90,
-                    monthlyResetEnabled   = prefs[Keys.MONTHLY_RESET_ENABLED] ?: true,
-                    fcmToken              = prefs[Keys.FCM_TOKEN]             ?: "",
-                    notifiedBudgets       = prefs[Keys.NOTIFIED_BUDGETS]      ?: emptySet(),
+                    dailyReminderEnabled        = prefs[Keys.DAILY_ENABLED]               ?: false,
+                    dailyReminderHour           = prefs[Keys.DAILY_HOUR]                  ?: 21,
+                    dailyReminderMinute         = prefs[Keys.DAILY_MINUTE]                ?: 0,
+                    budgetThresholdEnabled      = prefs[Keys.THRESHOLD_ENABLED]           ?: true,
+                    thresholdPercent            = prefs[Keys.THRESHOLD_PERCENT]           ?: 90,
+                    budgetAlertCustomLimitEnabled = prefs[Keys.BUDGET_CUSTOM_LIMIT_ENABLED] ?: false,
+                    budgetAlertCustomLimit      = prefs[Keys.BUDGET_CUSTOM_LIMIT]         ?: 1000,
+                    spendingInsightsEnabled     = prefs[Keys.SPENDING_INSIGHTS_ENABLED]   ?: true,
+                    unusualSpendingEnabled      = prefs[Keys.UNUSUAL_SPENDING_ENABLED]    ?: true,
+                    monthlyResetEnabled         = prefs[Keys.MONTHLY_RESET_ENABLED]       ?: true,
+                    fcmToken                    = prefs[Keys.FCM_TOKEN]                   ?: "",
+                    notifiedBudgets             = prefs[Keys.NOTIFIED_BUDGETS]            ?: emptySet(),
                 )
             }
 
@@ -119,10 +126,22 @@ class NotificationPreferences @Inject constructor(
     suspend fun setThresholdPercent(percent: Int) =
         context.notificationDataStore.edit { it[Keys.THRESHOLD_PERCENT] = percent.coerceIn(50, 100) }
 
+    suspend fun setBudgetAlertCustomLimitEnabled(enabled: Boolean) =
+        context.notificationDataStore.edit { it[Keys.BUDGET_CUSTOM_LIMIT_ENABLED] = enabled }
+
+    suspend fun setBudgetAlertCustomLimit(amount: Int) =
+        context.notificationDataStore.edit { it[Keys.BUDGET_CUSTOM_LIMIT] = amount.coerceAtLeast(1) }
+
+    suspend fun setSpendingInsightsEnabled(enabled: Boolean) =
+        context.notificationDataStore.edit { it[Keys.SPENDING_INSIGHTS_ENABLED] = enabled }
+
+    suspend fun setUnusualSpendingEnabled(enabled: Boolean) =
+        context.notificationDataStore.edit { it[Keys.UNUSUAL_SPENDING_ENABLED] = enabled }
+
     suspend fun setMonthlyResetEnabled(enabled: Boolean) =
         context.notificationDataStore.edit { it[Keys.MONTHLY_RESET_ENABLED] = enabled }
 
-    /** Called from [TruxpenseFirebaseMessagingService] when a new token arrives. */
+    /** Called from the Firebase Messaging Service when a new token arrives. */
     suspend fun saveFcmToken(token: String) =
         context.notificationDataStore.edit { it[Keys.FCM_TOKEN] = token }
 
@@ -153,14 +172,18 @@ class NotificationPreferences @Inject constructor(
             }
             .map { prefs ->
                 NotificationSettings(
-                    dailyReminderEnabled   = prefs[Keys.DAILY_ENABLED]         ?: false,
-                    dailyReminderHour      = prefs[Keys.DAILY_HOUR]            ?: 21,
-                    dailyReminderMinute    = prefs[Keys.DAILY_MINUTE]          ?: 0,
-                    budgetThresholdEnabled = prefs[Keys.THRESHOLD_ENABLED]     ?: true,
-                    thresholdPercent       = prefs[Keys.THRESHOLD_PERCENT]     ?: 90,
-                    monthlyResetEnabled    = prefs[Keys.MONTHLY_RESET_ENABLED] ?: true,
-                    fcmToken               = prefs[Keys.FCM_TOKEN]             ?: "",
-                    notifiedBudgets        = prefs[Keys.NOTIFIED_BUDGETS]      ?: emptySet(),
+                    dailyReminderEnabled          = prefs[Keys.DAILY_ENABLED]               ?: false,
+                    dailyReminderHour             = prefs[Keys.DAILY_HOUR]                  ?: 21,
+                    dailyReminderMinute           = prefs[Keys.DAILY_MINUTE]                ?: 0,
+                    budgetThresholdEnabled        = prefs[Keys.THRESHOLD_ENABLED]           ?: true,
+                    thresholdPercent              = prefs[Keys.THRESHOLD_PERCENT]           ?: 90,
+                    budgetAlertCustomLimitEnabled = prefs[Keys.BUDGET_CUSTOM_LIMIT_ENABLED] ?: false,
+                    budgetAlertCustomLimit        = prefs[Keys.BUDGET_CUSTOM_LIMIT]         ?: 1000,
+                    spendingInsightsEnabled       = prefs[Keys.SPENDING_INSIGHTS_ENABLED]   ?: true,
+                    unusualSpendingEnabled        = prefs[Keys.UNUSUAL_SPENDING_ENABLED]    ?: true,
+                    monthlyResetEnabled           = prefs[Keys.MONTHLY_RESET_ENABLED]       ?: true,
+                    fcmToken                      = prefs[Keys.FCM_TOKEN]                   ?: "",
+                    notifiedBudgets               = prefs[Keys.NOTIFIED_BUDGETS]            ?: emptySet(),
                 )
             }
             .first() // properly suspends until one value is emitted, then returns

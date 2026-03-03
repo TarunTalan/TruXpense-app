@@ -2,6 +2,7 @@ package com.example.truxpense.notification.deeplink
 
 import android.content.Intent
 import com.example.truxpense.notification.channels.NotificationConstants
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -14,7 +15,10 @@ import javax.inject.Singleton
 sealed class NotificationDeepLink {
     object AddExpense  : NotificationDeepLink()
     object BudgetTab   : NotificationDeepLink()
+    /** Navigate to the full budget list, then push the detail screen for [category]. */
     data class BudgetDetail(val category: String) : NotificationDeepLink()
+    /** Same as [BudgetDetail] but triggered from a notification — looks up live budget data. */
+    data class BudgetDetailByCategory(val category: String) : NotificationDeepLink()
     object Analytics   : NotificationDeepLink()
     object Transactions: NotificationDeepLink()
     object Home        : NotificationDeepLink()
@@ -34,8 +38,10 @@ class NotificationDeepLinkManager @Inject constructor() {
         val link: NotificationDeepLink = when (dest) {
             NotificationConstants.DEST_ADD_EXPENSE   -> NotificationDeepLink.AddExpense
             NotificationConstants.DEST_BUDGET_DETAIL -> {
-                if (!category.isNullOrBlank()) NotificationDeepLink.BudgetDetail(category)
-                else NotificationDeepLink.BudgetTab
+                if (!category.isNullOrBlank())
+                    NotificationDeepLink.BudgetDetailByCategory(category)
+                else
+                    NotificationDeepLink.BudgetTab
             }
             NotificationConstants.DEST_BUDGET_TAB    -> NotificationDeepLink.BudgetTab
             NotificationConstants.DEST_ANALYTICS     -> NotificationDeepLink.Analytics
@@ -52,5 +58,6 @@ class NotificationDeepLinkManager @Inject constructor() {
      * Call after successfully navigating so that the replay slot is cleared and
      * the same deep link is not re-processed on the next recomposition.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun consume() = _pending.resetReplayCache()
 }
