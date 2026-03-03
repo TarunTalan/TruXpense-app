@@ -2,9 +2,10 @@ package com.example.truxpense.presentation.screens.dashboard.budget
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.repository.dashboard.Budget
-import com.example.truxpense.data.repository.dashboard.BudgetRepository
-import com.example.truxpense.data.repository.dashboard.ExpenseRepository
+import com.example.truxpense.data.repository.budget.Budget
+import com.example.truxpense.data.repository.budget.BudgetRepository
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -211,7 +212,7 @@ class BudgetDetailViewModel @Inject constructor(
      * weekOffset = 0 → current week; -1 → last week; etc.
      */
     private fun buildWeekPoints(
-        txs: List<com.example.truxpense.data.repository.dashboard.Transaction>,
+        txs: List<Transaction>,
         weekOffset: Int,
     ): List<SpendPoint> {
         val cal = java.util.Calendar.getInstance()
@@ -247,7 +248,7 @@ class BudgetDetailViewModel @Inject constructor(
      * monthOffset = 0 → current month; -1 → last month; etc.
      */
     private fun buildMonthPoints(
-        txs: List<com.example.truxpense.data.repository.dashboard.Transaction>,
+        txs: List<Transaction>,
         monthOffset: Int,
     ): List<SpendPoint> {
         val cal = java.util.Calendar.getInstance()

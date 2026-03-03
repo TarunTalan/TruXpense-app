@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 
 
 // ─── Screen entry point ───────────────────────────────────────────────────────

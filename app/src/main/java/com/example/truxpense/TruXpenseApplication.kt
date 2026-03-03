@@ -3,9 +3,9 @@ package com.example.truxpense
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.example.truxpense.notification.NotificationChannels
-import com.example.truxpense.notification.NotificationPreferences
-import com.example.truxpense.notification.NotificationScheduler
+import com.example.truxpense.notification.channels.NotificationChannels
+import com.example.truxpense.notification.datastore.NotificationPreferences
+import com.example.truxpense.notification.scheduler.NotificationScheduler
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

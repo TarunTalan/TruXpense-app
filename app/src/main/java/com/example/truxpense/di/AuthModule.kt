@@ -3,13 +3,13 @@ package com.example.truxpense.di
 // Auth bindings
 
 import android.content.Context
-import com.example.truxpense.data.auth.AuthSessionManager
-import com.example.truxpense.data.prefs.AuthPreferences
+import com.example.truxpense.data.session.AuthSessionManager
+import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
 import com.example.truxpense.data.remote.api.OnboardingApi
-import com.example.truxpense.data.repository.AuthRepository
-import com.example.truxpense.data.repository.GoogleSignInRepository
-import com.example.truxpense.data.repository.OnboardingRepository
+import com.example.truxpense.data.repository.auth.AuthRepository
+import com.example.truxpense.data.repository.auth.GoogleSignInRepository
+import com.example.truxpense.data.repository.onboarding.OnboardingRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

@@ -20,7 +20,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

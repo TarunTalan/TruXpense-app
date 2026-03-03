@@ -33,7 +33,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 @Composable

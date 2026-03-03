@@ -2,8 +2,8 @@ package com.example.truxpense.presentation.screens.dashboard.transaction
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.repository.dashboard.ExpenseRepository
-import com.example.truxpense.data.repository.dashboard.Transaction
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch

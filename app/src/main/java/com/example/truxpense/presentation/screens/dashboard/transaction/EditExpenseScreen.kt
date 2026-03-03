@@ -13,7 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreenContent
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import java.text.SimpleDateFormat
 import java.util.*
 

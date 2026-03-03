@@ -28,7 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
-import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.ui.unit.dp

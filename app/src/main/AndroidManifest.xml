@@ -45,7 +45,7 @@
 
         <!-- ── FCM Service ──────────────────────────────────────────── -->
         <service
-                android:name=".notification.TruxpenseFirebaseMessagingService"
+                android:name=".service.TruxpenseFirebaseMessagingService"
                 android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

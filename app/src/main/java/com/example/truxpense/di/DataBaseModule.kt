@@ -5,7 +5,7 @@ import androidx.room.Room
 import com.example.truxpense.data.local.database.AppDatabase
 import com.example.truxpense.data.local.dao.BudgetDao
 import com.example.truxpense.data.local.dao.ExpenseDao
-import com.example.truxpense.data.repository.dashboard.ExpenseRepository
+import com.example.truxpense.data.repository.expense.ExpenseRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

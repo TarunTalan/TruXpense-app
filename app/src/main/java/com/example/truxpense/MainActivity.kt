@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
-import com.example.truxpense.data.auth.AuthSessionManager
+import com.example.truxpense.data.session.AuthSessionManager
 import com.example.truxpense.presentation.navigation.AppNavHost
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate

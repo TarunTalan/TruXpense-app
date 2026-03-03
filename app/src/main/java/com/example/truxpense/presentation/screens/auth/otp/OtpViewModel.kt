@@ -3,11 +3,11 @@ package com.example.truxpense.presentation.screens.auth.otp
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.truxpense.data.prefs.AuthPreferences
-import com.example.truxpense.data.otp.OtpLockManager
+import com.example.truxpense.data.local.datastore.AuthPreferences
+import com.example.truxpense.data.session.OtpLockManager
 import com.example.truxpense.data.remote.api.TokenResponse
-import com.example.truxpense.data.repository.AuthRepository
-import com.example.truxpense.presentation.navigation.AuthFlowType
+import com.example.truxpense.data.repository.auth.AuthRepository
+import com.example.truxpense.presentation.screens.auth.AuthFlowType
 import com.example.truxpense.presentation.utils.ResponseHandler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
