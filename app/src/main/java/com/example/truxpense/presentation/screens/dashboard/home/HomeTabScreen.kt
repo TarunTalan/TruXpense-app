@@ -3,12 +3,16 @@ package com.example.truxpense.presentation.screens.dashboard.home
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.*
@@ -38,21 +43,16 @@ fun HomeTabScreen(
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
+    onPendingReviewClick: (() -> Unit)? = null,
 ) {
-    // Keep empty/content decision based on expenseCount (VM-driven)
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
 
     val expenseCount by vm.expenseCount.collectAsState()
     val isLoaded by vm.isLoaded.collectAsState()
-
     val monthlySpend by vm.monthlySpend.collectAsState()
-    // val budgetLimit by vm.budgetLimit.collectAsState()
-    // val budgetLeft by vm.budgetLeft.collectAsState()
-    // val budgetProgress by vm.budgetProgress.collectAsState()   // ← from VM, was computed here
+    val pendingCount by vm.pendingCount.collectAsState()
 
-    // If data hasn't loaded yet, show a small loading placeholder to avoid
-    // briefly rendering the empty home content while the repository is warming up.
     if (!isLoaded) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -76,6 +76,7 @@ fun HomeTabScreen(
     HomeTabContent(
         monthlySpend = monthlySpend,
         hasSmsPermission = hasSmsPermission,
+        pendingCount = pendingCount,
         onAddExpense = onAddExpense,
         onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
         currencyCode = currencyCode,
@@ -84,6 +85,7 @@ fun HomeTabScreen(
         onViewAll = onViewAll,
         onNotificationsClick = onNotificationsClick,
         onProfileClick = onProfileClick,
+        onPendingReviewClick = onPendingReviewClick,
     )
 }
 
@@ -92,6 +94,7 @@ fun HomeTabScreen(
 fun HomeTabContent(
     monthlySpend: Double,
     hasSmsPermission: Boolean,
+    pendingCount: Int = 0,
     onAddExpense: (() -> Unit)? = null,
     onSmsGranted: (() -> Unit)? = null,
     currencyCode: String = "INR",
@@ -100,6 +103,7 @@ fun HomeTabContent(
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
+    onPendingReviewClick: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
     val notificationVm: NotificationViewModel = hiltViewModel()
@@ -159,6 +163,17 @@ fun HomeTabContent(
                     SmsPermissionBanner(
                         modifier = Modifier.fillMaxWidth(),
                         onGranted = { onSmsGranted?.invoke() },
+                    )
+                }
+            }
+
+            // Pending SMS transactions banner
+            if (hasSmsPermission && pendingCount > 0) {
+                item {
+                    PendingSmsBanner(
+                        count = pendingCount,
+                        onClick = { onPendingReviewClick?.invoke() },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -476,6 +491,59 @@ private fun TransactionRow(tx: HomeTransactionItem) {
                     color = MaterialTheme.colorScheme.onBackground,
                 )
             }
+        }
+    }
+}
+
+// ── Pending SMS Transactions Banner ──────────────────────────────────────────
+
+@Composable
+fun PendingSmsBanner(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        ),
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("💳", fontSize = 18.sp)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "$count new transaction${if (count > 1) "s" else ""} detected",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Text(
+                    text = "Tap to review and confirm",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                )
+            }
+            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
         }
     }
 }
