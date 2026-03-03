@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -42,13 +43,12 @@ import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailS
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
-import com.example.truxpense.presentation.screens.dashboard.settings.SettingsScreen
+import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
+import com.example.truxpense.presentation.screens.dashboard.settings.*
 import com.example.truxpense.presentation.screens.dashboard.theme.DashboardDimens
 import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
-import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
-import com.example.truxpense.notification.NotificationSettingsScreen
 
 // Dashboard shell: owns the NavController and tab routing
 
@@ -59,88 +59,55 @@ fun DashboardScreen(
     val vm = hiltViewModel<HomeViewModel>()
     val deepLinkVm = hiltViewModel<NotificationDeepLinkViewModel>()
 
-    // Single NavController for the dashboard
     val dashboardNavController = rememberNavController()
     val navBackStackEntry by dashboardNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
     // ── Notification deep-link handler ─────────────────────────────────────────
-    // Collects deep links emitted by NotificationDeepLinkManager (via MainActivity)
-    // and navigates to the appropriate screen.  consume() clears the replay slot so
-    // the same destination is not re-navigated on recomposition.
     LaunchedEffect(deepLinkVm) {
         deepLinkVm.pendingDeepLink.collect { link ->
             when (link) {
-                is NotificationDeepLink.AddExpense -> {
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
-                }
+                is NotificationDeepLink.AddExpense -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
 
-                is NotificationDeepLink.BudgetTab -> {
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                is NotificationDeepLink.BudgetTab -> dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
                 }
 
                 is NotificationDeepLink.BudgetDetail -> {
-                    // Navigate to Budget tab root; the user taps the highlighted category.
-                    // We don't carry limit/spent in the notification extra, so we can't
-                    // deep-link straight to BudgetDetailScreen without a repo look-up.
-                    // That look-up is done here so the deep link resolves correctly.
                     dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
+                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true; restoreState = true
                     }
-                    // Signal the Budget tab to highlight the correct category
                     try {
                         dashboardNavController.getBackStackEntry(Screen.Dashboard.Budget.Root).savedStateHandle.set(
-                            "highlightCategory", link.category
+                            "highlightCategory",
+                            link.category
                         )
-                    } catch (_: Exception) { /* backstack entry not yet available */
+                    } catch (_: Exception) {
                     }
                 }
 
-                is NotificationDeepLink.Analytics -> {
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                is NotificationDeepLink.Analytics -> dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
                 }
 
-                is NotificationDeepLink.Transactions -> {
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                is NotificationDeepLink.Transactions -> dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
                 }
 
-                is NotificationDeepLink.Home -> {
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                is NotificationDeepLink.Home -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
                 }
             }
             deepLinkVm.consume()
         }
     }
 
-    // Top-level tab roots (these show the bottom bar). Sub-screens hide it.
+    // Top-level tab roots (these show the bottom bar)
     val topLevelRoutes = remember {
         setOf(
             Screen.Dashboard.Home.Root,
@@ -160,10 +127,10 @@ fun DashboardScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             Box(modifier = Modifier.fillMaxWidth()) {
                 Spacer(Modifier.fillMaxWidth().height(DashboardDimens.bottomNavHeight))
-
                 AnimatedVisibility(visible = isTopLevelDestination, enter = fadeIn(), exit = ExitTransition.None) {
                     DashboardBottomBar(
                         items = BottomNavBarMenu.all,
@@ -171,15 +138,13 @@ fun DashboardScreen(
                         onItemSelected = { tab ->
                             dashboardNavController.navigate(tab.route) {
                                 popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                                launchSingleTop = true; restoreState = true
                             }
                         },
                     )
                 }
             }
         },
-        contentWindowInsets = WindowInsets(0.dp),
     ) { innerPadding ->
 
         val bottomBarPadding = innerPadding.calculateBottomPadding()
@@ -194,7 +159,9 @@ fun DashboardScreen(
             popExitTransition = { ExitTransition.None },
         ) {
 
-            // Home tab
+            // ══════════════════════════════════════════════════════════════════
+            // HOME TAB
+            // ══════════════════════════════════════════════════════════════════
             composable(Screen.Dashboard.Home.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     HomeTabScreen(
@@ -205,19 +172,20 @@ fun DashboardScreen(
                         onNavigateToBudget = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
                                 popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                                launchSingleTop = true; restoreState = true
                             }
                         },
                         onViewAll = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                                 popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                                launchSingleTop = true; restoreState = true
                             }
                         },
                         onNotificationsClick = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Notifications.Root)
+                        },
+                        onProfileClick = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Settings.PersonalInfo)
                         },
                     )
                 }
@@ -234,7 +202,9 @@ fun DashboardScreen(
                 )
             }
 
-            // Transactions tab
+            // ══════════════════════════════════════════════════════════════════
+            // TRANSACTIONS TAB
+            // ══════════════════════════════════════════════════════════════════
             composable(Screen.Dashboard.Transactions.Root) { backStackEntry ->
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     TransactionsScreen(
@@ -288,7 +258,9 @@ fun DashboardScreen(
                 )
             }
 
-            // Budget tab
+            // ══════════════════════════════════════════════════════════════════
+            // BUDGET TAB
+            // ══════════════════════════════════════════════════════════════════
             composable(Screen.Dashboard.Budget.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     BudgetTab(
@@ -338,17 +310,18 @@ fun DashboardScreen(
                         val cat = category?.trim()
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                             popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                            launchSingleTop = true; restoreState = true
                         }
                         if (!cat.isNullOrBlank()) {
                             try {
                                 dashboardNavController.getBackStackEntry(Screen.Dashboard.Transactions.Root).savedStateHandle.set(
-                                    "preselectCategory", cat
+                                    "preselectCategory",
+                                    cat
                                 )
                             } catch (_: Exception) {
                                 dashboardNavController.currentBackStackEntry?.savedStateHandle?.set(
-                                    "preselectCategory", cat
+                                    "preselectCategory",
+                                    cat
                                 )
                             }
                         }
@@ -361,7 +334,9 @@ fun DashboardScreen(
                 )
             }
 
-            // Analytics tab
+            // ══════════════════════════════════════════════════════════════════
+            // ANALYTICS TAB
+            // ══════════════════════════════════════════════════════════════════
             composable(Screen.Dashboard.Analytics.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     AnalyticsTab(
@@ -383,28 +358,144 @@ fun DashboardScreen(
                 )
             }
 
-            // Settings tab
+            // ══════════════════════════════════════════════════════════════════
+            // SETTINGS TAB  (root)
+            // ══════════════════════════════════════════════════════════════════
             composable(Screen.Dashboard.Settings.Root) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     SettingsTab(
+                        navController = dashboardNavController,
                         onLogout = onLogout,
-                        onNotificationsClick = {
-                            dashboardNavController.safeNavigate(
-                                Screen.Dashboard.Settings.NotificationSettings
-                            )
-                        },
                     )
                 }
             }
 
-            // Notification settings sub-screen (from Settings → Notifications row)
-            composable(Screen.Dashboard.Settings.NotificationSettings) {
-                NotificationSettingsScreen(
+            // ── Settings → Personal Info ──────────────────────────────────────
+            composable(Screen.Dashboard.Settings.PersonalInfo) {
+                val settingsVm: SettingsViewModel = hiltViewModel()
+                val username by settingsVm.username.collectAsStateWithLifecycle(initialValue = "")
+                val phone by settingsVm.phone.collectAsStateWithLifecycle(initialValue = "")
+                val isSaving by settingsVm.isSavingProfile.collectAsStateWithLifecycle()
+
+                PersonalInfoScreen(
+                    initialUsername = username ?: "",
+                    initialPhone = phone ?: "",
+                    isSaving = isSaving,
                     onBack = { dashboardNavController.popBackStack() },
+                    onSave = { name, ph ->
+                        settingsVm.saveProfile(name, ph) {
+                            dashboardNavController.popBackStack()
+                        }
+                    },
                 )
             }
 
-            // Notifications screen (full-screen, no bottom bar)
+            // ── Settings → Linked Accounts ────────────────────────────────────
+            composable(Screen.Dashboard.Settings.LinkedAccounts) {
+                val settingsVm: SettingsViewModel = hiltViewModel()
+                val linkedAccounts by settingsVm.linkedAccounts.collectAsStateWithLifecycle()
+                val smsEnabled by settingsVm.smsEnabled.collectAsStateWithLifecycle()
+
+                LinkedAccountsScreen(
+                    accounts = linkedAccounts,
+                    smsPermissionGranted = smsEnabled,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onAddAccount = { /* TODO: launch bank-linking flow */ },
+                    onRemoveAccount = settingsVm::removeLinkedAccount,
+                )
+            }
+
+            // ── Settings → Security ───────────────────────────────────────────
+            composable(Screen.Dashboard.Settings.Security) {
+                val settingsVm: SettingsViewModel = hiltViewModel()
+                val biometrics by settingsVm.biometricsEnabled.collectAsStateWithLifecycle()
+                val appLock by settingsVm.appLockEnabled.collectAsStateWithLifecycle()
+
+                SecurityScreen(
+                    biometricsAvailable = true, // TODO: query BiometricManager
+                    biometricsEnabled = biometrics,
+                    appLockEnabled = appLock,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onBiometricsToggle = settingsVm::setBiometricsEnabled,
+                    onAppLockToggle = settingsVm::setAppLockEnabled,
+                    onChangePassword = settingsVm::changePassword,
+                )
+            }
+
+            // ── Settings → Notifications & Reminders ──────────────────────────
+            composable(Screen.Dashboard.Settings.Notifications) {
+                val settingsVm: SettingsViewModel = hiltViewModel()
+                val notifPrefs by settingsVm.notifPrefs.collectAsStateWithLifecycle()
+
+                NotificationsScreen(
+                    prefs = notifPrefs,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onPrefsChanged = settingsVm::updateNotifPrefs,
+                )
+            }
+
+            // ── Settings → Help & Support ─────────────────────────────────────
+            composable(Screen.Dashboard.Settings.Help) {
+                val context = LocalContext.current
+                HelpSupportScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onEmailSupport = {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:support@truxpense.app")
+                            putExtra(Intent.EXTRA_SUBJECT, "TruXpense Support Request")
+                        }
+                        context.startActivity(intent)
+                    },
+                )
+            }
+
+            // ── Settings → Privacy Policy ─────────────────────────────────────
+            composable(Screen.Dashboard.Settings.PrivacyPolicy) {
+                PrivacyPolicyScreen(onBack = { dashboardNavController.popBackStack() })
+            }
+
+            // ── Settings → Terms of Service ───────────────────────────────────
+            composable(Screen.Dashboard.Settings.Terms) {
+                TermsScreen(onBack = { dashboardNavController.popBackStack() })
+            }
+
+            // ── Settings → About TruXpense ────────────────────────────────────
+            composable(Screen.Dashboard.Settings.About) {
+                val context = LocalContext.current
+                AboutScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onRateApp = {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW, Uri.parse("market://details?id=${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    },
+                    onViewLicences = { /* TODO: OssLicensesMenuActivity */ },
+                )
+            }
+
+            // ── Settings → Delete Account ─────────────────────────────────────
+            composable(Screen.Dashboard.Settings.DeleteAccount) {
+                val settingsVm: SettingsViewModel = hiltViewModel()
+                val username by settingsVm.username.collectAsStateWithLifecycle(initialValue = "")
+                val isDeleting by settingsVm.isDeletingAccount.collectAsStateWithLifecycle()
+
+                DeleteAccountScreen(
+                    username = username ?: "",
+                    isDeleting = isDeleting,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onConfirmDelete = {
+                        settingsVm.deleteAccount {
+                            // Pop all the way back to login/intro via the outer nav
+                            onLogout()
+                        }
+                    },
+                )
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // NOTIFICATIONS (full-screen, no bottom bar)
+            // ══════════════════════════════════════════════════════════════════
             composable(Screen.Dashboard.Notifications.Root) {
                 NotificationScreen(
                     onBack = { dashboardNavController.popBackStack() },
@@ -415,11 +506,8 @@ fun DashboardScreen(
                     },
                     onNavigateToWeeklyAnalytics = {
                         dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
-                            popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
                         }
                     },
                     onNavigateToTransactionDetail = { transactionId ->
@@ -432,11 +520,8 @@ fun DashboardScreen(
                     },
                     onNavigateToTransactions = {
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                            popUpTo(dashboardNavController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
                         }
                     },
                 )
@@ -447,6 +532,9 @@ fun DashboardScreen(
     SmsPermissionDialogHandler(vm = vm)
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PRIVATE TAB COMPOSABLES
+// ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
 private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
@@ -463,27 +551,38 @@ private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
     }
 }
 
+/**
+ * Settings tab — now a simple wrapper that wires the SettingsScreen callbacks
+ * to routes in the parent [navController]. No nested NavHost needed.
+ */
 @Composable
 private fun SettingsTab(
-    onLogout: () -> Unit = {},
-    onNotificationsClick: () -> Unit = {},
+    navController: androidx.navigation.NavHostController,
+    onLogout: () -> Unit,
 ) {
-    val vm: com.example.truxpense.presentation.screens.dashboard.settings.SettingsViewModel = hiltViewModel()
-    val username by vm.username.collectAsState(initial = null)
-    val smsEnabled by vm.smsEnabled.collectAsState()
-    val notificationsEnabled by vm.notificationsEnabled.collectAsState()
+    val vm: SettingsViewModel = hiltViewModel()
+    val username by vm.username.collectAsStateWithLifecycle(initialValue = null)
+    val phone by vm.phone.collectAsStateWithLifecycle(initialValue = null)
 
     SettingsScreen(
         username = username ?: "",
-        phone = "",
-        smsEnabled = smsEnabled,
-        notificationsEnabled = notificationsEnabled,
-        onSmsToggle = { vm.setSmsEnabled(it) },
-        onNotificationsToggle = { vm.setNotificationsEnabled(it) },
-        onNotificationsClick = onNotificationsClick,
+        phone = phone ?: "",
+        onPersonalInfo = { navController.safeNavigate(Screen.Dashboard.Settings.PersonalInfo) },
+        onLinkedAccounts = { navController.safeNavigate(Screen.Dashboard.Settings.LinkedAccounts) },
+        onSecurity = { navController.safeNavigate(Screen.Dashboard.Settings.Security) },
+        onNotifications = { navController.safeNavigate(Screen.Dashboard.Settings.Notifications) },
+        onHelp = { navController.safeNavigate(Screen.Dashboard.Settings.Help) },
+        onPrivacyPolicy = { navController.safeNavigate(Screen.Dashboard.Settings.PrivacyPolicy) },
+        onTerms = { navController.safeNavigate(Screen.Dashboard.Settings.Terms) },
+        onAbout = { navController.safeNavigate(Screen.Dashboard.Settings.About) },
+        onDeleteAccount = { navController.safeNavigate(Screen.Dashboard.Settings.DeleteAccount) },
         onLogout = { vm.logout(); onLogout() },
     )
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SMS PERMISSION DIALOG
+// ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
 private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
@@ -532,14 +631,17 @@ private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
                 ) { Text("Open settings") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
+                TextButton(onClick = { }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                }
             },
         )
     }
 }
 
-
-// Previews
+// ══════════════════════════════════════════════════════════════════════════════
+// PREVIEWS
+// ══════════════════════════════════════════════════════════════════════════════
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
