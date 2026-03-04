@@ -1,36 +1,30 @@
 package com.example.truxpense.presentation.screens.dashboard.budget
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.AddFab
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.components.SpendingCategoryCard
-import com.example.truxpense.presentation.screens.dashboard.components.AddFab
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.currencyFormat
 import com.example.truxpense.presentation.utils.toCurrency
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +43,7 @@ fun BudgetTab(
     val currentMonth by vm.currentMonth.collectAsState()
     val canGoBack by vm.canGoBack.collectAsState()
     val canGoForward by vm.canGoForward.collectAsState()
+    val isLoaded by vm.isLoaded.collectAsState()
 
     val budgetsToShow = previewBudgets?.mapIndexed { _, cat ->
         BudgetCategoryDisplay(
@@ -64,22 +59,27 @@ fun BudgetTab(
     val totalBudgetStr = totalBudget.toDouble().toCurrency(fmt)
     val totalSpentStr = totalSpent.toDouble().toCurrency(fmt)
 
-    // Show empty screen when there are no budgets or total budget is zero
-    if (budgetsToShow.isEmpty() || totalBudget <= 0) {
-        BudgetsEmptyScreen(onAddBudget = onNavigateToAddBudget)
-    } else {
-        BudgetTabContent(
-            budgetsToShow = budgetsToShow,
-            totalBudget = totalBudgetStr,
-            totalSpent = totalSpentStr,
-            currentMonth = currentMonth,
-            canGoBack = canGoBack,
-            canGoForward = canGoForward,
-            onPrevious = { vm.previousMonth() },
-            onNext = { vm.nextMonth() },
-            onNavigateToAddBudget = onNavigateToAddBudget,
-            onNavigateToBudgetDetail = onNavigateToBudgetDetail,
-        )
+    AnimatedVisibility(
+        visible = isLoaded,
+        enter = fadeIn(animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)),
+    ) {
+        // Show empty screen when there are no budgets or total budget is zero
+        if (budgetsToShow.isEmpty() || totalBudget <= 0) {
+            BudgetsEmptyScreen(onAddBudget = onNavigateToAddBudget)
+        } else {
+            BudgetTabContent(
+                budgetsToShow = budgetsToShow,
+                totalBudget = totalBudgetStr,
+                totalSpent = totalSpentStr,
+                currentMonth = currentMonth,
+                canGoBack = canGoBack,
+                canGoForward = canGoForward,
+                onPrevious = { vm.previousMonth() },
+                onNext = { vm.nextMonth() },
+                onNavigateToAddBudget = onNavigateToAddBudget,
+                onNavigateToBudgetDetail = onNavigateToBudgetDetail,
+            )
+        }
     }
 }
 

@@ -37,6 +37,7 @@ import com.example.truxpense.presentation.screens.dashboard.components.ScreenTop
 import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.DashboardDimens.detailRowHeight
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 import java.text.SimpleDateFormat
 import java.util.*
@@ -443,9 +444,17 @@ private fun DetailsCard(
 
                 // Divider between date and time
                 VerticalDivider(
-                    modifier = Modifier.height(24.dp),
+                    modifier = Modifier.height(35.dp),
                     color = MaterialTheme.colorScheme.outlineVariant,
                     thickness = DashboardDimens.dividerThin,
+                )
+                // Leading clock icon
+                Icon(
+                    painter = painterResource(R.drawable.time_),
+                    contentDescription = null,
+                    tint = if (selectedDate != null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(DashboardDimens.iconLg),
                 )
 
                 // Time chip

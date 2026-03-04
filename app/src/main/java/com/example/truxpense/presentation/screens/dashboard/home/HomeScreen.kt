@@ -239,11 +239,7 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Home.AddExpense) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
-                    onSave = { _ ->
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
-                            popUpTo(Screen.Dashboard.Root) { inclusive = false }
-                        }
-                    },
+                    onSave = { _ -> dashboardNavController.popBackStack() },
                 )
             }
 
@@ -395,11 +391,7 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Analytics.AddExpense) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
-                    onSave = { _ ->
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
-                            popUpTo(Screen.Dashboard.Root) { inclusive = false }
-                        }
-                    },
+                    onSave = { _ -> dashboardNavController.popBackStack() },
                 )
             }
 
@@ -540,28 +532,33 @@ fun DashboardScreen(
                 NotificationScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onNavigateToBudgetDetail = { budgetName, monthlyLimit, spent ->
+                        // Push BudgetDetail on top of Notification — back returns here
                         dashboardNavController.safeNavigate(
                             Screen.Dashboard.Budget.detailRoute(budgetName, monthlyLimit, spent)
                         )
                     },
                     onNavigateToWeeklyAnalytics = {
+                        // Push Analytics on top — back returns to Notification
                         dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
-                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
+                            launchSingleTop = true
                         }
                     },
                     onNavigateToTransactionDetail = { transactionId ->
+                        // Push TransactionDetail on top — back returns to Notification
                         dashboardNavController.safeNavigate(
                             Screen.Dashboard.Transactions.detailRoute(transactionId)
                         )
                     },
                     onNavigateToAddExpense = {
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
+                        // Push AddExpense on top — back returns to Notification
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense) {
+                            launchSingleTop = true
+                        }
                     },
                     onNavigateToTransactions = {
+                        // Push Transactions on top — back returns to Notification
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
+                            launchSingleTop = true
                         }
                     },
                 )
@@ -587,7 +584,11 @@ fun DashboardScreen(
 @Composable
 private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
     val homeVm: HomeViewModel = hiltViewModel()
+    val isLoaded by homeVm.isLoaded.collectAsState()
     val recentTx by homeVm.recentTransactions.collectAsState()
+
+    // Don't render anything until Room has delivered its first value — prevents empty-screen flash
+    if (!isLoaded) return
 
     if (recentTx.isEmpty()) {
         AnalyticsEmptyScreen(

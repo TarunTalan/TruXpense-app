@@ -1,8 +1,10 @@
 package com.example.truxpense.presentation.screens.dashboard.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -53,40 +55,40 @@ fun HomeTabScreen(
     val monthlySpend by vm.monthlySpend.collectAsState()
     val pendingCount by vm.pendingCount.collectAsState()
 
-    if (!isLoaded) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
-
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by remember {
         derivedStateOf { currencyVm.selectedCurrency.value?.code ?: "INR" }
     }
 
-    if (expenseCount == 0) {
-        EmptyHomeContent(
-            onAddExpense = onAddExpense,
-            hasSmsPermission = hasSmsPermission,
-        )
-        return
+    // Animate the whole screen in once data is ready — no hard blank→spinner→content flash
+    AnimatedVisibility(
+        visible = isLoaded,
+        enter = fadeIn(
+            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+        ),
+    ) {
+        if (expenseCount == 0) {
+            EmptyHomeContent(
+                onAddExpense = onAddExpense,
+                hasSmsPermission = hasSmsPermission,
+            )
+        } else {
+            HomeTabContent(
+                monthlySpend = monthlySpend,
+                hasSmsPermission = hasSmsPermission,
+                pendingCount = pendingCount,
+                onAddExpense = onAddExpense,
+                onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
+                currencyCode = currencyCode,
+                vm = vm,
+                onNavigateToBudget = onNavigateToBudget,
+                onViewAll = onViewAll,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick,
+                onPendingReviewClick = onPendingReviewClick,
+            )
+        }
     }
-
-    HomeTabContent(
-        monthlySpend = monthlySpend,
-        hasSmsPermission = hasSmsPermission,
-        pendingCount = pendingCount,
-        onAddExpense = onAddExpense,
-        onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
-        currencyCode = currencyCode,
-        vm = vm,
-        onNavigateToBudget = onNavigateToBudget,
-        onViewAll = onViewAll,
-        onNotificationsClick = onNotificationsClick,
-        onProfileClick = onProfileClick,
-        onPendingReviewClick = onPendingReviewClick,
-    )
 }
 
 

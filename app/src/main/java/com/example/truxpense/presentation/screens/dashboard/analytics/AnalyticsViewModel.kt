@@ -52,6 +52,8 @@ data class AnalyticsUiState(
     val trendPoints: List<TrendPoint> = emptyList(),
     val topMerchant: Pair<String, Double>? = null,
     val topCategory: Pair<String, Double>? = null,
+    /** False until Room has emitted at least once — used to suppress the pre-data skeleton flash. */
+    val roomLoaded: Boolean = false,
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -77,6 +79,20 @@ class AnalyticsViewModel @Inject constructor(
 
     fun goForward() {
         if (_offset.value < 0) _offset.value++
+    }
+
+    // Pre-compute the initial state synchronously so the screen never sees a blank sentinel.
+    // periodLabel / periodWindow only need Calendar.getInstance() — no coroutine required.
+    private val _initialState: AnalyticsUiState = run {
+        val now = Calendar.getInstance()
+        AnalyticsUiState(
+            period = AnalyticsPeriod.MONTH,
+            offset = 0,
+            periodLabel = periodLabel(AnalyticsPeriod.MONTH, 0, now),
+            canGoBack = true,
+            canGoForward = false,
+            // data fields stay 0/empty — Room hasn't loaded yet, but the skeleton is valid
+        )
     }
 
     val uiState: StateFlow<AnalyticsUiState> = combine(
@@ -126,8 +142,13 @@ class AnalyticsViewModel @Inject constructor(
             trendPoints = trendPoints,
             topMerchant = topMerchant,
             topCategory = topCategory,
+            roomLoaded = true,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnalyticsUiState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _initialState)
+
+    /** Always true — initial state is pre-computed synchronously, so there is never a blank frame. */
+    val isLoaded: StateFlow<Boolean> = uiState.map { it.roomLoaded }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     // ── Period window ─────────────────────────────────────────────────────────
 
