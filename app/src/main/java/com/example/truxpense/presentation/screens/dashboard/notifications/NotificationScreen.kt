@@ -28,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.theme.DashboardDimens
@@ -114,7 +115,7 @@ fun NotificationScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).clearFocusOnTap(),
             contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxxl),
         ) {
             groups.forEach { (groupLabel, items) ->

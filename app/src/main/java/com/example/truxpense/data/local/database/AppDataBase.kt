@@ -7,7 +7,7 @@ import com.example.truxpense.data.local.dao.BudgetDao
 
 @Database(
     entities = [com.example.truxpense.data.local.entity.ExpenseEntity::class, com.example.truxpense.data.local.entity.BudgetEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

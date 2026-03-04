@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 @Composable
 fun SecurityScreen(
@@ -54,7 +55,8 @@ fun SecurityScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = 16.dp),
+                .padding(vertical = 16.dp)
+                .clearFocusOnTap(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 

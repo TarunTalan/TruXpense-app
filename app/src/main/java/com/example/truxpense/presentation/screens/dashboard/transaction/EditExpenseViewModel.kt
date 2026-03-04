@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
+import com.example.truxpense.presentation.utils.AppCategories
+import com.example.truxpense.presentation.utils.DateTimeUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -34,6 +38,9 @@ class EditExpenseViewModel @Inject constructor(
     private val _selectedDate = MutableStateFlow<String?>(null)
     val selectedDate: StateFlow<String?> = _selectedDate.asStateFlow()
 
+    private val _selectedTime = MutableStateFlow<String?>(null)
+    val selectedTime: StateFlow<String?> = _selectedTime.asStateFlow()
+
     /** Original timestamp (preserved on save so the date grouping stays correct
      *  unless the user explicitly picks a new date, in which case we update it). */
     private var originalTimestamp: Long = System.currentTimeMillis()
@@ -41,10 +48,7 @@ class EditExpenseViewModel @Inject constructor(
 
     // ── Static option lists (same as AddExpenseViewModel) ─────────────────────
 
-    val categories = listOf(
-        "Food", "Transport", "Shopping", "Bills",
-        "Health", "Entertainment", "Groceries", "Other",
-    )
+    val categories = AppCategories.all
     val accountList = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI")
 
     // ── Derived validity ──────────────────────────────────────────────────────
@@ -77,13 +81,14 @@ class EditExpenseViewModel @Inject constructor(
 
             _rawAmount.value = "%.0f".format(kotlin.math.abs(tx.amount))
             _merchant.value = tx.merchant
+            _notes.value = tx.notes
             _selectedCategory.value = tx.category
             _selectedAccount.value = tx.paymentMethod.ifBlank { null }
 
-            // Format stored timestamp as a display date for the date chip
-            val cal = java.util.Calendar.getInstance().apply { timeInMillis = tx.timestamp }
-            val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault())
-            _selectedDate.value = sdf.format(cal.time)
+            // Format stored timestamp as a display date and time
+            val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+            _selectedDate.value = SimpleDateFormat("MMM d", Locale.getDefault()).format(cal.time)
+            _selectedTime.value = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time)
         }
     }
 
@@ -95,12 +100,16 @@ class EditExpenseViewModel @Inject constructor(
     fun selectCategory(cat: String) { _selectedCategory.value = cat }
     fun selectAccount(acc: String) { _selectedAccount.value = acc }
     fun setDate(date: String) { _selectedDate.value = date }
+    fun setTime(time: String) { _selectedTime.value = time }
 
     fun saveChanges() {
         val amount = _rawAmount.value.toDoubleOrNull() ?: return
         val category = _selectedCategory.value ?: return
         val paymentMethod = _selectedAccount.value ?: "UPI"
-        val merchantName = _merchant.value.trim().ifBlank { category }
+        val merchantName = _merchant.value.trim().ifBlank { "Anonymous" }
+        val timestamp = _selectedDate.value?.let { date ->
+            DateTimeUtils.parseDateTimeToMillis(date, _selectedTime.value ?: "12:00 AM")
+        } ?: originalTimestamp
 
         viewModelScope.launch {
             _isSaving.value = true
@@ -112,7 +121,8 @@ class EditExpenseViewModel @Inject constructor(
                         category = category,
                         paymentMethod = paymentMethod,
                         merchant = merchantName,
-                        timestamp = originalTimestamp,
+                        notes = _notes.value.trim(),
+                        timestamp = timestamp,
                     )
                 )
                 _updateComplete.emit(Unit)

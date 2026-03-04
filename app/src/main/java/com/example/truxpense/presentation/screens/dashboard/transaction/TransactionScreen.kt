@@ -41,6 +41,7 @@ import android.graphics.Typeface
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavBackStackEntry
 
@@ -102,7 +103,9 @@ fun TransactionsScreen(
             )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(top = DashboardDimens.spaceLg),
+                modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    .padding(top = DashboardDimens.spaceLg)
+                    .clearFocusOnTap(),
                 contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxl),
             ) {
 
