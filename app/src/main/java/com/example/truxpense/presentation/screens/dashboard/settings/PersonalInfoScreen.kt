@@ -12,6 +12,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 @Composable
 fun PersonalInfoScreen(
@@ -45,7 +46,8 @@ fun PersonalInfoScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 24.dp),
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .clearFocusOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(

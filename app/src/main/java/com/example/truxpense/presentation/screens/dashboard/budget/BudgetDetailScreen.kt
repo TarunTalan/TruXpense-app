@@ -43,6 +43,7 @@ import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.BudgetProgressBar
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import com.example.truxpense.presentation.utils.currencyFormat
 import com.example.truxpense.presentation.utils.progressColor
 
@@ -221,7 +222,7 @@ fun BudgetDetailScreen(
 
         LazyColumn(
             state = lazyListState,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).clearFocusOnTap(),
             contentPadding = PaddingValues(
                 horizontal = DashboardDimens.screenPaddingH,
                 vertical = DashboardDimens.spaceLg,

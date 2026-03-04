@@ -1,6 +1,8 @@
 package com.example.truxpense.presentation.screens.dashboard.addexpense
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import android.graphics.drawable.ColorDrawable
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -32,8 +34,10 @@ import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.AccountDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,39 +57,52 @@ fun AddExpenseScreen(
     val selectedCategory by vm.selectedCategory.collectAsState()
     val selectedAccount by vm.selectedAccount.collectAsState()
     val selectedDate by vm.selectedDate.collectAsState()
+    val selectedTime by vm.selectedTime.collectAsState()
     val isFormValid by vm.isFormValid.collectAsState()
 
-    // Delegate UI to a parameterized content function (makes preview easier)
     val context = LocalContext.current
 
-    // Capture theme colors once (safe to call in @Composable scope)
     val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
     val onPrimaryArgb = MaterialTheme.colorScheme.onPrimary.toArgb()
     val onBackgroundArgb = MaterialTheme.colorScheme.onBackground.toArgb()
 
     fun openDatePicker() {
         val now = Calendar.getInstance()
-        val year = now.get(Calendar.YEAR)
-        val month = now.get(Calendar.MONTH)
-        val day = now.get(Calendar.DAY_OF_MONTH)
-
         val picker = DatePickerDialog(context, { _: android.widget.DatePicker, y: Int, m: Int, d: Int ->
-            val cal = Calendar.getInstance()
-            cal.set(y, m, d)
-            val sdf = SimpleDateFormat("MMM d", Locale.getDefault())
-            vm.setDate(sdf.format(cal.time))
+            val cal = Calendar.getInstance().apply { set(y, m, d) }
+            vm.setDate(SimpleDateFormat("MMM d", Locale.getDefault()).format(cal.time))
             onDatePick()
-        }, year, month, day)
-        // Make the platform DatePickerDialog follow Compose theme colors (best-effort)
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH))
         picker.setOnShowListener {
             try {
-                val window = picker.window
-                window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(surfaceArgb))
+                picker.window?.setBackgroundDrawable(ColorDrawable(surfaceArgb))
                 picker.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
                 picker.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
-            } catch (_: Exception) { /* best-effort */ }
+            } catch (_: Exception) { }
         }
         picker.show()
+    }
+
+    fun openTimePicker() {
+        val now = Calendar.getInstance()
+        val dialog = TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                val cal = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, hour); set(Calendar.MINUTE, minute) }
+                vm.setTime(SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time))
+            },
+            now.get(Calendar.HOUR_OF_DAY),
+            now.get(Calendar.MINUTE),
+            false,
+        )
+        dialog.setOnShowListener {
+            try {
+                dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceArgb))
+                dialog.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
+                dialog.getButton(TimePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
+            } catch (_: Exception) { }
+        }
+        dialog.show()
     }
 
     AddExpenseScreenContent(
@@ -97,6 +114,7 @@ fun AddExpenseScreen(
         categories = vm.categories,
         accounts = vm.accountList,
         selectedDate = selectedDate,
+        selectedTime = selectedTime,
         isFormValid = isFormValid,
         onRawChange = { vm.setRawAmount(it) },
         onMerchantChange = { vm.setMerchant(it) },
@@ -104,19 +122,19 @@ fun AddExpenseScreen(
         onSelectCategory = { vm.selectCategory(it) },
         onSelectAccount = { vm.selectAccount(it) },
         onDatePick = { openDatePicker() },
-        onSave = { // build tx and forward to parent onSave
+        onTimePick = { openTimePicker() },
+        onSave = {
             val amt = vm.rawAmount.value.toDoubleOrNull() ?: 0.0
-            val merchantVal = vm.merchant.value.ifBlank { "Expense" }
+            val merchantVal = vm.merchant.value.ifBlank { "Anonymous" }
             val categoryVal = vm.selectedCategory.value ?: "Other"
             vm.saveExpense()
-            val tx = HomeTransactionItem(
+            onSave(HomeTransactionItem(
                 id = UUID.randomUUID().toString(),
                 title = merchantVal,
                 category = categoryVal,
                 amount = amt,
                 currencyCode = "INR",
-            )
-            onSave(tx)
+            ))
         },
         onBack = onBack,
     )
@@ -134,6 +152,7 @@ fun AddExpenseScreenContent(
     categories: List<String>,
     accounts: List<String>,
     selectedDate: String?,
+    selectedTime: String? = null,
     isFormValid: Boolean,
     onRawChange: (String) -> Unit,
     onMerchantChange: (String) -> Unit,
@@ -141,6 +160,7 @@ fun AddExpenseScreenContent(
     onSelectCategory: (String) -> Unit,
     onSelectAccount: (String) -> Unit,
     onDatePick: () -> Unit,
+    onTimePick: () -> Unit = {},
     onSave: () -> Unit,
     onBack: () -> Unit,
     // New optional parameters for overrides (Edit screen passes these)
@@ -153,8 +173,10 @@ fun AddExpenseScreenContent(
         topBar = { ScreenTopBar(headerTitle = screenTitle, showBack = true, onBack = onBack) },
     ) { innerPadding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = DashboardDimens.screenPaddingH)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
+                .padding(horizontal = DashboardDimens.screenPaddingH)
+                .verticalScroll(rememberScrollState())
+                .clearFocusOnTap(),
         ) {
             Spacer(Modifier.height(DashboardDimens.spaceMd))
 
@@ -186,7 +208,9 @@ fun AddExpenseScreenContent(
                 accounts = accounts,
                 onAccountSelect = onSelectAccount,
                 selectedDate = selectedDate,
+                selectedTime = selectedTime,
                 onDateClick = onDatePick,
+                onTimeClick = onTimePick,
             )
 
             Spacer(Modifier.height(DashboardDimens.spaceXxl))
@@ -312,7 +336,9 @@ private fun DetailsCard(
     accounts: List<String>,
     onAccountSelect: (String) -> Unit,
     selectedDate: String?,
+    selectedTime: String?,
     onDateClick: () -> Unit,
+    onTimeClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -330,7 +356,6 @@ private fun DetailsCard(
                 iconForCategory = { cat -> iconForCategory(cat) },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = "Select category",
-                inline = true,
             )
 
             RowDivider()
@@ -389,37 +414,47 @@ private fun DetailsCard(
 
             RowDivider()
 
-            // ── Row 4: Date ───────────────────────────────────────────────────
-            DetailRow(
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.calender),
-                        contentDescription = null,
-                        tint = if (selectedDate != null) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(DashboardDimens.iconMd),
-                    )
-                },
-                label = "Date",
-                trailingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.calender),
-                        contentDescription = "Pick date",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(DashboardDimens.iconMd),
-                    )
-                },
-                modifier = Modifier.fillMaxWidth().clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                    onClick = onDateClick,
-                ),
+            // ── Row 4: Date + Time (same row) ─────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(DashboardDimens.detailRowHeight)
+                    .padding(horizontal = DashboardDimens.screenPaddingH),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
             ) {
-                Text(
-                    text = selectedDate ?: "Pick a date",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (selectedDate != null) MaterialTheme.colorScheme.onBackground
+                // Leading calendar icon
+                Icon(
+                    painter = painterResource(R.drawable.calender),
+                    contentDescription = null,
+                    tint = if (selectedDate != null) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(DashboardDimens.iconMd),
+                )
+
+                // Date chip
+                DateTimeChip(
+                    label = "Date",
+                    value = selectedDate ?: "Pick date",
+                    hasValue = selectedDate != null,
+                    onClick = onDateClick,
+                    modifier = Modifier.weight(1f),
+                )
+
+                // Divider between date and time
+                VerticalDivider(
+                    modifier = Modifier.height(24.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    thickness = DashboardDimens.dividerThin,
+                )
+
+                // Time chip
+                DateTimeChip(
+                    label = "Time",
+                    value = selectedTime ?: "Pick time",
+                    hasValue = selectedTime != null,
+                    onClick = onTimeClick,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -486,8 +521,46 @@ private fun RowDivider() {
     )
 }
 
+/** Small tappable chip used for the Date and Time cells in the same row. */
+@Composable
+private fun DateTimeChip(
+    label: String,
+    value: String,
+    hasValue: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(DashboardDimens.cornerChip))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onClick,
+            )
+            .padding(vertical = DashboardDimens.spaceXs),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(DashboardDimens.spaceXxs))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (hasValue) FontWeight.Medium else FontWeight.Normal,
+            color = if (hasValue) MaterialTheme.colorScheme.onBackground
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 
 // ─── ③ Notes card, buttons, preview and helpers ───────────────────────────────
+
+private const val NOTES_MAX_CHARS = 100
 
 @Composable
 private fun NotesCard(notes: String, onChange: (String) -> Unit) {
@@ -521,18 +594,20 @@ private fun NotesCard(notes: String, onChange: (String) -> Unit) {
 
             Spacer(Modifier.height(DashboardDimens.spaceMd))
 
-            // Text input
+            // Text input — hard-capped at NOTES_MAX_CHARS, max 3 visual lines
             BasicTextField(
                 value = notes,
-                onValueChange = onChange,
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerChip))
+                onValueChange = { if (it.length <= NOTES_MAX_CHARS) onChange(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(DashboardDimens.cornerChip))
                     .background(MaterialTheme.colorScheme.background)
                     .padding(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceMdL)
                     .defaultMinSize(minHeight = DashboardDimens.inputMinHeight),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onBackground,
                 ),
-                maxLines = 4,
+                maxLines = 3,
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 decorationBox = { inner ->
                     if (notes.isEmpty()) {
@@ -544,6 +619,18 @@ private fun NotesCard(notes: String, onChange: (String) -> Unit) {
                     }
                     inner()
                 },
+            )
+
+            // Character counter
+            Spacer(Modifier.height(DashboardDimens.spaceXs))
+            Text(
+                text = "${notes.length}/$NOTES_MAX_CHARS",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (notes.length >= NOTES_MAX_CHARS)
+                    MaterialTheme.colorScheme.error
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.End),
             )
         }
     }
@@ -577,9 +664,10 @@ fun AddExpenseScreenPreview() {
         notes = "Lunch",
         selectedCategory = "Food",
         selectedAccount = "Cash",
-        categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Groceries", "Other"),
+        categories = AppCategories.all,
         accounts = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI"),
-        selectedDate = null,
+        selectedDate = "Mar 4",
+        selectedTime = "09:30 AM",
         isFormValid = true,
         onRawChange = {},
         onMerchantChange = {},

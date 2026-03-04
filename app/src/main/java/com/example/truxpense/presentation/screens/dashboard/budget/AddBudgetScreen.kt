@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -14,6 +16,7 @@ import com.example.truxpense.presentation.components.NumberField
 import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 
@@ -25,20 +28,25 @@ fun AddBudgetScreen(
 ) {
     val viewModel: AddBudgetViewModel = hiltViewModel()
 
-    val amountInput by viewModel.amountInput.collectAsState()
-    val selected by viewModel.selectedCategory.collectAsState()
-    val categories by viewModel.categories.collectAsState(initial = emptyList())
-    val isFormValid by viewModel.isFormValid.collectAsState()
+    val amountInput       by viewModel.amountInput.collectAsState()
+    val selected          by viewModel.selectedCategory.collectAsState()
+    val categories        by viewModel.categories.collectAsState(initial = emptyList())
+    val isFormValid       by viewModel.isFormValid.collectAsState()
+    val isDuplicateCategory by viewModel.isDuplicateCategory.collectAsState()
+    // collect already budgeted categories from VM
+    val existingBudgetedCategories by viewModel.existingBudgetedCategories.collectAsState()
 
     AddBudgetScreenContent(
-        amountInput = amountInput,
-        selected = selected,
-        categories = categories,
-        isFormValid = isFormValid,
-        onSelectCategory = { viewModel.setSelected(it) },
-        onAmountChange = { viewModel.setAmountInput(it) },
-        onCreateBudget = { viewModel.createBudget(onSave) },
-        onBack = onBack,
+        amountInput         = amountInput,
+        selected            = selected,
+        categories          = categories,
+        isFormValid         = isFormValid,
+        isDuplicateCategory = isDuplicateCategory,
+        existingBudgetedCategories = existingBudgetedCategories,
+        onSelectCategory    = { viewModel.setSelected(it) },
+        onAmountChange      = { viewModel.setAmountInput(it) },
+        onCreateBudget      = { viewModel.createBudget(onSave) },
+        onBack              = onBack,
     )
 }
 
@@ -50,11 +58,15 @@ fun AddBudgetScreenContent(
     selected: String?,
     categories: List<String>,
     isFormValid: Boolean,
+    isDuplicateCategory: Boolean = false,
+    existingBudgetedCategories: Set<String> = emptySet(),
     onSelectCategory: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onCreateBudget: () -> Unit,
     onBack: () -> Unit,
 ) {
+    // existingBudgetedCategories is passed from the parent AddBudgetScreen
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -114,16 +126,43 @@ fun AddBudgetScreenContent(
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
 
-                    // Category selector (bottom sheet handled inside CategoryDropdown)
+                    // Category selector
                     CategoryDropdown(
-                        selected = selected,
-                        categories = categories,
-                        onSelect = { onSelectCategory(it) },
-                        iconForCategory = { cat -> iconForCategory(cat) },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = "Select category",
-                        inline = true,
-                    )
+                         selected = selected,
+                         categories = categories,
+                         onSelect = { onSelectCategory(it) },
+                         iconForCategory = { cat -> iconForCategory(cat) },
+                         modifier = Modifier.fillMaxWidth(),
+                         placeholder = "Select category",
+                        existingBudgetedCategories = existingBudgetedCategories
+                     )
+
+                    // Duplicate category inline error
+                    if (isDuplicateCategory && selected != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = DashboardDimens.screenPaddingH,
+                                    end = DashboardDimens.screenPaddingH,
+                                    bottom = DashboardDimens.spaceSm,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.alert),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                text = "A budget for $selected already exists. Please choose a different category or edit the existing budget.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
 
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth()
@@ -211,32 +250,54 @@ fun AddBudgetScreenContent(
 
 // Helper function for category icons
 private fun iconForCategory(category: String): Int = when (category.trim().lowercase()) {
-    "food" -> R.drawable.food
-    "transport" -> R.drawable.transport
-    "bills" -> R.drawable.bills
-    "shopping" -> R.drawable.shopping
-    "travel" -> R.drawable.category_icon
-    "health" -> R.drawable.health
-    "education" -> R.drawable.category_icon
+    "food"          -> R.drawable.food
+    "transport"     -> R.drawable.transport
+    "bills"         -> R.drawable.bills
+    "shopping"      -> R.drawable.shopping
+    "travel"        -> R.drawable.category_icon
+    "health"        -> R.drawable.health
+    "education"     -> R.drawable.category_icon
     "entertainment" -> R.drawable.entertainment
-    "groceries" -> R.drawable.groceries
-    else -> R.drawable.category_icon
+    "groceries"     -> R.drawable.groceries
+    else            -> R.drawable.category_icon
 }
 
-// Preview
+// Preview — normal state
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
 fun AddBudgetScreenPreview() {
     MaterialTheme {
         AddBudgetScreenContent(
-            amountInput = "",
-            selected = null,
-            categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Other"),
-            isFormValid = false,
-            onSelectCategory = {},
-            onAmountChange = {},
-            onCreateBudget = {},
-            onBack = {},
+            amountInput         = "",
+            selected            = null,
+            categories          = AppCategories.all,
+            isFormValid         = false,
+            isDuplicateCategory = false,
+            existingBudgetedCategories = emptySet(),
+            onSelectCategory    = {},
+            onAmountChange      = {},
+            onCreateBudget      = {},
+            onBack              = {},
+        )
+    }
+}
+
+// Preview — duplicate state
+@Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "Duplicate category")
+@Composable
+fun AddBudgetScreenDuplicatePreview() {
+    MaterialTheme {
+        AddBudgetScreenContent(
+            amountInput         = "2000",
+            selected            = "Food",
+            categories          = AppCategories.all,
+            isFormValid         = false,
+            isDuplicateCategory = true,
+            existingBudgetedCategories = setOf("food"),
+            onSelectCategory    = {},
+            onAmountChange      = {},
+            onCreateBudget      = {},
+            onBack              = {},
         )
     }
 }

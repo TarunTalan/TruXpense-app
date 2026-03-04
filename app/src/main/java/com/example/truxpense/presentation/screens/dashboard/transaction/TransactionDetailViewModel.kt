@@ -63,7 +63,7 @@ class TransactionDetailViewModel @Inject constructor(
                     amount = match.amount,
                     type = if (match.amount < 0) "Expense" else "Income",
                     source = "Detected from SMS",
-                    notes = "",
+                    notes = match.notes,
                 )
             } else {
                 // Preview / not-yet-persisted stub
@@ -76,6 +76,16 @@ class TransactionDetailViewModel @Inject constructor(
 
     fun setNotes(text: String) {
         _notes.value = text
+    }
+
+    fun saveNotes() {
+        viewModelScope.launch {
+            val current = _detail.value ?: return@launch
+            val txList = repo.transactions.firstOrNull() ?: emptyList()
+            val tx = txList.firstOrNull { it.id == current.id } ?: return@launch
+            repo.updateExpense(tx.copy(notes = _notes.value.trim()))
+            _detail.value = current.copy(notes = _notes.value.trim())
+        }
     }
 
     fun toggleNotes() {
