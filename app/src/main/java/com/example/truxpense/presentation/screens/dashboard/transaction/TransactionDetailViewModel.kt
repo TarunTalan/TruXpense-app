@@ -62,7 +62,7 @@ class TransactionDetailViewModel @Inject constructor(
                     time = timeFmt.format(cal.time),
                     amount = match.amount,
                     type = if (match.amount < 0) "Expense" else "Income",
-                    source = "Detected from SMS",
+                    source = if (match.source == "sms") "Detected from SMS" else "Added manually",
                     notes = match.notes,
                 )
             } else {
@@ -111,7 +111,7 @@ class TransactionDetailViewModel @Inject constructor(
         time = "8:45 PM",
         amount = -450.0,
         type = "Expense",
-        source = "Detected from SMS",
+        source = "Added manually",
         notes = "",
     )
 }

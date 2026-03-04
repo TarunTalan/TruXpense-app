@@ -119,6 +119,7 @@ class AddExpenseViewModel @Inject constructor(
                         merchant = merchantName,
                         notes = _notes.value.trim(),
                         timestamp = timestamp,
+                        source = "manual",
                     )
                 )
                 // Trigger an immediate one-shot budget threshold check so the

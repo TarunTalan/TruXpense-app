@@ -17,7 +17,8 @@ data class Transaction(
     val paymentMethod: String,
     val merchant: String,
     val notes: String = "",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val source: String = "manual",   // "manual" | "sms"
 )
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ class ExpenseRepository @Inject constructor(
         merchant = merchant,
         notes = notes,
         timestamp = timestamp,
+        source = source,
     )
 
     private fun ExpenseEntity.toDomain() = Transaction(
@@ -74,6 +76,7 @@ class ExpenseRepository @Inject constructor(
         merchant = merchant,
         notes = notes,
         timestamp = timestamp,
+        source = source,
     )
 }
 

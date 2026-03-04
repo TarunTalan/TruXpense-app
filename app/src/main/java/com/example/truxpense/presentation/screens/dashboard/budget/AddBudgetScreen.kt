@@ -3,10 +3,10 @@ package com.example.truxpense.presentation.screens.dashboard.budget
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -137,32 +137,6 @@ fun AddBudgetScreenContent(
                         existingBudgetedCategories = existingBudgetedCategories
                      )
 
-                    // Duplicate category inline error
-                    if (isDuplicateCategory && selected != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    start = DashboardDimens.screenPaddingH,
-                                    end = DashboardDimens.screenPaddingH,
-                                    bottom = DashboardDimens.spaceSm,
-                                ),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.alert),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Text(
-                                text = "A budget for $selected already exists. Please choose a different category or edit the existing budget.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
 
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth()

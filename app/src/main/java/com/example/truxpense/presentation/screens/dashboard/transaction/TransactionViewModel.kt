@@ -25,6 +25,10 @@ class TransactionsViewModel @Inject constructor(
                 savedStateHandle.remove<String>("preselectCategory")
             }
         }
+        viewModelScope.launch {
+            repository.transactions.first()
+            _isLoaded.value = true
+        }
     }
 
     // ── Search ────────────────────────────────────────────────────────────────
@@ -58,13 +62,22 @@ class TransactionsViewModel @Inject constructor(
         _paymentMethod.value = method?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    // ── Month / date range (missing declarations were causing type inference failures) ──
+    // ── Month / date range ────────────────────────────────────────────────────
 
     private val _selectedMonth = MutableStateFlow<Int?>(null)
     val selectedMonth: StateFlow<Int?> = _selectedMonth.asStateFlow()
 
     fun setMonth(month: Int?) {
         _selectedMonth.value = month
+    }
+
+    // ── Year filter ───────────────────────────────────────────────────────────
+
+    private val _selectedYear = MutableStateFlow<Int?>(null)
+    val selectedYear: StateFlow<Int?> = _selectedYear.asStateFlow()
+
+    fun setYear(year: Int?) {
+        _selectedYear.value = year
     }
 
     private val _dateFrom = MutableStateFlow<Long?>(null)
@@ -113,6 +126,10 @@ class TransactionsViewModel @Inject constructor(
         _totalExpanded.update { !it }
     }
 
+    /** True once Room has emitted its first value — used to fade the screen in. */
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
     // ── Raw data from Room ────────────────────────────────────────────────────
 
     private val _rawTransactions: StateFlow<List<TransactionItem>> = repository.transactions.map { list ->
@@ -126,25 +143,30 @@ class TransactionsViewModel @Inject constructor(
                 paymentMethod = t.paymentMethod,
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** All unique categories found in the user's expense data. */
     val availableCategories: StateFlow<List<String>> =
         _rawTransactions.map { txs -> txs.map { it.category }.distinct().sorted() }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** All unique payment methods found in the user's expense data. */
     val availablePaymentMethods: StateFlow<List<String>> = _rawTransactions.map { txs ->
         txs.map { it.paymentMethod }.filter { it.isNotBlank() }.distinct().sorted()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** All unique years found in the user's expense data, descending. */
+    val availableYears: StateFlow<List<Int>> = repository.transactions.map { list ->
+        list.map { t ->
+            java.util.Calendar.getInstance().apply { timeInMillis = t.timestamp }
+                .get(java.util.Calendar.YEAR)
+        }.distinct().sortedDescending()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Total count before any filter/search (for the "X of Y" display). */
     val totalTransactionCount: StateFlow<Int> =
-        _rawTransactions.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+        _rawTransactions.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    /** Filtered + searched flat list — drives both [resultCount] and [monthGroups].
-     *  Month and date-range are applied on the raw entity list (which has timestamps).
-     *  Category, payment-method and search are applied on the mapped UI list. */
     val transactions: StateFlow<List<TransactionItem>> = combine(
         // Pre-filter by month + date range on the raw entity list first
         combine(repository.transactions, _selectedMonth, _dateFrom, _dateTo) { raw, month, from, to ->
@@ -178,25 +200,29 @@ class TransactionsViewModel @Inject constructor(
                 )
             matchesCategory && matchesPayment && matchesSearch
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Count of results after applying all active filters + search. */
     val resultCount: StateFlow<Int> =
-        transactions.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+        transactions.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     /** Whether any filter or search is currently active. */
     val hasActiveFiltersOrSearch: StateFlow<Boolean> = combine(
-        _selectedCategory, _paymentMethod, _searchQuery, _selectedMonth, _dateFrom
-    ) { cat, pay, q, month, from ->
-        cat != null || pay != null || q.isNotBlank() || month != null || from != null
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        combine(_selectedCategory, _paymentMethod, _searchQuery) { cat, pay, q ->
+            cat != null || pay != null || q.isNotBlank()
+        },
+        combine(_selectedMonth, _selectedYear, _dateFrom) { month, year, from ->
+            month != null || year != null || from != null
+        },
+    ) { left, right -> left || right }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Grouped for the UI list (derived from already-filtered [transactions]). */
     val monthGroups: StateFlow<List<TransactionMonthGroup>> =
         transactions.map { buildMonthGroups(it) }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val totalSpent: StateFlow<Double> = transactions.map { it.sumOf { tx -> -tx.amount } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     // ── Private helpers ───────────────────────────────────────────────────────
 

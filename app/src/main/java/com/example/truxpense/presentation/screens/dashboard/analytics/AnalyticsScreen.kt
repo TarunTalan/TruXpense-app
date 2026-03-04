@@ -1,7 +1,6 @@
 package com.example.truxpense.presentation.screens.dashboard.analytics
 
 import androidx.compose.animation.core.*
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -24,15 +23,17 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,9 @@ fun AnalyticsScreen(
     vm: AnalyticsViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsState()
+
+    // Don't render anything until Room has emitted its first real value — prevents skeleton flash.
+    if (!state.roomLoaded) return
 
     // One-shot animation trigger for the donut chart: fires once when the screen is navigated to
     var chartAnimTriggered by remember { mutableStateOf(false) }
@@ -116,98 +120,98 @@ fun AnalyticsScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            ScreenTopBar(
-                headerTitle = "Analytics",
-                showBack = false,
-                modifier = Modifier.padding(bottom = DashboardDimens.spaceLg),
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            state = lazyListState,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = DashboardDimens.screenPaddingH,
-                end = DashboardDimens.screenPaddingH,
-                bottom = DashboardDimens.spaceXxl,
-            ),
-            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
-        ) {
-
-            // ── Period tabs ───────────────────────────────────────────────────
-            item {
-                PeriodTabs(
-                    selected = effectiveState.period,
-                    onSelect = { vm.setPeriod(it) },
-                    modifier = Modifier.fillMaxWidth(),
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                ScreenTopBar(
+                    headerTitle = "Analytics",
+                    showBack = false,
+                    modifier = Modifier.padding(bottom = DashboardDimens.spaceLg),
                 )
-            }
+            },
+        ) { innerPadding ->
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentPadding = PaddingValues(
+                    start = DashboardDimens.screenPaddingH,
+                    end = DashboardDimens.screenPaddingH,
+                    bottom = DashboardDimens.spaceXxl,
+                ),
+                verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
+            ) {
 
-            // ── Date navigator ────────────────────────────────────────────────
-            item {
-                PeriodNavigatorRow(
-                    label = effectiveState.periodLabel,
-                    canBack = effectiveState.canGoBack,
-                    canForward = effectiveState.canGoForward,
-                    onBack = { vm.goBack() },
-                    onForward = { vm.goForward() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            // ── Summary card ──────────────────────────────────────────────────
-            item {
-                SummaryCard(
-                    state = effectiveState,
-                    summaryProgressAnim = summaryProgressAnim,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            // ── Donut chart card ──────────────────────────────────────────────
-            if (effectiveState.categories.isNotEmpty()) {
+                // ── Period tabs ───────────────────────────────────────────────────
                 item {
-                    DonutChartCard(
-                        categories = effectiveState.categories,
-                        total = effectiveState.totalSpent,
-                        chartAnimProgress = chartAnimProgress,
+                    PeriodTabs(
+                        selected = effectiveState.period,
+                        onSelect = { vm.setPeriod(it) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
 
-                // ── Category legend ───────────────────────────────────────────
+                // ── Date navigator ────────────────────────────────────────────────
                 item {
-                    LabelsCard(
-                        categories = effectiveState.categories,
+                    PeriodNavigatorRow(
+                        label = effectiveState.periodLabel,
+                        canBack = effectiveState.canGoBack,
+                        canForward = effectiveState.canGoForward,
+                        onBack = { vm.goBack() },
+                        onForward = { vm.goForward() },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-            }
 
-            // ── Spending trend ────────────────────────────────────────────────
-            if (effectiveState.trendPoints.isNotEmpty()) {
+                // ── Summary card ──────────────────────────────────────────────────
                 item {
-                    SpendingTrendCard(
-                        points = effectiveState.trendPoints,
-                        period = effectiveState.period,
-                        chartAnimProgress = trendAnimProgress,
+                    SummaryCard(
+                        state = effectiveState,
+                        summaryProgressAnim = summaryProgressAnim,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-            }
 
-            // ── Insights ──────────────────────────────────────────────────────
-            if (effectiveState.topMerchant != null || effectiveState.topCategory != null) {
-                item {
-                    InsightsCard(state = effectiveState, modifier = Modifier.fillMaxWidth())
+                // ── Donut chart card ──────────────────────────────────────────────
+                if (effectiveState.categories.isNotEmpty()) {
+                    item {
+                        DonutChartCard(
+                            categories = effectiveState.categories,
+                            total = effectiveState.totalSpent,
+                            chartAnimProgress = chartAnimProgress,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    // ── Category legend ───────────────────────────────────────────
+                    item {
+                        LabelsCard(
+                            categories = effectiveState.categories,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
-            }
 
-            item { Spacer(Modifier.height(DashboardDimens.spaceXxl)) }
+                // ── Spending trend ────────────────────────────────────────────────
+                if (effectiveState.trendPoints.isNotEmpty()) {
+                    item {
+                        SpendingTrendCard(
+                            points = effectiveState.trendPoints,
+                            period = effectiveState.period,
+                            chartAnimProgress = trendAnimProgress,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
+                // ── Insights ──────────────────────────────────────────────────────
+                if (effectiveState.topMerchant != null || effectiveState.topCategory != null) {
+                    item {
+                        InsightsCard(state = effectiveState, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+
+                item { Spacer(Modifier.height(DashboardDimens.spaceXxl)) }
+            }
         }
-    }
 }
 
 // AnimatedSlideIn removed — charts use their own entry animations instead
@@ -615,7 +619,11 @@ private fun LabelsCard(
                         barAnimDone.value = true
                         animPct.animateTo(
                             targetValue = pct / 100f,
-                            animationSpec = tween(durationMillis = 800, delayMillis = i * 80, easing = FastOutSlowInEasing),
+                            animationSpec = tween(
+                                durationMillis = 800,
+                                delayMillis = i * 80,
+                                easing = FastOutSlowInEasing
+                            ),
                         )
                     }
                 }
@@ -659,7 +667,8 @@ private fun LabelsCard(
                             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
                     ) {
                         Box(
-                            modifier = Modifier.fillMaxHeight().fillMaxWidth(animPct.value).clip(RoundedCornerShape(1.5.dp))
+                            modifier = Modifier.fillMaxHeight().fillMaxWidth(animPct.value)
+                                .clip(RoundedCornerShape(1.5.dp))
                                 .background(cat.color),
                         )
                     }
@@ -779,6 +788,7 @@ private fun InteractiveTrendChart(
             val step = chartW / (points.size - 1).coerceAtLeast(1)
 
             fun xAt(i: Int) = chartLeft + i * step
+
             // Rise from baseline: each point's Y interpolates from baseline (bottom) to its real Y
             fun yAt(v: Double): Float {
                 val realY = (padTop + chartH - (v / maxVal * chartH * 0.82f)).toFloat()

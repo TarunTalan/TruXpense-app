@@ -86,36 +86,41 @@ class HomeViewModel @Inject constructor(
                     currencyCode = "INR",
                 )
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Aggregated totals ─────────────────────────────────────────────────────
 
     val monthlySpend: StateFlow<Double> =
         expenseRepository.transactions.map { it.sumOf { t -> t.amount } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val expenseCount: StateFlow<Int> =
         expenseRepository.transactions.map { it.size }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     /** True once the repository has emitted its first value (avoids UI flashing). */
-    val isLoaded: StateFlow<Boolean> =
-        expenseRepository.transactions
-            .map { true }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            expenseRepository.transactions.first()
+            _isLoaded.value = true
+        }
+    }
 
     val budgetLimit: StateFlow<Double> =
         budgetRepository.budgets.map { it.sumOf { b -> b.amount } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val budgetLeft: StateFlow<Double> =
         combine(budgetLimit, monthlySpend) { limit, spent -> limit - spent }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val budgetProgress: StateFlow<Float> =
         combine(budgetLimit, monthlySpend) { limit, spent ->
             if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     // ── Top spending categories ───────────────────────────────────────────────
 
@@ -127,7 +132,7 @@ class HomeViewModel @Inject constructor(
                     HomeSpendingCategory(cat, amt, if (total > 0) (amt / total).toFloat() else 0f)
                 }
                 .sortedByDescending { it.amount }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Deep-link helpers ─────────────────────────────────────────────────────
 
