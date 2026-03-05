@@ -6,6 +6,7 @@ import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
 import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.utils.DateTimeUtils
+import com.example.truxpense.presentation.utils.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -94,7 +95,7 @@ class EditExpenseViewModel @Inject constructor(
 
     // ── Event handlers ────────────────────────────────────────────────────────
 
-    fun setRawAmount(v: String) { _rawAmount.value = v.filter { it.isDigit() || it == '.' } }
+    fun setRawAmount(v: String) { _rawAmount.value = sanitizeAmountInput(v) }
     fun setMerchant(v: String) { _merchant.value = v }
     fun setNotes(v: String) { _notes.value = v }
     fun selectCategory(cat: String) { _selectedCategory.value = cat }

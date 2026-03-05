@@ -10,6 +10,7 @@ data class HomeTransactionItem(
     val category: String,
     val amount: Double,
     val currencyCode: String = "INR",
+    val isExpense: Boolean = true,
 ) : Serializable
 
 // ── Category spending summary (used for top-spending breakdown) ───────────────
