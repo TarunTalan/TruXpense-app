@@ -245,8 +245,7 @@ fun CategoryDropdown(
 
                     LazyColumn(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = DashboardDimens.listPaddingH),
+                            .fillMaxWidth(),
                     ) {
                         itemsIndexed(categories) { _, item ->
                             val isCustomItem = item == AppCategories.CUSTOM
@@ -256,64 +255,96 @@ fun CategoryDropdown(
                                 else MaterialTheme.colorScheme.surface
                             val iconRes = iconForCategory(item)
                             val isBudgeted = item.trim().lowercase() in existingBudgetedCategories
-                            val rowModifier = if (isBudgeted) Modifier.blur(6.dp).alpha(0.6f) else Modifier
 
-                            Row(
-                                modifier = rowModifier.clickable(enabled = !isBudgeted) {
-                                    if (isCustomItem) {
-                                        // Switch to custom input mode
-                                        customMode = true
-                                    } else {
-                                        onSelect(item)
-                                        scope.launch { sheetState.hide() }
-                                        dismissDropdown()
-                                    }
-                                },
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = DashboardDimens.listPaddingH),
                             ) {
-                                ListItem(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(DashboardDimens.cornerChip)),
-                                    colors = ListItemDefaults.colors(containerColor = containerColor),
-                                    leadingContent = {
-                                        if (isCustomItem) {
-                                            // Pencil / edit icon for Custom
+                                // The list item — blurred + dimmed when already budgeted
+                                Row(
+                                    modifier = (if (isBudgeted)
+                                        Modifier.blur(3.dp).alpha(0.4f)
+                                    else Modifier)
+                                        .clickable(enabled = !isBudgeted) {
+                                            if (isCustomItem) {
+                                                customMode = true
+                                            } else {
+                                                onSelect(item)
+                                                scope.launch { sheetState.hide() }
+                                                dismissDropdown()
+                                            }
+                                        },
+                                ) {
+                                    ListItem(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(DashboardDimens.cornerChip)),
+                                        colors = ListItemDefaults.colors(containerColor = containerColor),
+                                        leadingContent = {
+                                            if (isCustomItem) {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.add_notes_icon),
+                                                    contentDescription = "Custom category",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(DashboardDimens.iconMd),
+                                                )
+                                            } else {
+                                                Icon(
+                                                    painter = painterResource(iconRes),
+                                                    contentDescription = "$item icon",
+                                                    tint = if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onBackground,
+                                                    modifier = Modifier.size(DashboardDimens.iconMd),
+                                                )
+                                            }
+                                        },
+                                        headlineContent = {
+                                            Text(
+                                                text = if (isCustomItem) "Custom category" else item,
+                                                color = if (isCustomItem) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onBackground,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = if (isSelected || isCustomItem) FontWeight.SemiBold
+                                                else FontWeight.Normal,
+                                            )
+                                        },
+                                        trailingContent = if (isCustomItem) ({
                                             Icon(
-                                                painter = painterResource(R.drawable.add_notes_icon),
-                                                contentDescription = "Custom category",
-                                                tint = MaterialTheme.colorScheme.primary,
+                                                painter = painterResource(R.drawable.drop_down_icon),
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(DashboardDimens.iconMd),
                                             )
-                                        } else {
-                                            Icon(
-                                                painter = painterResource(iconRes),
-                                                contentDescription = "$item icon",
-                                                tint = if (isSelected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onBackground,
-                                                modifier = Modifier.size(DashboardDimens.iconMd),
+                                        }) else null,
+                                    )
+                                }
+
+                                // "Budget set" overlay badge — shown on top of the blurred row
+                                if (isBudgeted) {
+                                    Box(
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .clickable(enabled = false) {},
+                                        contentAlignment = Alignment.CenterEnd,
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant,
+                                            tonalElevation = 2.dp,
+                                            modifier = Modifier.padding(end = DashboardDimens.screenPaddingH),
+                                        ) {
+                                            Text(
+                                                text = "Budget set",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                             )
                                         }
-                                    },
-                                    headlineContent = {
-                                        Text(
-                                            text = if (isCustomItem) "Custom category" else item,
-                                            color = if (isCustomItem) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onBackground,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = if (isSelected || isCustomItem) FontWeight.SemiBold
-                                            else FontWeight.Normal,
-                                        )
-                                    },
-                                    trailingContent = if (isCustomItem) ({
-                                        Icon(
-                                            painter = painterResource(R.drawable.drop_down_icon),
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(DashboardDimens.iconMd),
-                                        )
-                                    }) else null,
-                                )
+                                    }
+                                }
                             }
+
                             if (categories.indexOf(item) < categories.lastIndex) {
                                 Spacer(Modifier.height(4.dp))
                             }

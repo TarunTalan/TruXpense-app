@@ -15,6 +15,7 @@ object NotificationConstants {
     const val NOTIF_BUDGET_100 = 1200  // +category.hashCode() per category
     const val NOTIF_MONTHLY_SUMMARY = 1300
     const val NOTIF_RESET_REMINDER = 1400
+    const val NOTIF_UNUSUAL_SPENDING = 1500
 
     // ── Channel IDs — MUST match NotificationChannels.* exactly ──────────────
     // Previously these were "truxpense_channel_*" which didn't match the

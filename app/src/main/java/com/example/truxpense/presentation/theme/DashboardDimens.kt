@@ -157,7 +157,7 @@ object DashboardDimens {
 
     // ── Corner radii ──────────────────────────────────────────────────────────
     /** Section / large card corners */
-    val cornerCard = 14.dp
+    val cornerCard = 16.dp
 
     /** Chip corners */
     val cornerChip = 8.dp
