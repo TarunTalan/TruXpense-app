@@ -3,22 +3,39 @@ package com.example.truxpense.presentation.screens.dashboard.addexpense
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.graphics.drawable.ColorDrawable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -26,19 +43,22 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
-import com.example.truxpense.presentation.screens.dashboard.components.AccountDropdown
-import com.example.truxpense.presentation.screens.dashboard.components.CategoryDropdown
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.theme.DashboardDimens
-import com.example.truxpense.presentation.theme.DashboardDimens.detailRowHeight
+import com.example.truxpense.presentation.utils.AppCategories
+import com.example.truxpense.presentation.utils.amountAbbreviationHint
+import com.example.truxpense.presentation.utils.amountDisplayText
 import com.example.truxpense.presentation.utils.clearFocusOnTap
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -62,24 +82,28 @@ fun AddExpenseScreen(
     val isFormValid by vm.isFormValid.collectAsState()
 
     val context = LocalContext.current
-
     val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
     val onPrimaryArgb = MaterialTheme.colorScheme.onPrimary.toArgb()
     val onBackgroundArgb = MaterialTheme.colorScheme.onBackground.toArgb()
 
     fun openDatePicker() {
         val now = Calendar.getInstance()
-        val picker = DatePickerDialog(context, { _: android.widget.DatePicker, y: Int, m: Int, d: Int ->
-            val cal = Calendar.getInstance().apply { set(y, m, d) }
-            vm.setDate(SimpleDateFormat("MMM d", Locale.getDefault()).format(cal.time))
-            onDatePick()
-        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH))
+        val picker = DatePickerDialog(
+            context,
+            { _: android.widget.DatePicker, y: Int, m: Int, d: Int ->
+                val cal = Calendar.getInstance().apply { set(y, m, d) }
+                vm.setDate(SimpleDateFormat("MMM d", Locale.getDefault()).format(cal.time))
+                onDatePick()
+            },
+            now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH),
+        )
         picker.setOnShowListener {
             try {
                 picker.window?.setBackgroundDrawable(ColorDrawable(surfaceArgb))
                 picker.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
                 picker.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
         picker.show()
     }
@@ -89,19 +113,20 @@ fun AddExpenseScreen(
         val dialog = TimePickerDialog(
             context,
             { _, hour, minute ->
-                val cal = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, hour); set(Calendar.MINUTE, minute) }
+                val cal = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, hour); set(Calendar.MINUTE, minute)
+                }
                 vm.setTime(SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time))
             },
-            now.get(Calendar.HOUR_OF_DAY),
-            now.get(Calendar.MINUTE),
-            false,
+            now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false,
         )
         dialog.setOnShowListener {
             try {
                 dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceArgb))
                 dialog.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
                 dialog.getButton(TimePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
         dialog.show()
     }
@@ -129,20 +154,25 @@ fun AddExpenseScreen(
             val merchantVal = vm.merchant.value.ifBlank { "Anonymous" }
             val categoryVal = vm.selectedCategory.value ?: "Other"
             vm.saveExpense()
-            onSave(HomeTransactionItem(
-                id = UUID.randomUUID().toString(),
-                title = merchantVal,
-                category = categoryVal,
-                amount = amt,
-                currencyCode = "INR",
-            ))
+            onSave(
+                HomeTransactionItem(
+                    id = UUID.randomUUID().toString(),
+                    title = merchantVal, category = categoryVal,
+                    amount = amt, currencyCode = "INR",
+                )
+            )
         },
         onBack = onBack,
     )
 }
 
-// Parameterized content for AddExpense screen — no Hilt inside, friendly for Preview
-@OptIn(ExperimentalMaterial3Api::class)
+// ══════════════════════════════════════════════════════════════════════════════
+// SCREEN CONTENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+@OptIn(
+    ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class
+)
 @Composable
 fun AddExpenseScreenContent(
     rawAmount: String,
@@ -164,549 +194,710 @@ fun AddExpenseScreenContent(
     onTimePick: () -> Unit = {},
     onSave: () -> Unit,
     onBack: () -> Unit,
-    // New optional parameters for overrides (Edit screen passes these)
     screenTitle: String = "Add expense",
     saveLabel: String? = null,
     extraBottomContent: (@Composable () -> Unit)? = null,
 ) {
+    val focusManager = LocalFocusManager.current
+    val isImeVisible = WindowInsets.isImeVisible
+
+    // When the system dismisses the keyboard (back gesture / done action),
+    // clear focus so no field inadvertently re-summons it on recomposition.
+    LaunchedEffect(isImeVisible) {
+        if (!isImeVisible) focusManager.clearFocus(force = false)
+    }
+
     Scaffold(
+        // ── Zero out Scaffold's own window-inset handling so we control every
+        //    edge ourselves.  This prevents double-inset application.
+        contentWindowInsets = WindowInsets(0),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ScreenTopBar(headerTitle = screenTitle, showBack = true, onBack = onBack) },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
-                .padding(horizontal = DashboardDimens.screenPaddingH)
-                .verticalScroll(rememberScrollState())
-                .clearFocusOnTap(),
-        ) {
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
 
-            // Amount card (separate card above details)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(DashboardDimens.cornerCard),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                elevation = CardDefaults.cardElevation(defaultElevation = DashboardDimens.cardElevation),
+        // ── The bottomBar lifts above the keyboard via imePadding() and stays
+        //    above the system gesture bar via navigationBarsPadding().
+        //    Scaffold measures the resulting height and passes it back as
+        //    innerPadding.bottom, so the scroll column shrinks correctly.
+        bottomBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                shadowElevation = 8.dp,
+                tonalElevation = 0.dp,
             ) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(DashboardDimens.cardPaddingComp),
-                    contentAlignment = Alignment.CenterStart
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()   // respects gesture-nav bar
+                        .imePadding()              // rises above the keyboard
+                        .padding(
+                            horizontal = DashboardDimens.screenPaddingH,
+                            vertical = 12.dp,
+                        ),
                 ) {
-                    AmountInputZone(rawAmount = rawAmount, onRawChange = onRawChange)
+                    SaveButton(
+                        enabled = isFormValid,
+                        onClick = {
+                            // Dismiss keyboard before saving so the transition is clean
+                            focusManager.clearFocus()
+                            onSave()
+                        },
+                        label = saveLabel ?: "Save expense",
+                    )
                 }
             }
+        },
+    ) { innerPadding ->
+        // innerPadding.bottom is the live bottomBar height (grows as keyboard opens).
+        // We do NOT add imePadding() here — that would double-count it.
+        Column(
+            modifier = Modifier.fillMaxSize().padding(innerPadding)            // tracks bottomBar height automatically
+                .padding(horizontal = DashboardDimens.screenPaddingH).verticalScroll(rememberScrollState())
+                .clearFocusOnTap(),               // tap outside a field → dismiss keyboard
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Spacer(Modifier.height(2.dp))
 
-            Spacer(Modifier.height(DashboardDimens.spaceLg))
+            AmountCard(rawAmount = rawAmount, onRawChange = onRawChange)
 
-            // Details card (category, merchant, account, date)
-            DetailsCard(
-                selectedCategory = selectedCategory,
+            CategorySection(
                 categories = categories,
-                onCategorySelect = onSelectCategory,
-                merchant = merchant,
-                onMerchantChange = onMerchantChange,
-                selectedAccount = selectedAccount,
-                accounts = accounts,
-                onAccountSelect = onSelectAccount,
-                selectedDate = selectedDate,
-                selectedTime = selectedTime,
-                onDateClick = onDatePick,
-                onTimeClick = onTimePick,
+                selected = selectedCategory,
+                onSelect = onSelectCategory,
             )
 
-            Spacer(Modifier.height(DashboardDimens.spaceXxl))
+            MerchantField(value = merchant, onChange = onMerchantChange)
 
-            // Notes
+            PaymentMethodField(selectedAccount = selectedAccount, onSelect = onSelectAccount)
+
+            DateTimeRow(
+                selectedDate = selectedDate,
+                selectedTime = selectedTime,
+                // Clear focus (keyboard) before opening a system dialog — prevents
+                // the dialog appearing behind a still-animating keyboard.
+                onDateClick = {
+                    focusManager.clearFocus()
+                    onDatePick()
+                },
+                onTimeClick = {
+                    focusManager.clearFocus()
+                    onTimePick()
+                },
+            )
+
             NotesCard(notes = notes, onChange = onNotesChange)
 
-            Spacer(Modifier.height(DashboardDimens.spaceXxl))
-
-            // Action buttons
-            SaveButton(enabled = isFormValid, onClick = onSave, label = saveLabel ?: "Save expense")
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
-
-            // Optional extra bottom content (e.g., Cancel button for Edit screen)
             if (extraBottomContent != null) {
-                Spacer(Modifier.height(DashboardDimens.spaceMd))
                 extraBottomContent()
             }
 
-            Spacer(Modifier.height(DashboardDimens.spaceXxl))
+            // Bottom guard — ensures the last card never sits flush against the
+            // bottomBar even if innerPadding.bottom momentarily lags.
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
-// ─── ① Amount Input Zone ─────────────────────────────────────────────────────
+// ─── ① Amount Card ────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AmountInputZone(
-    rawAmount: String,
-    onRawChange: (String) -> Unit,
-) {
-    // Single centered text field for amount input
+private fun AmountCard(rawAmount: String, onRawChange: (String) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "How much did you spend?",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(12.dp))
+            AmountInputZone(rawAmount = rawAmount, onRawChange = onRawChange)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AmountInputZone(rawAmount: String, onRawChange: (String) -> Unit) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val textMeasurer = rememberTextMeasurer()
+    val scope = rememberCoroutineScope()
+
+    // BringIntoViewRequester scrolls the card into the visible area when
+    // the keyboard opens and the amount field is focused.
+    val bringIntoView = remember { BringIntoViewRequester() }
+
+    val displayStyle = MaterialTheme.typography.displaySmall.copy(
+        color = MaterialTheme.colorScheme.onBackground,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        letterSpacing = 1.12.sp,
+    )
+
+    val displayText = amountDisplayText(rawAmount)
+    val currencyText = "₹"
+
+    val amountPx = textMeasurer.measure(AnnotatedString(displayText), style = displayStyle).size.width
+    val currencyPx = textMeasurer.measure(AnnotatedString(currencyText), style = displayStyle).size.width
+    val totalDp = with(LocalDensity.current) { (amountPx + currencyPx).toDp() }
+    val fieldWidth = totalDp + 8.dp
+
+    val hint = amountAbbreviationHint(rawAmount, "INR")
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView),
     ) {
-        Text(
-            text = "How much did you spend?",
-            modifier = Modifier,
-            fontSize = DashboardDimens.textInput,
-            color = MaterialTheme.colorScheme.tertiary
-        )
-
-        Spacer(Modifier.height(DashboardDimens.spaceLg))
-
-        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-
-        // Measurement helpers to size the currency+amount tightly
-        val textMeasurer = rememberTextMeasurer()
-        val displayStyle = MaterialTheme.typography.displaySmall.copy(
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            letterSpacing = 1.15.sp
-        )
-        val amountText = rawAmount.ifEmpty { "0" }
-        val currencyText = "₹"
-        val amountLayout = textMeasurer.measure(AnnotatedString(amountText), style = displayStyle)
-        val currencyLayout = textMeasurer.measure(AnnotatedString(currencyText), style = displayStyle)
-        val totalPx = amountLayout.size.width + currencyLayout.size.width
-        val density = LocalDensity.current
-        val totalDp = with(density) { totalPx.toDp() }
-        val finalWidth = totalDp + DashboardDimens.spaceSm
-
         Box(
             modifier = Modifier.fillMaxWidth().clickable(
-            indication = null, interactionSource = remember { MutableInteractionSource() }) {
-            focusRequester.requestFocus()
-            keyboardController?.show()
-        }, contentAlignment = Alignment.Center
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+            ) { focusRequester.requestFocus(); keyboardController?.show() },
+            contentAlignment = Alignment.Center,
         ) {
             BasicTextField(
                 value = rawAmount,
-                onValueChange = onRawChange,
+                onValueChange = { typed ->
+                    onRawChange(typed.filter { it.isDigit() })
+                },
                 singleLine = true,
-                modifier = Modifier.widthIn(min = DashboardDimens.iconButtonMd).width(finalWidth)
-                    .focusRequester(focusRequester),
-                textStyle = displayStyle,
+                modifier = Modifier.widthIn(min = 48.dp).width(fieldWidth).focusRequester(focusRequester)
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            // Delay matches the keyboard slide-in animation (~300 ms)
+                            scope.launch { delay(320); bringIntoView.bringIntoView() }
+                        }
+                    },
+                textStyle = displayStyle.copy(color = Color.Transparent),
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal,
+                    keyboardType = KeyboardType.Number,
                     imeAction = ImeAction.Done,
                 ),
+                keyboardActions = KeyboardActions(
+                    onDone = { keyboardController?.hide() }),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
                 decorationBox = { inner ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.wrapContentWidth()) {
-                        Text(
-                            text = currencyText,
-                            style = displayStyle,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.wrapContentWidth()) {
-                            if (rawAmount.isEmpty()) {
-                                Text(
-                                    text = "0",
-                                    style = displayStyle.copy(color = MaterialTheme.colorScheme.onBackground.copy(0.7f)),
-                                    modifier = Modifier.padding(end = DashboardDimens.spaceXs)
-                                )
-                            }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = currencyText, style = displayStyle)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = displayText,
+                                style = displayStyle.copy(
+                                    color = if (rawAmount.isEmpty()) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                                    else MaterialTheme.colorScheme.onBackground,
+                                ),
+                            )
                             inner()
                         }
                     }
-                })
-        }
-    }
-
-    Spacer(Modifier.height(DashboardDimens.spaceXs))
-}
-
-// ─── ② Details Card ──────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DetailsCard(
-    selectedCategory: String?,
-    categories: List<String>,
-    onCategorySelect: (String) -> Unit,
-    merchant: String,
-    onMerchantChange: (String) -> Unit,
-    selectedAccount: String?,
-    accounts: List<String>,
-    onAccountSelect: (String) -> Unit,
-    selectedDate: String?,
-    selectedTime: String?,
-    onDateClick: () -> Unit,
-    onTimeClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-
-            // ── Row 1: Category ──────────────────────────────────────────────
-            CategoryDropdown(
-                selected = selectedCategory,
-                categories = categories,
-                onSelect = { onCategorySelect(it) },
-                iconForCategory = { cat -> iconForCategory(cat) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = "Select category",
-            )
-
-            RowDivider()
-
-            // ── Row 2: Merchant ───────────────────────────────────────────────
-            DetailRow(
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.add_notes_icon),
-                        contentDescription = null,
-                        tint = if (merchant.isNotBlank()) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(DashboardDimens.iconMd),
-                    )
                 },
-                label = "Merchant",
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                BasicTextField(
-                    value = merchant,
-                    onValueChange = onMerchantChange,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                    decorationBox = { inner ->
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            if (merchant.isEmpty()) {
-                                Text(
-                                    text = "Where did you spend?",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            inner()
-                        }
-                    },
-                )
-            }
-
-            RowDivider()
-
-            // ── Row 3: Account ────────────────────────────────────────────────
-            AccountDropdown(
-                selected = selectedAccount,
-                accounts = accounts,
-                onSelect = { onAccountSelect(it) },
-                iconForAccount = { acc -> iconForAccount(acc) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = "Select account",
-                inline = true,
             )
-
-            RowDivider()
-
-            // ── Row 4: Date + Time (same row) ─────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DashboardDimens.detailRowHeight)
-                    .padding(horizontal = DashboardDimens.screenPaddingH),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
-            ) {
-                // Leading calendar icon
-                Icon(
-                    painter = painterResource(R.drawable.calender),
-                    contentDescription = null,
-                    tint = if (selectedDate != null) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(DashboardDimens.iconMd),
-                )
-
-                // Date chip
-                DateTimeChip(
-                    label = "Date",
-                    value = selectedDate ?: "Pick date",
-                    hasValue = selectedDate != null,
-                    onClick = onDateClick,
-                    modifier = Modifier.weight(1f),
-                )
-
-                // Divider between date and time
-                VerticalDivider(
-                    modifier = Modifier.height(35.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    thickness = DashboardDimens.dividerThin,
-                )
-                // Leading clock icon
-                Icon(
-                    painter = painterResource(R.drawable.time_),
-                    contentDescription = null,
-                    tint = if (selectedDate != null) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(DashboardDimens.iconLg),
-                )
-
-                // Time chip
-                DateTimeChip(
-                    label = "Time",
-                    value = selectedTime ?: "Pick time",
-                    hasValue = selectedTime != null,
-                    onClick = onTimeClick,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun DetailRow(
-    leadingIcon: @Composable () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    trailingIcon: (@Composable () -> Unit)? = null,
-    content: @Composable () -> Unit,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth().height(DashboardDimens.detailRowHeight)
-            .padding(horizontal = DashboardDimens.screenPaddingH),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
-    ) {
-        // Leading icon — consistent slot
-        Box(
-            modifier = Modifier.size(DashboardDimens.iconMd),
-            contentAlignment = Alignment.Center,
-        ) {
-            leadingIcon()
         }
 
-        // Label + value stacked
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center,
+        AnimatedVisibility(
+            visible = hint != null,
+            enter = fadeIn(tween(200)) + expandVertically(tween(200)),
+            exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
         ) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = hint ?: "",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                modifier = Modifier.padding(top = 4.dp),
             )
-            Spacer(Modifier.height(DashboardDimens.spaceXxs))
-            content()
         }
+    }
+}
 
-        // Optional trailing icon
-        if (trailingIcon != null) {
-            Box(
-                modifier = Modifier.size(DashboardDimens.iconMd),
-                contentAlignment = Alignment.Center,
-            ) {
-                trailingIcon()
+// ─── ② Category Section ───────────────────────────────────────────────────────
+
+@Composable
+private fun CategorySection(
+    categories: List<String>,
+    selected: String?,
+    onSelect: (String) -> Unit,
+) {
+    Column {
+        Text(
+            text = "Category",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        val rows = categories.chunked(4)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            rows.forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowItems.forEach { cat ->
+                        CategoryChip(
+                            category = cat,
+                            isSelected = cat == selected,
+                            onSelect = onSelect,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(4 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                }
             }
         }
     }
 }
 
-/** Thin divider with screen-edge inset */
 @Composable
-private fun RowDivider() {
-    HorizontalDivider(
-        modifier = Modifier.fillMaxWidth()
-            .padding(start = DashboardDimens.screenPaddingH + DashboardDimens.iconMd + DashboardDimens.spaceMd),
-        color = MaterialTheme.colorScheme.outlineVariant,
-        thickness = DashboardDimens.dividerThin,
-    )
-}
-
-/** Small tappable chip used for the Date and Time cells in the same row. */
-@Composable
-private fun DateTimeChip(
-    label: String,
-    value: String,
-    hasValue: Boolean,
-    onClick: () -> Unit,
+private fun CategoryChip(
+    category: String,
+    isSelected: Boolean,
+    onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+    val bgColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
+    else MaterialTheme.colorScheme.surfaceContainer
+    val borderWidth = if (isSelected) 1.5.dp else 1.dp
+
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(DashboardDimens.cornerChip))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onClick,
-            )
-            .padding(vertical = DashboardDimens.spaceXs),
-        verticalArrangement = Arrangement.Center,
+        modifier = modifier.clip(RoundedCornerShape(12.dp)).background(bgColor)
+            .border(borderWidth, borderColor, RoundedCornerShape(12.dp)).clickable { onSelect(category) }
+            .padding(horizontal = 4.dp).padding(top = 6.dp, bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Icon(
+            painter = painterResource(iconForCategory(category)),
+            contentDescription = category,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(32.dp),
         )
-        Spacer(Modifier.height(DashboardDimens.spaceXxs))
         Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (hasValue) FontWeight.Medium else FontWeight.Normal,
-            color = if (hasValue) MaterialTheme.colorScheme.onBackground
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            text = category,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
 }
 
+// ─── ③ Merchant Name Field ────────────────────────────────────────────────────
 
-// ─── ③ Notes card, buttons, preview and helpers ───────────────────────────────
-
-private const val NOTES_MAX_CHARS = 100
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NotesCard(notes: String, onChange: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceLg),
-        ) {
-            // Header row — icon + label
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.add_notes_icon),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(DashboardDimens.iconMd),
-                )
-                Text(
-                    text = "Notes",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+private fun MerchantField(value: String, onChange: (String) -> Unit) {
+    val focusRequester = remember { FocusRequester() }
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    var isFocused by remember { mutableStateOf(false) }
 
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
+    Column(modifier = Modifier.bringIntoViewRequester(bringIntoView)) {
+        Text(
+            text = "Merchant name",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
 
-            // Text input — hard-capped at NOTES_MAX_CHARS, max 3 visual lines
-            BasicTextField(
-                value = notes,
-                onValueChange = { if (it.length <= NOTES_MAX_CHARS) onChange(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(DashboardDimens.cornerChip))
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceMdL)
-                    .defaultMinSize(minHeight = DashboardDimens.inputMinHeight),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onBackground,
-                ),
-                maxLines = 3,
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                decorationBox = { inner ->
-                    if (notes.isEmpty()) {
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onBackground,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            modifier = Modifier.fillMaxWidth().height(48.dp).focusRequester(focusRequester).onFocusChanged { state ->
+                isFocused = state.isFocused
+                if (state.isFocused) {
+                    scope.launch { delay(320); bringIntoView.bringIntoView() }
+                }
+            }.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainer).border(
+                width = if (isFocused) 1.5.dp else 1.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(12.dp),
+            ).padding(horizontal = 16.dp),
+            decorationBox = { inner ->
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
                         Text(
-                            text = "Add a few notes to help you remember…",
+                            text = "e.g. Zomato, Swiggy, Ub...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     inner()
-                },
-            )
+                }
+            },
+        )
+    }
+}
 
-            // Character counter
-            Spacer(Modifier.height(DashboardDimens.spaceXs))
+// ─── ④ Date + Time Row ────────────────────────────────────────────────────────
+
+@Composable
+private fun DateTimeRow(
+    selectedDate: String?,
+    selectedTime: String?,
+    onDateClick: () -> Unit,
+    onTimeClick: () -> Unit,
+) {
+    val today = remember { SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date()) }
+    val displayDate = selectedDate ?: today
+    val displayTime = selectedTime ?: remember {
+        SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Date
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${notes.length}/$NOTES_MAX_CHARS",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (notes.length >= NOTES_MAX_CHARS)
-                    MaterialTheme.colorScheme.error
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.End),
+                text = "Date",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 6.dp),
             )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                    .clickable(onClick = onDateClick).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(text = displayDate, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
+                Icon(
+                    painter = painterResource(R.drawable.calender),
+                    contentDescription = "Pick date",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+
+        // Time
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Time",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                    .clickable(onClick = onTimeClick).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(text = displayTime, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
+                Icon(
+                    painter = painterResource(R.drawable.time_),
+                    contentDescription = "Pick time",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
 
+// ─── ⑤ Payment Method Field ──────────────────────────────────────────────────
+
+private val paymentMethods = listOf("Card", "Cash", "UPI", "Net Banking")
+
 @Composable
-private fun SaveButton(enabled: Boolean, onClick: () -> Unit, label: String = "Save expense") {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
-        ),
-        elevation = ButtonDefaults.buttonElevation(0.dp)
-    ) {
-        Text(text = label, fontWeight = FontWeight.SemiBold, fontSize = DashboardDimens.textXl, color = MaterialTheme.colorScheme.background)
+private fun PaymentMethodField(
+    selectedAccount: String?,
+    onSelect: (String) -> Unit = {},
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val triggerWidthPx = remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val cornerRadius = 12.dp
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Payment method",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+                    .onGloballyPositioned { triggerWidthPx.value = it.size.width }
+                    .clip(RoundedCornerShape(cornerRadius)).background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(
+                        width = if (expanded) 1.5.dp else 1.dp,
+                        color = if (expanded) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(cornerRadius),
+                    ).clickable { expanded = true }.padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = selectedAccount ?: "Select payment method",
+                    fontSize = 14.sp,
+                    color = if (selectedAccount != null) MaterialTheme.colorScheme.onBackground
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                val rotation by animateFloatAsState(
+                    targetValue = if (expanded) 180f else 0f,
+                    animationSpec = tween(200),
+                    label = "chevron_rotation",
+                )
+                Icon(
+                    painter = painterResource(R.drawable.drop_down_icon),
+                    contentDescription = "Expand payment method",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = rotation },
+                )
+            }
+
+            val menuWidthDp = with(density) { triggerWidthPx.value.toDp() }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                offset = DpOffset(x = 0.dp, y = 4.dp),
+                modifier = Modifier.width(menuWidthDp).clip(RoundedCornerShape(cornerRadius))
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                paymentMethods.forEach { method ->
+                    val isSelected = method == selectedAccount
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = method,
+                                fontSize = 14.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onBackground,
+                            )
+                        },
+                        onClick = { onSelect(method); expanded = false },
+                        trailingIcon = if (isSelected) ({
+                            Icon(
+                                painter = painterResource(R.drawable.ic_check),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }) else null,
+                        colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
     }
 }
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 844, backgroundColor = 0xFFFFFFFF)
+// ─── ⑥ Notes Card ─────────────────────────────────────────────────────────────
+
+private const val NOTES_MAX_CHARS = 100
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NotesCard(notes: String, onChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(notes.isNotEmpty()) }
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+
+    Card(
+        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView).animateContentSize(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            )
+        ),
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(0.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.add_notes_icon),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = "Notes",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Crossfade(targetState = expanded, label = "notes_icon") { isExpanded ->
+                        if (isExpanded) {
+                            Icon(
+                                Icons.Filled.Close,
+                                "Collapse notes",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Add,
+                                "Add notes",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(
+                    animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
+                    expandFrom = Alignment.Top,
+                ) + fadeIn(tween(220, delayMillis = 40)),
+                exit = shrinkVertically(tween(180), Alignment.Top) + fadeOut(tween(150)),
+            ) {
+                Column {
+                    BasicTextField(
+                        value = notes,
+                        onValueChange = { if (it.length <= NOTES_MAX_CHARS) onChange(it) },
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(horizontal = 14.dp, vertical = 12.dp).defaultMinSize(minHeight = 64.dp)
+                            .onFocusChanged { state ->
+                                if (state.isFocused) {
+                                    scope.launch { delay(320); bringIntoView.bringIntoView() }
+                                }
+                            },
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                        maxLines = 3,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        decorationBox = { inner ->
+                            if (notes.isEmpty()) {
+                                Text(
+                                    "Add a few notes to help you later",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            inner()
+                        },
+                    )
+                    Text(
+                        text = "${notes.length}/$NOTES_MAX_CHARS",
+                        fontSize = 11.sp,
+                        color = if (notes.length >= NOTES_MAX_CHARS) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Save Button ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun SaveButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    label: String = "Save expense",
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
+        ),
+        elevation = ButtonDefaults.buttonElevation(0.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimary
+        )
+    }
+}
+
+// ─── Preview ──────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun AddExpenseScreenPreview() {
-    AddExpenseScreenContent(
-        rawAmount = "1200",
-        merchant = "Cafe",
-        notes = "Lunch",
-        selectedCategory = "Food",
-        selectedAccount = "Cash",
-        categories = AppCategories.all,
-        accounts = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI"),
-        selectedDate = "Mar 4",
-        selectedTime = "09:30 AM",
-        isFormValid = true,
-        onRawChange = {},
-        onMerchantChange = {},
-        onNotesChange = {},
-        onSelectCategory = {},
-        onSelectAccount = {},
-        onDatePick = {},
-        onSave = {},
-        onBack = {})
+    MaterialTheme {
+        AddExpenseScreenContent(
+            rawAmount = "", merchant = "", notes = "",
+            selectedCategory = "Food", selectedAccount = null,
+            categories = AppCategories.all, accounts = listOf("Card", "Cash", "UPI"),
+            selectedDate = null, selectedTime = null, isFormValid = true,
+            onRawChange = {}, onMerchantChange = {}, onNotesChange = {},
+            onSelectCategory = {}, onSelectAccount = {},
+            onDatePick = {}, onTimePick = {}, onSave = {}, onBack = {},
+        )
+    }
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 private fun iconForCategory(category: String?): Int = when (category?.trim()?.lowercase()) {
     "food" -> R.drawable.food
     "transport" -> R.drawable.transport
-    "bills" -> R.drawable.bills
+    "bills" -> R.drawable.bills_ic
     "shopping" -> R.drawable.shopping
     "travel" -> R.drawable.category_icon
     "health" -> R.drawable.health
     "education" -> R.drawable.category_icon
     "entertainment" -> R.drawable.entertainment
-    "groceries" -> R.drawable.groceries
+    "groceries" -> R.drawable.drink
     else -> R.drawable.category_icon
-}
-
-private fun iconForAccount(account: String?): Int = when (account?.trim()?.lowercase()) {
-    "hdfc bank", "hdfc" -> R.drawable.bills
-    "sbi", "sbi bank" -> R.drawable.bills
-    "icici bank", "icici" -> R.drawable.bills
-    "axis bank", "axis" -> R.drawable.bills
-    "cash" -> R.drawable.bills
-    "upi" -> R.drawable.bills
-    else -> R.drawable.bills
 }

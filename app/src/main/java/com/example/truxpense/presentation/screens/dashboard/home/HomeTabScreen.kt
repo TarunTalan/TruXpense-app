@@ -46,6 +46,7 @@ import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.theme.TruXpenseTheme
 import com.example.truxpense.presentation.utils.currencyFormat
 import com.example.truxpense.presentation.utils.toCurrency
+import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.abs
@@ -857,7 +858,21 @@ private fun TxHeader(text: String, modifier: Modifier, align: TextAlign) {
 
 @Composable
 private fun TxRow(tx: HomeTransactionItem) {
-    val isCredit = tx.amount > 0
+    val isCredit = !tx.isExpense          // income = credit = green; expense = debit = normal
+    val absAmount = abs(tx.amount)
+    val sign = if (isCredit) "+" else "-"
+
+    // Currency symbol
+    val symbol = remember(tx.currencyCode) {
+        runCatching {
+            Currency.getInstance(tx.currencyCode).getSymbol(Locale.getDefault())
+        }.getOrDefault("₹")
+    }
+
+    // Abbreviated display: "₹1.23L", "₹2.50Cr", "$1.23M" etc.
+    val abbreviated = formatAbbreviatedAmount(absAmount, tx.currencyCode)
+    val amountText = "$sign$symbol$abbreviated"
+
     Row(
         modifier = Modifier.fillMaxWidth().clickable { }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -872,7 +887,6 @@ private fun TxRow(tx: HomeTransactionItem) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-
         Text(
             text = tx.category,
             fontSize = 13.sp,
@@ -881,15 +895,17 @@ private fun TxRow(tx: HomeTransactionItem) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        // Amount
+        // Amount — credit (income) tinted tertiary/green, expense uses onBackground
         Text(
-            text = "${if (isCredit) "+" else "-"}₹${String.format("%,.0f", abs(tx.amount))}",
+            text = amountText,
             modifier = Modifier.weight(0.9f),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (isCredit) MaterialTheme.colorScheme.tertiary
+                    else MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.End,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1082,36 +1098,6 @@ private fun InsightCardPreview() {
 @Composable
 private fun SpendingTrendsPreview() {
     TruXpenseTheme {
-        Surface(modifier = Modifier.padding(16.dp)) {
-            SpendingTrendsCard(
-                dailySpendPoints = floatArrayOf(
-                    200f, 0f, 450f, 300f, 150f, 600f, 50f,
-                    400f, 320f, 0f, 750f, 250f, 180f, 420f,
-                    0f, 310f, 500f, 95f, 630f, 200f, 0f,
-                    410f, 280f, 360f, 140f, 0f, 800f, 230f,
-                    170f, 520f, 390f,
-                ),
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Trend – empty state")
-@Composable
-private fun SpendingTrendsEmptyPreview() {
-    TruXpenseTheme {
-        Surface(modifier = Modifier.padding(16.dp)) {
-            SpendingTrendsCard(dailySpendPoints = FloatArray(0))
-        }
-    }
-}
-
-@Preview(
-    showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, name = "Trend – dark mode"
-)
-@Composable
-private fun SpendingTrendsDarkPreview() {
-    TruXpenseTheme(darkTheme = true) {
         Surface(modifier = Modifier.padding(16.dp)) {
             SpendingTrendsCard(
                 dailySpendPoints = floatArrayOf(

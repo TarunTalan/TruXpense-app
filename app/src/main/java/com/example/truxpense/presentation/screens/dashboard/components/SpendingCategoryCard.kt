@@ -13,9 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.presentation.utils.progressColor
-import com.example.truxpense.presentation.utils.toCurrency
-import com.example.truxpense.presentation.screens.dashboard.home.HomeSpendingCategory
-import java.text.NumberFormat
 
 
 @Composable
@@ -119,35 +116,3 @@ fun SpendingCategoryCard(
     }
 }
 
-// Overload used by HomeTabScreen: accept a HomeSpendingCategory and a NumberFormat (fmt)
-@Composable
-fun SpendingCategoryCard(
-    category: HomeSpendingCategory,
-    fmt: NumberFormat,
-    modifier: Modifier = Modifier,
-    errorColor: Color = MaterialTheme.colorScheme.error,
-    titleColor: Color? = null,
-    progressMultiplier: Float = 1f,
-) {
-    val raw = category.amount.toCurrency(fmt)
-    // Trim trailing decimals when not abbreviated (e.g., remove ".00"), but keep abbreviated forms like "1.2K"
-    fun trimmedAmount(s: String): String {
-        // if contains alphabetic abbreviation (K/M etc), return as-is
-        if (s.contains(Regex("[A-Za-z]"))) return s
-        val dot = s.lastIndexOf('.')
-        if (dot == -1) return s
-        val frac = s.substring(dot + 1).replace(Regex("\\D"), "")
-        return if (frac.all { it == '0' }) s.substring(0, dot) else s
-    }
-
-    val amountText = trimmedAmount(raw)
-    SpendingCategoryCard(
-        name = category.name,
-        amountText = amountText,
-        progress = category.progress,
-        modifier = modifier,
-        errorColor = errorColor,
-        titleColor = titleColor,
-        progressMultiplier = progressMultiplier,
-    )
-}
