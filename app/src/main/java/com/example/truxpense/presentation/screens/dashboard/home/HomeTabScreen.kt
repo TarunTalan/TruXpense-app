@@ -1,16 +1,17 @@
 package com.example.truxpense.presentation.screens.dashboard.home
 
+import android.graphics.Color.rgb
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,32 +21,62 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategory
+import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategoryDisplay
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.*
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationViewModel
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.theme.TruXpenseTheme
 import com.example.truxpense.presentation.utils.currencyFormat
-import com.example.truxpense.presentation.utils.formatAmountParts
 import com.example.truxpense.presentation.utils.toCurrency
+import java.text.NumberFormat
+import java.util.*
+import kotlin.math.abs
 
+
+private val BgColor = Color(0xFFF0F2F5)
+private val TealColor = Color(0xFF1BAF9D)
+private val AmberColor = Color(0xFFF5A623)
+private val SubColor = Color(0xFF8490A8)
+private val IconBlue = Color(0xFFEBF1FF)
+private val IconOrange = Color(0xFFFEF0E4)
+private val IconGreen = Color(0xFFE4F7EF)
+private val IconPurple = Color(0xFFF0EAFF)
+
+@Composable
+private fun GlassCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) = GradientCard(modifier = modifier, elevation = 2.dp, content = content)
 
 @Composable
 fun HomeTabScreen(
     vm: HomeViewModel,
     onAddExpense: (() -> Unit)? = null,
+    onAddIncome: (() -> Unit)? = null,
     onNavigateToBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
+    onNavigateToAnalytics: (() -> Unit)? = null,
 ) {
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
@@ -60,12 +91,9 @@ fun HomeTabScreen(
         derivedStateOf { currencyVm.selectedCurrency.value?.code ?: "INR" }
     }
 
-    // Animate the whole screen in once data is ready — no hard blank→spinner→content flash
     AnimatedVisibility(
         visible = isLoaded,
-        enter = fadeIn(
-            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
-        ),
+        enter = fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)),
     ) {
         if (expenseCount == 0) {
             EmptyHomeContent(
@@ -78,6 +106,7 @@ fun HomeTabScreen(
                 hasSmsPermission = hasSmsPermission,
                 pendingCount = pendingCount,
                 onAddExpense = onAddExpense,
+                onAddIncome = onAddIncome,
                 onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
                 currencyCode = currencyCode,
                 vm = vm,
@@ -86,11 +115,11 @@ fun HomeTabScreen(
                 onNotificationsClick = onNotificationsClick,
                 onProfileClick = onProfileClick,
                 onPendingReviewClick = onPendingReviewClick,
+                onNavigateToAnalytics = onNavigateToAnalytics, // pass through
             )
         }
     }
 }
-
 
 @Composable
 fun HomeTabContent(
@@ -98,6 +127,7 @@ fun HomeTabContent(
     hasSmsPermission: Boolean,
     pendingCount: Int = 0,
     onAddExpense: (() -> Unit)? = null,
+    onAddIncome: (() -> Unit)? = null,
     onSmsGranted: (() -> Unit)? = null,
     currencyCode: String = "INR",
     vm: HomeViewModel = hiltViewModel(),
@@ -106,29 +136,34 @@ fun HomeTabContent(
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
+    onNavigateToAnalytics: (() -> Unit)? = null, // new optional callback here
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
     val notificationVm: NotificationViewModel = hiltViewModel()
     val unreadCount by notificationVm.unreadCount.collectAsState()
-    val topCategories by vm.topCategories.collectAsState(initial = emptyList())
-    val recentTx by vm.recentTransactions.collectAsState(initial = emptyList<HomeTransactionItem>())
-    // Budget VM for real budget data
+    val recentTx by vm.recentTransactions.collectAsState(initial = emptyList())
     val budgetVm: BudgetViewModel = hiltViewModel()
-    val budgetItems by budgetVm.categoryDisplayItems.collectAsState(initial = emptyList())
+    val budgetDisplayItems by budgetVm.categoryDisplayItems.collectAsState(initial = emptyList())
     val hasBudgets by budgetVm.hasBudgets.collectAsState(initial = false)
-    val totalBudget by budgetVm.totalBudget.collectAsState()
-    val totalSpentInBudgets by budgetVm.totalSpent.collectAsState()
-    // compute overall progress as Float only when budgets exist
-    val overallProgress: Float = if (hasBudgets) {
-        if (totalBudget > 0) (totalSpentInBudgets.toFloat() / totalBudget.toFloat()).coerceIn(0f, 1f) else 0f
-    } else 0f
+    val totalBudgetInt by budgetVm.totalBudget.collectAsState()
+    val totalSpentInt by budgetVm.totalSpent.collectAsState()
+    val totalBudget = totalBudgetInt.toDouble()
+    val totalSpent = totalSpentInt.toDouble()
+    val budgetLeft = (totalBudget - totalSpent).coerceAtLeast(0.0)
 
-    // One-shot progress bar fill — fires once when this screen is navigated to
+    // Real income & savings from HomeViewModel
+    val monthlyIncome by vm.monthlyIncome.collectAsState()
+    val monthlySavings by vm.monthlySavings.collectAsState()
+
+    // Per-day spending for the spending-trends chart
+    val dailySpendPoints by vm.dailySpendPoints.collectAsState()
+
+    // Animated progress multiplier (fires once on enter)
     var progTriggered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { progTriggered = true }
-    val progMultiplier by animateFloatAsState(
+    val progMul by animateFloatAsState(
         targetValue = if (progTriggered) 1f else 0f,
-        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        animationSpec = tween(800, easing = FastOutSlowInEasing),
         label = "home_progress",
     )
 
@@ -137,39 +172,35 @@ fun HomeTabContent(
         topBar = {
             ScreenTopBar(
                 headerTitle = "TruXpense",
-                showBack = false,
                 showProfileIcons = true,
+                unreadCount = unreadCount,
                 onNotificationsClick = { onNotificationsClick?.invoke() },
                 onProfileClick = { onProfileClick?.invoke() },
-                unreadCount = unreadCount
             )
-        },
-        floatingActionButton = {
-            AddFab(onClick = { onAddExpense?.invoke() })
         },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(
-                start = DashboardDimens.screenPaddingH,
-                end = DashboardDimens.screenPaddingH,
-                top = DashboardDimens.spaceLg,
-                bottom = DashboardDimens.spaceLg,
+                start = 16.dp,
+                end = 16.dp,
+                top = 12.dp,
+                bottom = 96.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
 
-            // SMS permission banner
+            // ── SMS / Pending banners ─────────────────────────────────────────
+
             if (!hasSmsPermission) {
                 item {
-                    SmsPermissionBanner(
+                    SmsBanner(
                         modifier = Modifier.fillMaxWidth(),
-                        onGranted = { onSmsGranted?.invoke() },
+                        onEnable = { onSmsGranted?.invoke() },
                     )
                 }
             }
 
-            // Pending SMS transactions banner
             if (hasSmsPermission && pendingCount > 0) {
                 item {
                     PendingSmsBanner(
@@ -180,325 +211,691 @@ fun HomeTabContent(
                 }
             }
 
-            // Monthly spend
+            // ── Spend this month ──────────────────────────────────────────────
+
             item {
-                SectionCard(title = "Spend this month") {
-                    Text(
-                        text = monthlySpend.toCurrency(fmt),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.SemiBold,
+                SpendThisMonthCard(
+                    monthlySpend = monthlySpend,
+                    income = monthlyIncome,
+                    savings = monthlySavings,
+                    budgetLeft = budgetLeft,
+                    fmt = fmt,
+                )
+            }
+
+            // ── Quick Actions ─────────────────────────────────────────────────
+
+            item {
+                QuickActionsRow(
+                    onAddExpense = { onAddExpense?.invoke() },
+                    onAddIncome = { onAddIncome?.invoke() },
+                    onSetBudget = { onNavigateToBudget?.invoke() },
+                    onSavings = { /* TODO: savings goal screen */ },
+                )
+            }
+
+            // ── Budget overview ───────────────────────────────────────────────
+
+            if (hasBudgets && budgetDisplayItems.isNotEmpty()) {
+                item {
+                    BudgetOverviewCard(
+                        budgetLeft = budgetLeft,
+                        budgetDisplayItems = budgetDisplayItems,
+                        progMul = progMul,
+                        fmt = fmt,
+                        onDetails = { onNavigateToBudget?.invoke() },
                     )
                 }
             }
 
-            // Budget summary — show only when user has created budgets
-            if (hasBudgets && budgetItems.isNotEmpty()) {
-                // overall budget progress computed from BudgetViewModel totals
-                item {
-                    SectionCard(
-                        title = "Budget",
-                        trailingContent = {
-                            // Use `secondary` as background color in dark mode, keep primaryContainer in light mode.
-                            val detailContainer =
-                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primaryContainer
-                            val detailContent =
-                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onPrimaryContainer
-                            FilledTonalButton(
-                                onClick = { onNavigateToBudget?.invoke() },
-                                contentPadding = PaddingValues(
-                                    start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg
-                                ),
-                                modifier = Modifier.height(DashboardDimens.buttonHeightSm),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = detailContainer,
-                                    contentColor = detailContent,
-                                )
-                            ) {
-                                Text("Details", style = MaterialTheme.typography.labelMedium)
-                            }
-                        },
-                    ) {
-                        Text(
-                            text = "${(totalBudget.toDouble() - totalSpentInBudgets.toDouble()).toCurrency(fmt)} of ${
-                                totalBudget.toDouble().toCurrency(fmt)
-                            }",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(DashboardDimens.spaceMdL))
-                        BudgetProgressBar(progress = overallProgress, progressMultiplier = progMultiplier)
-                    }
-                }
+            // ── Spending trends ───────────────────────────────────────────────
+
+            item {
+                SpendingTrendsCard(dailySpendPoints = dailySpendPoints)
             }
 
-            // Insight nudge
+            // ── AI Insight ────────────────────────────────────────────────────
+
             item {
                 InsightCard(
                     message = "You spent more on food this week than usual",
-                    actionText = "Consider setting a weekly limit",
-                    onAction = { /* navigate */ },
+                    actionText = "Review food spending",
+                    onAction = { onNavigateToAnalytics?.invoke() }, // navigate when tapped
                 )
             }
 
-            // Top spending categories
-            item {
-                SectionHeader(text = "Highest spending categories this month")
-            }
+            // ── Recent transactions ───────────────────────────────────────────
 
-            items(topCategories, key = { it.name }) { category ->
-                SpendingCategoryCard(
-                    category = category,
-                    fmt = fmt,
-                    errorColor = MaterialTheme.colorScheme.error,
-                    progressMultiplier = progMultiplier,
-                )
-            }
-
-            // Recent transactions
             item {
                 RecentTransactionsCard(
-                    transactions = recentTx, onViewAll = { onViewAll?.invoke() })
-            }
-
-            // FAB clearance — last item never hidden behind the FAB
-            item { Spacer(Modifier.height(DashboardDimens.fabClearance)) }
-        }
-    }
-}
-
-// Section card
-
-@Composable
-private fun SectionCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    trailingContent: (@Composable () -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation),
-    ) {
-        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    transactions = recentTx,
+                    onViewAll = { onViewAll?.invoke() },
                 )
-                trailingContent?.invoke()
             }
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
-            content()
         }
     }
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = DashboardDimens.spaceXs),
+private fun SmsBanner(
+    modifier: Modifier = Modifier,
+    onEnable: () -> Unit,
+) {
+    val startGrd = MaterialTheme.colorScheme.surfaceContainerLowest
+    val endGrd = MaterialTheme.colorScheme.surfaceContainerHighest
+    // Gradient: from rgba(255,244,229,1) to rgba(179,116,26,1) with 20% transition
+    val smsGradient = remember {
+        Brush.horizontalGradient(
+            0.0f to startGrd,
+            1f to endGrd,
+        )
+    }
+    val borderColor = if (isSystemInDarkTheme()) Color(0xFFF4A62A) else Color(rgb(244, 166, 42))
+    val txtColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceContainerHighest else Color.White
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(DashboardDimens.cornerCard)).background(smsGradient).border(
+            color = borderColor, width = 1.dp, shape = RoundedCornerShape(DashboardDimens.cornerCard)
+        ).padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.sms_icon),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.size(DashboardDimens.iconMd)
+            )
+
+            Text(
+                text = "Enable SMS access",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.errorContainer,
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = onEnable,
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = txtColor,
+                ),
+                // fixed smaller height + comfortable vertical padding so the text doesn't get squashed
+                modifier = Modifier.height(30.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+            ) {
+                Text("Enable", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            }
+        }
+
+        Text(
+            text = "Automatically track expenses from bank sms.",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.errorContainer,
+            lineHeight = 15.sp,
+            maxLines = 1
+        )
+    }
+}
+
+
+@Composable
+private fun SpendThisMonthCard(
+    monthlySpend: Double,
+    income: Double,
+    savings: Double,
+    budgetLeft: Double,
+    fmt: NumberFormat,
+) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            // Label
+            Text(
+                text = "Spend this month",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            Spacer(Modifier.height(6.dp))
+            // Amount
+            Text(
+                text = monthlySpend.toCurrency(fmt),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                letterSpacing = (-0.8).sp,
+                lineHeight = 36.sp,
+            )
+            // Change indicator
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = 6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = AmberColor,
+                    modifier = Modifier.size(13.dp).graphicsLayer { rotationZ = -90f },
+                )
+                Text(
+                    text = "12% vs Feb",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            // Divider + mini stats
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 16.dp),
+                color = MaterialTheme.colorScheme.outline.copy(0.3f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            ) {
+                MiniStat(
+                    label = "Income",
+                    value = income.toCurrency(fmt),
+                    modifier = Modifier.weight(1f),
+                )
+                VerticalDivider(
+                    modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f)
+                )
+                MiniStat(
+                    label = "Savings",
+                    value = savings.toCurrency(fmt),
+                    modifier = Modifier.weight(1f),
+                )
+                VerticalDivider(modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f))
+                MiniStat(
+                    label = "Left",
+                    value = budgetLeft.toCurrency(fmt),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = label.uppercase(),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.secondary,
+            letterSpacing = 0.5.sp,
+        )
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
+}
+
+// QUICK ACTIONS ROW
+@Composable
+private fun QuickActionsRow(
+    onAddExpense: () -> Unit,
+    onAddIncome: () -> Unit,
+    onSetBudget: () -> Unit,
+    onSavings: () -> Unit,
+) {
+    Column {
+        Text(
+            text = "Quick actions",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 10.dp),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QuickActionItem(
+                label = "Add expense",
+                bgColor = IconBlue,
+                iconRes = R.drawable.add,
+                onClick = onAddExpense,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionItem(
+                label = "Add income",
+                bgColor = IconOrange,
+                iconRes = R.drawable.add_inocme,
+                onClick = onAddIncome,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionItem(
+                label = "Set budget",
+                bgColor = IconGreen,
+                iconRes = R.drawable.budget,
+                onClick = onSetBudget,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionItem(
+                label = "Savings goal",
+                bgColor = IconPurple,
+                iconRes = R.drawable.savings,
+                onClick = onSavings,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickActionItem(
+    label: String,
+    bgColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconRes: Int? = null,
+) {
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(bgColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    modifier = Modifier.size(24.dp),
+                    tint = Color.Unspecified
+                )
+            } else {
+                // fallback: empty box to preserve layout
+                Spacer(modifier = Modifier.size(24.dp))
+            }
+        }
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            lineHeight = 14.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+
+// BUDGET OVERVIEW CARD
+// Budget display item — map from your BudgetViewModel's categoryDisplayItems
+data class BudgetDisplayItem(
+    val name: String,
+    val spent: Double,
+    val limit: Double,
+) {
+    val progress: Float get() = if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
+    val remaining: Double get() = (limit - spent).coerceAtLeast(0.0)
+    val isOverspent: Boolean get() = spent > limit
+}
+
+@Composable
+private fun BudgetOverviewCard(
+    budgetLeft: Double,
+    budgetDisplayItems: List<BudgetCategoryDisplay>,
+    progMul: Float,
+    fmt: NumberFormat,
+    onDetails: () -> Unit,
+) {
+    // Map BudgetCategoryDisplay → BudgetDisplayItem for the UI
+    val displayItems = remember(budgetDisplayItems) {
+        budgetDisplayItems.take(4).map { bcd ->
+            BudgetDisplayItem(
+                name = bcd.category.name,
+                spent = bcd.category.spent.toDouble(),
+                limit = bcd.category.total.toDouble(),
+            )
+        }
+    }
+
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Remaining amount
+                Text(
+                    text = "Budget Remaining",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = budgetLeft.toCurrency(fmt),
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        letterSpacing = (-0.5).sp,
+                    )
+                    Button(
+                        onClick = onDetails,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = TealColor,
+                            contentColor = Color.White,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        modifier = Modifier.height(30.dp),
+                    ) {
+                        Text(
+                            "Details",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.background,
+                        )
+                    }
+                }
+                Text(
+                    text = buildAnnotatedString {
+                        val cal = Calendar.getInstance()
+                        val daysLeft = cal.getActualMaximum(Calendar.DAY_OF_MONTH) - cal.get(Calendar.DAY_OF_MONTH) + 1
+                        val safePerDay = if (daysLeft > 0) budgetLeft / daysLeft else 0.0
+                        append("$daysLeft more days · ")
+                        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
+                            append("${safePerDay.toCurrency(fmt)}/day safe to spend")
+                        }
+                    },
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // Per-category budget items
+                displayItems.forEachIndexed { index, item ->
+                    BudgetCategoryItem(item = item, progMul = progMul, fmt = fmt)
+                    if (index < displayItems.lastIndex) {
+                        Spacer(Modifier.height(13.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BudgetCategoryItem(
+    item: BudgetDisplayItem,
+    progMul: Float,
+    fmt: NumberFormat,
+) {
+    val fillColor = when {
+        item.progress > 0.85f -> Color(0xFFE53935) to Color(0xFFFF7066)
+        item.progress > 0.65f -> Color(0xFFF5A623) to Color(0xFFFFCA72)
+        else -> TealColor to Color(0xFF4DD6C7)
+    }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = item.name,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Row {
+                Text(
+                    text = item.spent.toCurrency(fmt),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Text(
+                    text = "/${item.limit.toCurrency(fmt)}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        // Progress track
+        Box(
+            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(999.dp))
+                .background(Color(0xFFF0F2F5)),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(item.progress * progMul).fillMaxHeight()
+                    .clip(RoundedCornerShape(999.dp)).background(
+                        Brush.horizontalGradient(listOf(fillColor.first, fillColor.second))
+                    ),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "${item.remaining.toCurrency(fmt)} left this month",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (item.isOverspent) fillColor.first else TealColor,
+        )
+    }
+}
+
+// SPENDING TRENDS CARD  — thin wrapper around the shared SpendingTrendChart
+@Composable
+private fun SpendingTrendsCard(dailySpendPoints: FloatArray = FloatArray(0)) {
+    val cal = remember { Calendar.getInstance() }
+    val monthName = remember { cal.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.getDefault()) ?: "" }
+    val year = remember { cal.get(Calendar.YEAR) }
+    val today = remember { cal.get(Calendar.DAY_OF_MONTH) }
+
+    val points = remember<List<SpendPoint>>(dailySpendPoints, monthName, year, today) {
+        dailySpendPoints.toSpendPoints(monthName = monthName, year = year, todayDay = today)
+    }
+
+    SpendingTrendCard(
+        points = points,
+        pillLabel = "$monthName $year",
     )
 }
 
-
-// Insight nudge card
-
+// ══════════════════════════════════════════════════════════════════════════════
+// INSIGHT CARD
+// ══════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun InsightCard(
     message: String,
     actionText: String,
     onAction: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerCard))
+            .background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = onAction).border(
+                color = MaterialTheme.colorScheme.onSurface.copy(0.7f),
+                width = 1.dp,
+                shape = RoundedCornerShape(DashboardDimens.cornerCard)
+            ).padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Column(modifier = Modifier.padding(DashboardDimens.cardPadding)) {
+        Icon(
+            painterResource(R.drawable.bulb), contentDescription = null, tint = Color.Unspecified
+        )
+        Column {
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(DashboardDimens.spaceSm))
-            Text(
-                text = actionText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable(onClick = onAction),
+                color = MaterialTheme.colorScheme.onBackground.copy(0.8f),
+                lineHeight = 19.sp,
             )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.padding(top = 5.dp),
+            ) {
+                Text(
+                    text = actionText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = TealColor,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
         }
     }
 }
 
-// Recent transactions card
 
+// RECENT TRANSACTIONS CARD
 @Composable
 fun RecentTransactionsCard(
     modifier: Modifier = Modifier,
     transactions: List<HomeTransactionItem>,
     onViewAll: (() -> Unit)? = null,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
-        Column(modifier = Modifier.padding(vertical = DashboardDimens.spaceXs)) {
-
+    GlassCard(modifier = modifier.fillMaxWidth()) {
+        Column {
             // Header
             Row(
-                modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = DashboardDimens.screenPaddingH,
-                    vertical = DashboardDimens.spaceLg,
-                ),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 0.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "Recent transactions",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
                     text = "View all",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onViewAll?.invoke() })
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.clickable { onViewAll?.invoke() },
+                )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.background)
-            Spacer(Modifier.height(DashboardDimens.spaceLg))
-            // Column labels (increase vertical padding to spaceXl)
+            // Column headers
             Row(
-                modifier = Modifier.fillMaxWidth().padding(
-                    start = DashboardDimens.screenPaddingH,
-                    end = DashboardDimens.screenPaddingH,
-                    top = DashboardDimens.spaceMd,
-                    bottom = DashboardDimens.spaceMd,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TxColumnLabel("Transaction", Modifier.weight(1f), TextAlign.Start)
-                TxColumnLabel("Category", Modifier.weight(1f), TextAlign.Center)
-                TxColumnLabel("Amount", Modifier.weight(1f), TextAlign.End)
+                TxHeader("Merchant", Modifier.weight(1.1f), TextAlign.Start)
+                TxHeader("Category", Modifier.weight(1f), TextAlign.Center)
+                TxHeader("Amount", Modifier.weight(0.9f), TextAlign.End)
             }
-
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.3f))
 
             if (transactions.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(DashboardDimens.screenPaddingH),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "No recent transactions",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        color = SubColor,
                     )
                 }
             } else {
-                val display = transactions.take(3)
-                display.forEachIndexed { index, tx ->
-                    TransactionRow(tx = tx)
-                    if (index < display.lastIndex) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
+                transactions.take(3).forEachIndexed { idx, tx ->
+                    TxRow(tx = tx)
+                    if (idx < transactions.take(3).lastIndex) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
                     }
                 }
             }
-
-            Spacer(Modifier.height(DashboardDimens.spaceXs))
+            Spacer(Modifier.height(4.dp))
         }
     }
 }
 
 @Composable
-private fun TxColumnLabel(text: String, modifier: Modifier, align: TextAlign) {
+private fun TxHeader(text: String, modifier: Modifier, align: TextAlign) {
     Text(
-        text = text,
+        text = text.uppercase(),
         modifier = modifier,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.secondary.copy(0.9f),
         textAlign = align,
     )
 }
 
 @Composable
-private fun TransactionRow(tx: HomeTransactionItem) {
-    val (prefix, numeric, suffix) = formatAmountParts(tx.amount, tx.currencyCode)
+private fun TxRow(tx: HomeTransactionItem) {
+    val isCredit = tx.amount > 0
     Row(
-        modifier = Modifier.fillMaxWidth().padding(
-            horizontal = DashboardDimens.screenPaddingH,
-            vertical = DashboardDimens.spaceXl,
-        ),
+        modifier = Modifier.fillMaxWidth().clickable { }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = tx.title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.weight(1.1f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onBackground,
         )
+
         Text(
             text = tx.category,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.secondary.copy(0.9f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (prefix.isNotEmpty()) {
-                Text(
-                    prefix,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(Modifier.width(DashboardDimens.spaceXxs))
-            }
-            Text(
-                text = numeric,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            if (suffix.isNotEmpty()) {
-                Spacer(Modifier.width(DashboardDimens.spaceXs))
-                Text(
-                    suffix,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        }
+        // Amount
+        Text(
+            text = "${if (isCredit) "+" else "-"}₹${String.format("%,.0f", abs(tx.amount))}",
+            modifier = Modifier.weight(0.9f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
     }
 }
 
-// ── Pending SMS Transactions Banner ──────────────────────────────────────────
 
+// PENDING SMS BANNER  (reused from original, kept intact)
 @Composable
 fun PendingSmsBanner(
     count: Int,
@@ -508,41 +905,33 @@ fun PendingSmsBanner(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
         onClick = onClick,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.tertiary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("💳", fontSize = 18.sp)
-            }
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary),
+                contentAlignment = Alignment.Center,
+            ) { Text("💳", fontSize = 18.sp) }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "$count new transaction${if (count > 1) "s" else ""} detected",
-                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
                 Text(
                     text = "Tap to review and confirm",
-                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                 )
             }
-            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
             )
@@ -550,138 +939,189 @@ fun PendingSmsBanner(
     }
 }
 
-// Preview
+// ══════════════════════════════════════════════════════════════════════════════
+// PREVIEWS
+// ══════════════════════════════════════════════════════════════════════════════
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun HomeTabScreenPreview() {
-    val sampleTopCategories = listOf(
-        HomeSpendingCategory("Food", 4250.0, 0.42f),
-        HomeSpendingCategory("Shopping", 2250.0, 0.22f),
-        HomeSpendingCategory("Transport", 450.0, 0.045f),
-    )
-    val sampleRecent = listOf(
-        HomeTransactionItem(id = "tx1", title = "Zomato", category = "Food", amount = 500.0, currencyCode = "INR"),
-        HomeTransactionItem(id = "tx2", title = "Uber", category = "Transport", amount = 350.0, currencyCode = "INR"),
-        HomeTransactionItem(
-            id = "tx3", title = "BigBasket", category = "Groceries", amount = 1200.0, currencyCode = "INR"
-        ),
-    )
-
+private fun HomeTabContentPreview() {
     val fmt = remember { currencyFormat("INR") }
-
+    val sampleTx = listOf(
+        HomeTransactionItem("1", "Swiggy", "Food", 450.0, "INR"),
+        HomeTransactionItem("2", "Uber", "Transport", 320.0, "INR"),
+        HomeTransactionItem("3", "Amazon", "Shopping", 1250.0, "INR"),
+    )
     MaterialTheme {
-        Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
-            ScreenTopBar(
-                headerTitle = "TruXpense",
-                showBack = false,
-                showProfileIcons = true,
-                onNotificationsClick = { /* preview stub */ }
-            )
-        }, floatingActionButton = {
-             AddFab(onClick = {})
-         }) { inner ->
+        Scaffold(
+            containerColor = BgColor,
+            topBar = {
+                ScreenTopBar(
+                    headerTitle = "TruXpense, Tushar",
+                    showProfileIcons = true,
+                    unreadCount = 2,
+                    onNotificationsClick = {},
+                    onProfileClick = {},
+                )
+            },
+        ) { pad ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(inner),
-                contentPadding = PaddingValues(
-                    start = DashboardDimens.screenPaddingH,
-                    end = DashboardDimens.screenPaddingH,
-                    top = DashboardDimens.spaceLg,
-                    bottom = DashboardDimens.spaceLg,
-                ),
-                verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
+                modifier = Modifier.fillMaxSize().padding(pad),
+                contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                item { SmsBanner(modifier = Modifier.fillMaxWidth(), onEnable = {}) }
                 item {
-                    SectionCard(title = "Spend this month") {
-                        Text(
-                            text = 12345.0.toCurrency(fmt),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    SpendThisMonthCard(
+                        monthlySpend = 18550.0,
+                        income = 45000.0,
+                        savings = 26450.0,
+                        budgetLeft = 26000.0,
+                        fmt = fmt,
+                    )
                 }
-
                 item {
-                    SectionCard(
-                        title = "Budget",
-                        trailingContent = {
-                            // Preview: reflect same dark-mode behavior for visuals
-                            val previewDetailContainer =
-                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primaryContainer
-                            val previewDetailContent =
-                                if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onPrimaryContainer
-                            Button(
-                                onClick = { /*TODO*/ },
-                                modifier = Modifier.height(DashboardDimens.buttonHeightSm).clip(RoundedCornerShape(12.dp)),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(
-                                    start = DashboardDimens.spaceLg, end = DashboardDimens.spaceLg
-                                ),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = previewDetailContainer,
-                                    contentColor = previewDetailContent,
-                                )
-                            ) {
-                                Text("", style = MaterialTheme.typography.labelMedium)
-                            }
-                        },
-                    ) {
-                        Text(
-                            text = "8,000.00 of 10,000.00",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(DashboardDimens.spaceMdL))
-                        BudgetProgressBar(progress = 0.8f)
-                    }
+                    QuickActionsRow(
+                        onAddExpense = {},
+                        onAddIncome = {},
+                        onSetBudget = {},
+                        onSavings = {},
+                    )
                 }
-
+                item { SpendingTrendsCard() }
                 item {
                     InsightCard(
                         message = "You spent more on food this week than usual",
-                        actionText = "Consider setting a weekly limit",
-                        onAction = { /* navigate */ },
+                        actionText = "Review food spending",
+                        onAction = {},
                     )
                 }
-
-                item {
-                    SectionHeader(text = "Highest spending categories this month")
-                }
-
-                items(sampleTopCategories, key = { it.name }) { category ->
-                    SpendingCategoryCard(
-                        category = category,
-                        fmt = fmt,
-                        errorColor = MaterialTheme.colorScheme.error,
-                    )
-                }
-
-                item {
-                    RecentTransactionsCard(transactions = sampleRecent)
-                }
-
-                item { Spacer(Modifier.height(DashboardDimens.fabClearance)) }
+                item { RecentTransactionsCard(transactions = sampleTx, onViewAll = {}) }
             }
         }
     }
 }
 
-@Preview(showBackground = true, name = "RecentTransactionsCardPreview")
+@Preview(showBackground = true)
 @Composable
-fun RecentTransactionsCardPreview() {
-    val sampleRecent = listOf(
-        HomeTransactionItem(id = "tx1", title = "Zomato", category = "Food", amount = 500.0, currencyCode = "INR"),
-        HomeTransactionItem(id = "tx2", title = "Uber", category = "Transport", amount = 350.0, currencyCode = "INR"),
-        HomeTransactionItem(
-            id = "tx3", title = "BigBasket", category = "Groceries", amount = 1200.0, currencyCode = "INR"
+private fun BudgetOverviewPreview() {
+    // sample fmt
+    val fmt = NumberFormat.getCurrencyInstance(Locale.Builder().setLanguage("en").setRegion("IN").build()).apply {
+        currency = Currency.getInstance("INR")
+    }
+
+    val sampleBudgetDisplays = listOf(
+        BudgetCategoryDisplay(
+            category = BudgetCategory(id = 1, name = "Food", spent = 1200, total = 3000, barColor = Color(0xFFEF4444)),
+            amountText = "₹1,200 / ₹3,000",
+            progress = 1200f / 3000f,
+        ),
+        BudgetCategoryDisplay(
+            category = BudgetCategory(
+                id = 2, name = "Shopping", spent = 500, total = 2000, barColor = Color(0xFFF59E0B)
+            ),
+            amountText = "₹500 / ₹2,000",
+            progress = 500f / 2000f,
+        ),
+        BudgetCategoryDisplay(
+            category = BudgetCategory(
+                id = 3, name = "Transport", spent = 200, total = 800, barColor = Color(0xFF14B8A6)
+            ),
+            amountText = "₹200 / ₹800",
+            progress = 200f / 800f,
+        ),
+        BudgetCategoryDisplay(
+            category = BudgetCategory(id = 4, name = "Bills", spent = 700, total = 1000, barColor = Color(0xFFEF4444)),
+            amountText = "₹700 / ₹1,000",
+            progress = 700f / 1000f,
         ),
     )
 
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            RecentTransactionsCard(transactions = sampleRecent)
+    TruXpenseTheme {
+        BudgetOverviewCard(
+            budgetLeft = 3500.0,
+            budgetDisplayItems = sampleBudgetDisplays,
+            progMul = 1f,
+            fmt = fmt,
+            onDetails = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RecentTransactionsPreview() {
+    val sampleTx = listOf(
+        HomeTransactionItem("1", "Swiggy", "Food", 450.0, "INR"),
+        HomeTransactionItem("2", "Uber", "Transport", 320.0, "INR"),
+        HomeTransactionItem("3", "Amazon", "Shopping", 1250.0, "INR"),
+        HomeTransactionItem("4", "Starbucks", "Coffee", 250.0, "INR"),
+    )
+
+    TruXpenseTheme {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            RecentTransactionsCard(transactions = sampleTx, onViewAll = {})
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun InsightCardPreview() {
+    TruXpenseTheme {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            InsightCard(
+                message = "You spent more on food this week than usual",
+                actionText = "Review food spending",
+                onAction = {})
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Trend – with data (light)")
+@Composable
+private fun SpendingTrendsPreview() {
+    TruXpenseTheme {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            SpendingTrendsCard(
+                dailySpendPoints = floatArrayOf(
+                    200f, 0f, 450f, 300f, 150f, 600f, 50f,
+                    400f, 320f, 0f, 750f, 250f, 180f, 420f,
+                    0f, 310f, 500f, 95f, 630f, 200f, 0f,
+                    410f, 280f, 360f, 140f, 0f, 800f, 230f,
+                    170f, 520f, 390f,
+                ),
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Trend – empty state")
+@Composable
+private fun SpendingTrendsEmptyPreview() {
+    TruXpenseTheme {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            SpendingTrendsCard(dailySpendPoints = FloatArray(0))
+        }
+    }
+}
+
+@Preview(
+    showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES, name = "Trend – dark mode"
+)
+@Composable
+private fun SpendingTrendsDarkPreview() {
+    TruXpenseTheme(darkTheme = true) {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            SpendingTrendsCard(
+                dailySpendPoints = floatArrayOf(
+                    200f, 0f, 450f, 300f, 150f, 600f, 50f,
+                    400f, 320f, 0f, 750f, 250f, 180f, 420f,
+                    0f, 310f, 500f, 95f, 630f, 200f, 0f,
+                    410f, 280f, 360f, 140f, 0f, 800f, 230f,
+                    170f, 520f, 390f,
+                ),
+            )
         }
     }
 }

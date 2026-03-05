@@ -211,6 +211,9 @@ fun DashboardScreen(
                         onAddExpense = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
                         },
+                        onAddIncome = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddIncome)
+                        },
                         onNavigateToBudget = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
                                 popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
@@ -240,6 +243,12 @@ fun DashboardScreen(
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onSave = { _ -> dashboardNavController.popBackStack() },
+                )
+            }
+
+            composable(Screen.Dashboard.Home.AddIncome) {
+                com.example.truxpense.presentation.screens.dashboard.addincome.AddIncomeScreen(
+                    onBack = { dashboardNavController.popBackStack() },
                 )
             }
 

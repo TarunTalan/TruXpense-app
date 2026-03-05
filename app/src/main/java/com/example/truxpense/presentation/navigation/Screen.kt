@@ -25,6 +25,7 @@ object Screen {
             const val Root = "home"
             const val AddExpense = "home/add_expense"
             const val AddExpenseResult = "home/add_expense/result"
+            const val AddIncome = "home/add_income"
         }
 
         // ── Transactions tab ──────────────────────────────────────────────────

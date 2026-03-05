@@ -122,7 +122,7 @@ fun AddBudgetScreenContent(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(DashboardDimens.cornerCard),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                elevation = CardDefaults.cardElevation(0.dp),
+                elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation),
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
 

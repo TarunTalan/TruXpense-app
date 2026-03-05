@@ -2,10 +2,17 @@ package com.example.truxpense.presentation.screens.dashboard.home
 
 import java.io.Serializable
 
-// Simple UI models used by Home screen
+// ── Transaction item shown in the Recent Transactions table ───────────────────
+
 data class HomeTransactionItem(
-    val id: String, val title: String, val category: String, val amount: Double, val currencyCode: String = "INR"
+    val id: String,
+    val title: String,
+    val category: String,
+    val amount: Double,
+    val currencyCode: String = "INR",
 ) : Serializable
+
+// ── Category spending summary (used for top-spending breakdown) ───────────────
 
 data class HomeSpendingCategory(
     val name: String,

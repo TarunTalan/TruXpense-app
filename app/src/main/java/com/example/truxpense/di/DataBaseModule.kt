@@ -5,7 +5,9 @@ import androidx.room.Room
 import com.example.truxpense.data.local.database.AppDatabase
 import com.example.truxpense.data.local.dao.BudgetDao
 import com.example.truxpense.data.local.dao.ExpenseDao
+import com.example.truxpense.data.local.dao.IncomeDao
 import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.income.IncomeRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,7 +40,13 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideExpenseRepository(expenseDao: ExpenseDao): ExpenseRepository =
-        ExpenseRepository(expenseDao)
+    fun provideIncomeDao(db: AppDatabase): IncomeDao = db.incomeDao()
 
+    @Provides
+    @Singleton
+    fun provideExpenseRepository(dao: ExpenseDao): ExpenseRepository = ExpenseRepository(dao)
+
+    @Provides
+    @Singleton
+    fun provideIncomeRepository(dao: IncomeDao): IncomeRepository = IncomeRepository(dao)
 }
