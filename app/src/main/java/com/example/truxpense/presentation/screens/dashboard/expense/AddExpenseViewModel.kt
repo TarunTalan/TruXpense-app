@@ -1,4 +1,4 @@
-package com.example.truxpense.presentation.screens.dashboard.addexpense
+package com.example.truxpense.presentation.screens.dashboard.expense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

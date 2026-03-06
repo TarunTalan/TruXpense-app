@@ -16,6 +16,7 @@ data class Income(
     val source: String,
     val notes: String = "",
     val timestamp: Long = System.currentTimeMillis(),
+    val paymentMethod: String = "",
 )
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ class IncomeRepository @Inject constructor(
             source = income.source,
             notes = income.notes,
             timestamp = income.timestamp,
+            paymentMethod = income.paymentMethod,
         )
     }
 
@@ -65,6 +67,7 @@ class IncomeRepository @Inject constructor(
         source = source,
         notes = notes,
         timestamp = timestamp,
+        paymentMethod = paymentMethod,
     )
 
     private fun IncomeEntity.toDomain() = Income(
@@ -73,6 +76,7 @@ class IncomeRepository @Inject constructor(
         source = source,
         notes = notes,
         timestamp = timestamp,
+        paymentMethod = paymentMethod,
     )
 }
 

@@ -1,4 +1,4 @@
-package com.example.truxpense.presentation.screens.dashboard.transaction
+package com.example.truxpense.presentation.screens.dashboard.expense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,11 +8,21 @@ import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.utils.DateTimeUtils
 import com.example.truxpense.presentation.utils.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
+import kotlin.math.abs
 
 @HiltViewModel
 class EditExpenseViewModel @Inject constructor(
@@ -56,7 +66,7 @@ class EditExpenseViewModel @Inject constructor(
 
     val isFormValid: StateFlow<Boolean> = combine(_rawAmount, _selectedCategory) { amt, cat ->
         amt.isNotBlank() && amt.toDoubleOrNull() != null && cat != null
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    }.stateIn(viewModelScope, SharingStarted.Companion.Eagerly, false)
 
     // ── Save / update completion signal ───────────────────────────────────────
 
@@ -80,7 +90,7 @@ class EditExpenseViewModel @Inject constructor(
             transactionId = tx.id
             originalTimestamp = tx.timestamp
 
-            _rawAmount.value = "%.0f".format(kotlin.math.abs(tx.amount))
+            _rawAmount.value = "%.0f".format(abs(tx.amount))
             _merchant.value = tx.merchant
             _notes.value = tx.notes
             _selectedCategory.value = tx.category
@@ -95,7 +105,8 @@ class EditExpenseViewModel @Inject constructor(
 
     // ── Event handlers ────────────────────────────────────────────────────────
 
-    fun setRawAmount(v: String) { _rawAmount.value = sanitizeAmountInput(v) }
+    fun setRawAmount(v: String) { _rawAmount.value = sanitizeAmountInput(v)
+    }
     fun setMerchant(v: String) { _merchant.value = v }
     fun setNotes(v: String) { _notes.value = v }
     fun selectCategory(cat: String) { _selectedCategory.value = cat }

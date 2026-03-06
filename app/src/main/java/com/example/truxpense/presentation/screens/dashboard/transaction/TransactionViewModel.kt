@@ -144,7 +144,7 @@ class TransactionsViewModel @Inject constructor(
                 category = inc.source,
                 timeLabel = formatRelativeTime(inc.timestamp),
                 amount = inc.amount,
-                paymentMethod = "",
+                paymentMethod = inc.paymentMethod,
                 entryType = EntryType.INCOME,
                 timestamp = inc.timestamp,
             )

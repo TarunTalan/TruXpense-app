@@ -5,7 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +33,8 @@ fun CategoryPickerGrid(
     modifier: Modifier = Modifier,
     disabledCategories: Set<String> = emptySet(),
     label: String? = "Category",
+    /** Override to supply a different icon per label (e.g. income sources). */
+    iconResolver: (String) -> Int = ::iconForCategory,
 ) {
     Column(modifier = modifier) {
         if (label != null) {
@@ -58,6 +62,7 @@ fun CategoryPickerGrid(
                             isDisabled = isDisabled,
                             onSelect = { if (!isDisabled) onSelect(cat) },
                             modifier = Modifier.weight(1f),
+                            iconRes = iconResolver(cat),
                         )
                     }
                     // Fill any trailing empty slots so the last row is aligned
@@ -79,16 +84,17 @@ private fun CategoryGridChip(
     isDisabled: Boolean,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
+    iconRes: Int = iconForCategory(category),
 ) {
     val borderColor = when {
         isDisabled -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
         isSelected -> MaterialTheme.colorScheme.primary
-        else       -> MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     }
     val bgColor = when {
         isDisabled -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f)
         isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
-        else       -> MaterialTheme.colorScheme.surfaceContainer
+        else -> MaterialTheme.colorScheme.surfaceContainer
     }
     val borderWidth = if (isSelected && !isDisabled) 1.5.dp else 1.dp
 
@@ -105,7 +111,7 @@ private fun CategoryGridChip(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(
-            painter = painterResource(iconForCategory(category)),
+            painter = painterResource(iconRes),
             contentDescription = category,
             tint = Color.Unspecified,
             modifier = Modifier.size(32.dp),
@@ -126,16 +132,31 @@ private fun CategoryGridChip(
 
 internal fun iconForCategory(category: String?): Int =
     when (category?.trim()?.lowercase()) {
-        "food"          -> R.drawable.food
-        "transport"     -> R.drawable.transport
-        "bills"         -> R.drawable.bills_ic
-        "shopping"      -> R.drawable.shopping
-        "travel"        -> R.drawable.category_icon
-        "health"        -> R.drawable.health
-        "education"     -> R.drawable.education
+        "food" -> R.drawable.food
+        "transport" -> R.drawable.transport
+        "bills" -> R.drawable.bills_ic
+        "shopping" -> R.drawable.shopping
+        "travel" -> R.drawable.category_icon
+        "health" -> R.drawable.health
+        "education" -> R.drawable.education
         "entertainment" -> R.drawable.entertainment
-        "groceries"     -> R.drawable.drink
-        else            -> R.drawable.categories
+        "groceries" -> R.drawable.drink
+        else -> R.drawable.categories
+    }
+
+/** Icon resolver for income source categories. */
+fun iconForIncomeSource(source: String?): Int =
+    when (source?.trim()?.lowercase()) {
+        "salary" -> R.drawable.money
+        "freelance" -> R.drawable.freelance
+        "business" -> R.drawable.business
+        "investment" -> R.drawable.home_investment
+        "gift" -> R.drawable.gift
+        "rental" -> R.drawable.savings
+        "refund" -> R.drawable.refund
+        "cashBack" -> R.drawable.cashback
+        "other" -> R.drawable.categories
+        else -> R.drawable.add_inocme
     }
 
 // ── Previews ─────────────────────────────────────────────────────────────────

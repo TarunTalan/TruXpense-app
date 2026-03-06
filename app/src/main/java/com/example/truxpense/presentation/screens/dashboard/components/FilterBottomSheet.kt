@@ -22,6 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.presentation.theme.DashboardDimens
 import java.util.*
+import com.example.truxpense.presentation.screens.dashboard.transaction.EntryType
 
 // ── Shared month labels ───────────────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ fun FilterBottomSheet(
     selectedPayment: String?,
     selectedMonth: Int?,
     selectedYear: Int?,
+    selectedType: EntryType?,
+    onSelectType: (EntryType?) -> Unit,
     dateFrom: Long?,
     dateTo: Long?,
     onSelectCategory: (String?) -> Unit,
@@ -111,7 +114,7 @@ fun FilterBottomSheet(
     }
 
     val hasAnyFilter =
-        selectedCategory != null || selectedPayment != null || selectedMonth != null || selectedYear != null || dateFrom != null || dateTo != null
+        selectedCategory != null || selectedPayment != null || selectedMonth != null || selectedYear != null || selectedType != null || dateFrom != null || dateTo != null
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -150,6 +153,36 @@ fun FilterBottomSheet(
                     }
                 }
             }
+
+            // ── Type (Expense/Income) ─────────────────────────────────────────
+            FilterSectionLabel(
+                text = "Type",
+                modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
+            )
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = DashboardDimens.screenPaddingH),
+                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
+            ) {
+                item {
+                    SheetFilterChip(label = "All", isSelected = selectedType == null, onClick = { onSelectType(null) })
+                }
+                item {
+                    SheetFilterChip(
+                        label = "Expense",
+                        isSelected = selectedType == EntryType.EXPENSE,
+                        onClick = { onSelectType(if (selectedType == EntryType.EXPENSE) null else EntryType.EXPENSE) },
+                    )
+                }
+                item {
+                    SheetFilterChip(
+                        label = "Income",
+                        isSelected = selectedType == EntryType.INCOME,
+                        onClick = { onSelectType(if (selectedType == EntryType.INCOME) null else EntryType.INCOME) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(DashboardDimens.spaceXl))
 
             HorizontalDivider(color = dividerColor)
             Spacer(Modifier.height(DashboardDimens.spaceLg))
@@ -511,6 +544,8 @@ fun FilterBottomSheetPreview() {
             selectedPayment = null,
             selectedMonth = 3,
             selectedYear = 2026,
+            selectedType = null,
+            onSelectType = {},
             dateFrom = null,
             dateTo = null,
             onSelectCategory = {},
@@ -525,4 +560,3 @@ fun FilterBottomSheetPreview() {
         )
     }
 }
-
