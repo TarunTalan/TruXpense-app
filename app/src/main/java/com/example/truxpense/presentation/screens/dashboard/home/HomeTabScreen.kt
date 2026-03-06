@@ -47,6 +47,7 @@ import com.example.truxpense.presentation.theme.TruXpenseTheme
 import com.example.truxpense.presentation.utils.currencyFormat
 import com.example.truxpense.presentation.utils.toCurrency
 import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
+import com.example.truxpense.presentation.utils.progressColor
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.abs
@@ -652,11 +653,7 @@ private fun BudgetCategoryItem(
     progMul: Float,
     fmt: NumberFormat,
 ) {
-    val fillColor = when {
-        item.progress > 0.85f -> Color(0xFFE53935) to Color(0xFFFF7066)
-        item.progress > 0.65f -> Color(0xFFF5A623) to Color(0xFFFFCA72)
-        else -> TealColor to Color(0xFF4DD6C7)
-    }
+    val barColor = progressColor(item.progress)
 
     Column {
         Row(
@@ -686,24 +683,18 @@ private fun BudgetCategoryItem(
             }
         }
         Spacer(Modifier.height(6.dp))
-        // Progress track
-        Box(
-            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(999.dp))
-                .background(Color(0xFFF0F2F5)),
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth(item.progress * progMul).fillMaxHeight()
-                    .clip(RoundedCornerShape(999.dp)).background(
-                        Brush.horizontalGradient(listOf(fillColor.first, fillColor.second))
-                    ),
-            )
-        }
+        BudgetProgressBar(
+            progress = item.progress,
+            progressMultiplier = progMul,
+            showLabel = false,
+            height = 6.dp,
+        )
         Spacer(Modifier.height(4.dp))
         Text(
             text = "${item.remaining.toCurrency(fmt)} left this month",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = if (item.isOverspent) fillColor.first else TealColor,
+            color = barColor,
         )
     }
 }

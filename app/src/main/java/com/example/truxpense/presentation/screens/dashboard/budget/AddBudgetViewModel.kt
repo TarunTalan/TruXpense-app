@@ -7,6 +7,7 @@ import com.example.truxpense.R
 import com.example.truxpense.data.repository.budget.Budget
 import com.example.truxpense.data.repository.budget.BudgetRepository
 import com.example.truxpense.presentation.utils.AppCategories
+import com.example.truxpense.presentation.utils.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -75,7 +76,7 @@ class AddBudgetViewModel @Inject constructor(
 
     fun setQuery(q: String) { _query.value = q }
     fun setSelected(cat: String?) { _selectedCategory.value = cat }
-    fun setAmountInput(v: String) { _amountInput.value = v }
+    fun setAmountInput(v: String) { _amountInput.value = sanitizeAmountInput(v) }
 
     /** Persists the new budget to Room then calls [onComplete]. Silently guards duplicates. */
     fun createBudget(onComplete: () -> Unit) {
