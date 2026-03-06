@@ -18,6 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -184,24 +187,38 @@ fun AnalyticsScreen(
                 headerTitle = "Analytics",
                 showBack = false,
                 actions = {
-                    // Filter button with badge
+                    // Glassy filter button with badge
                     Box {
                         IconButton(
                             onClick = { showFilterSheet = true },
                             modifier = Modifier.size(40.dp).clip(RoundedCornerShape(DashboardDimens.cornerCard))
-                                .background(
-                                    if (activeFilterCount > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                    else MaterialTheme.colorScheme.surfaceContainer
-                                ),
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.filter),
-                                contentDescription = "Filter",
-                                tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(DashboardDimens.iconMd),
-                            )
+                            Box(
+                                modifier = Modifier.size(38.dp).border(
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                                    CircleShape
+                                ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                // blurred background layer (behind the icon)
+                                Box(
+                                    modifier = Modifier.matchParentSize().background(
+                                        if (activeFilterCount > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.15f),
+                                        CircleShape
+                                    ).blur(8.dp)
+                                )
+
+                                Icon(
+                                    painter = painterResource(R.drawable.filter),
+                                    contentDescription = "Filter",
+                                    tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(DashboardDimens.iconMd),
+                                )
+                            }
                         }
+
                         if (activeFilterCount > 0) {
                             Badge(
                                 modifier = Modifier.align(Alignment.TopEnd).offset(4.dp, (-4).dp),
@@ -1019,10 +1036,6 @@ private fun InsightsCard(
                     color,
                 )
             )
-        }
-        val remaining = state.totalBudget - totalSpentVal
-        if (remaining > 0) {
-            add(InsightTile("💰", "Remaining budget", fmt(remaining), "Keep it up!", Color(0xFF10B981)))
         }
     }
 

@@ -15,6 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -225,6 +228,31 @@ fun AddExpenseScreenContent(
             }
         },
     ) { innerPadding ->
+        // ── Custom category state (per screen instance) ──────────────────
+        // Extra categories added by the user via the custom dialog this session.
+        // Stored as (name → iconRes) so the icon resolver can look them up.
+        var customIconMap by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+        var extraCategories by remember { mutableStateOf<List<String>>(emptyList()) }
+
+        // Merged list: base categories (with "Custom" at end) + any user-created ones
+        // inserted just before "Custom".
+        val mergedCategories = remember(categories, extraCategories) {
+            val customIdx = categories.indexOfFirst { it == AppCategories.CUSTOM }
+            if (customIdx >= 0 && extraCategories.isNotEmpty()) {
+                categories.toMutableList().also { list ->
+                    list.addAll(customIdx, extraCategories)
+                }
+            } else {
+                categories + extraCategories
+            }
+        }
+
+        // Icon resolver that checks the custom map first, then falls back to the
+        // caller-supplied resolver (expense categories or income sources).
+        val resolveIcon: (String) -> Int = { cat ->
+            customIconMap.getOrElse(cat) { categoryIconResolver(cat) }
+        }
+
         // innerPadding.bottom is the live bottomBar height (grows as keyboard opens).
         // We do NOT add imePadding() here — that would double-count it.
         Column(
@@ -238,11 +266,20 @@ fun AddExpenseScreenContent(
             AmountInputCard(rawAmount = rawAmount, onRawChange = onRawChange)
 
             CategoryPickerGrid(
-                categories = categories,
+                categories = mergedCategories,
                 selected = selectedCategory,
                 onSelect = onSelectCategory,
                 label = categoryLabel,
-                iconResolver = categoryIconResolver,
+                iconResolver = resolveIcon,
+                onCustomCategoryAdded = { name, iconRes ->
+                    // Add to the grid only if not already present
+                    if (name !in mergedCategories) {
+                        extraCategories = extraCategories + name
+                    }
+                    customIconMap = customIconMap + (name to iconRes)
+                    // Auto-select the newly created category
+                    onSelectCategory(name)
+                },
             )
 
             LabeledTextField(

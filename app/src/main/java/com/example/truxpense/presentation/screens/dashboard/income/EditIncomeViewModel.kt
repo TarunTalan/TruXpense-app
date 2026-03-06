@@ -3,6 +3,7 @@ package com.example.truxpense.presentation.screens.dashboard.income
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.income.IncomeRepository
+import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.utils.DateTimeUtils
 import com.example.truxpense.presentation.utils.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +21,7 @@ class EditIncomeViewModel @Inject constructor(
     val sourceOptions = listOf(
         "Salary", "Freelance", "Business", "Investment",
         "Gift", "Rental", "Refund", "Other",
+        AppCategories.CUSTOM,
     )
     val accountList = listOf("Bank Transfer", "Cash", "UPI", "Card")
 
@@ -64,13 +66,20 @@ class EditIncomeViewModel @Inject constructor(
             incomeId = income.id
             originalTimestamp = income.timestamp
             _rawAmount.value = "%.0f".format(income.amount)
-            _sourceName.value = income.source
             _notes.value = income.notes
             _selectedAccount.value = income.paymentMethod.ifBlank { null }
             val matchedOption = sourceOptions.firstOrNull {
                 it.equals(income.source, ignoreCase = true)
             }
-            _selectedSource.value = matchedOption ?: "Other"
+            if (matchedOption != null) {
+                // Standard option: highlight chip AND show the same label in the free-text field
+                _selectedSource.value = matchedOption
+                _sourceName.value = matchedOption
+            } else {
+                // Custom name: chip shows "Other", free-text shows the stored custom name
+                _selectedSource.value = "Other"
+                _sourceName.value = income.source
+            }
             val cal = Calendar.getInstance().apply { timeInMillis = income.timestamp }
             _selectedDate.value = SimpleDateFormat("MMM d", Locale.getDefault()).format(cal.time)
             _selectedTime.value = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time)
@@ -78,8 +87,20 @@ class EditIncomeViewModel @Inject constructor(
     }
 
     fun setRawAmount(v: String) { _rawAmount.value = sanitizeAmountInput(v) }
-    fun setSourceName(v: String) { _sourceName.value = v }
-    fun selectSource(v: String) { _selectedSource.value = v }
+    fun setSourceName(v: String) {
+        _sourceName.value = v
+        // If typed name exactly matches a standard option (but not Custom), keep chip in sync
+        val matched = sourceOptions.firstOrNull {
+            it != AppCategories.CUSTOM && it.equals(v.trim(), ignoreCase = true)
+        }
+        if (matched != null) _selectedSource.value = matched
+    }
+    fun selectSource(v: String) {
+        _selectedSource.value = v
+        // Don't overwrite the free-text field when Custom chip is tapped —
+        // the user will type their own name in the dialog.
+        if (v != AppCategories.CUSTOM) _sourceName.value = v
+    }
     fun selectAccount(v: String) { _selectedAccount.value = v }
     fun setNotes(v: String) { _notes.value = v }
     fun setDate(d: String) { _selectedDate.value = d }

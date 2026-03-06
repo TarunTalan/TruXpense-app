@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.income.Income
 import com.example.truxpense.data.repository.income.IncomeRepository
 import com.example.truxpense.presentation.utils.DateTimeUtils
+import com.example.truxpense.presentation.utils.AppCategories
 import com.example.truxpense.presentation.utils.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -22,6 +23,7 @@ class AddIncomeViewModel @Inject constructor(
     val sourceOptions = listOf(
         "Salary", "Freelance", "Business", "Investment",
         "Gift", "Rental", "Refund", "Other",
+        AppCategories.CUSTOM,
     )
 
     /** Payment method options — same as expense for consistency. */
@@ -77,7 +79,11 @@ class AddIncomeViewModel @Inject constructor(
 
     fun setRawAmount(v: String) { _rawAmount.value = sanitizeAmountInput(v) }
     fun setSourceName(v: String) { _sourceName.value = v }
-    fun selectSource(v: String) { _selectedSource.value = v }
+    fun selectSource(v: String) {
+        _selectedSource.value = v
+        // Don't overwrite free-text when Custom is tapped — user will type their own name
+        if (v != AppCategories.CUSTOM) _sourceName.value = v
+    }
     fun selectAccount(v: String) { _selectedAccount.value = v }
     fun setNotes(v: String) { _notes.value = v }
     fun setDate(d: String) { _selectedDate.value = d }

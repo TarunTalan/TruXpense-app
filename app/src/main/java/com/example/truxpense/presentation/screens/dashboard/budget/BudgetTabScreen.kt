@@ -9,11 +9,13 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
-import com.example.truxpense.presentation.screens.dashboard.components.AddFab
 import com.example.truxpense.presentation.screens.dashboard.components.BudgetProgressBar
 import com.example.truxpense.presentation.screens.dashboard.components.GradientCard
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
@@ -156,8 +157,39 @@ fun BudgetTabContent(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(headerTitle = "Budgets", showBack = false) },
-        floatingActionButton = { AddFab(onClick = onNavigateToAddBudget) },
+        topBar = {
+            ScreenTopBar(
+                headerTitle = "Budgets",
+                showBack = false,
+                actions = {
+                    Box {
+                        IconButton(onClick = onNavigateToAddBudget) {
+                            Box(
+                                modifier = Modifier.size(38.dp).border(
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                                    CircleShape
+                                ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                // blurred background layer (behind the icon)
+                                Box(
+                                    modifier = Modifier.matchParentSize().background(
+                                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.15f), CircleShape
+                                    ).blur(8.dp)
+                                )
+
+                                Icon(
+                                    painter = painterResource(R.drawable.add),
+                                    contentDescription = "Add budget",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            )
+        },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding)
@@ -508,7 +540,7 @@ private fun BudgetCategoryCard(
         else -> if (isDark) CardColors(BorderSafeDark, BgSafeDark, BarColorSafe)
         else CardColors(BorderSafeLight, BgSafeLight, BarColorSafe)
     }
-    val (borderColor, bgColor, footerColor) = colors
+    val (borderColor, _, footerColor) = colors
 
     val remaining = (display.category.total - display.category.spent).coerceAtLeast(0)
     val pctUsed = (p * 100).toInt()
