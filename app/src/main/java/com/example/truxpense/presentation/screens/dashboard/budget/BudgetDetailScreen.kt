@@ -62,6 +62,28 @@ private fun fmtINR(amount: Double): String = runCatching {
 
 private fun fmtINRAbs(amount: Double): String = "₹${"%,.0f".format(kotlin.math.abs(amount))}"
 
+/**
+ * Derives a stable, visually distinct colour from a merchant name.
+ * The same name always produces the same colour so avatars are consistent across recompositions.
+ */
+private val avatarPalette = listOf(
+    Color(0xFF5C6BC0), // indigo
+    Color(0xFF26A69A), // teal
+    Color(0xFFEF5350), // red
+    Color(0xFFFF7043), // deep orange
+    Color(0xFF66BB6A), // green
+    Color(0xFFAB47BC), // purple
+    Color(0xFF29B6F6), // light blue
+    Color(0xFFFFCA28), // amber
+    Color(0xFF8D6E63), // brown
+    Color(0xFF78909C), // blue grey
+)
+
+private fun merchantAvatarColor(name: String): Color {
+    val index = kotlin.math.abs(name.hashCode()) % avatarPalette.size
+    return avatarPalette[index]
+}
+
 private const val MAX_RECENT = 5
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -299,7 +321,6 @@ fun BudgetDetailScreen(
                     TopMerchantsCard(
                         merchants = topMerchants,
                         totalSpent = spentFinal,
-                        categoryName = budgetNameFinal,
                     )
                 }
             }
@@ -369,7 +390,7 @@ fun BudgetDetailScreen(
                         ) {
                             txsForDay.forEachIndexed { idx, tx ->
                                 TransactionRow(
-                                    tx = tx, onClick = { onTransactionClick(tx.id) }, categoryName = budgetNameFinal
+                                    tx = tx, onClick = { onTransactionClick(tx.id) }
                                 )
                                 if (idx < txsForDay.lastIndex) {
                                     HorizontalDivider(
@@ -664,7 +685,6 @@ private fun VerticalBarChart(
 private fun TopMerchantsCard(
     merchants: List<Triple<String, Int, Double>>,   // name, orderCount, totalSpent
     totalSpent: Double,
-    categoryName: String,
 ) {
     GradientCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -682,7 +702,6 @@ private fun TopMerchantsCard(
                     orderCount = orders,
                     amount = amount,
                     pctOfBudget = if (totalSpent > 0) (amount / totalSpent * 100).toInt() else 0,
-                    categoryName = categoryName,
                 )
                 if (idx < merchants.lastIndex) {
                     HorizontalDivider(
@@ -702,25 +721,30 @@ private fun MerchantRow(
     orderCount: Int,
     amount: Double,
     pctOfBudget: Int,
-    categoryName: String,
 ) {
+    // Derive a consistent colour from the merchant name so each merchant has a unique avatar tint
+    val avatarColor = remember(merchantName) { merchantAvatarColor(merchantName) }
+    val initial = merchantName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        // Icon + name + orders
+        // Avatar + name + orders
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(avatarColor.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    painter = painterResource(iconForCategory(categoryName)),
-                    contentDescription = null,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(22.dp),
+                Text(
+                    text = initial,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = avatarColor,
                 )
             }
             Spacer(Modifier.width(10.dp))
@@ -767,25 +791,29 @@ private fun MerchantRow(
 private fun TransactionRow(
     tx: BudgetTransaction,
     onClick: () -> Unit,
-    categoryName: String,
 ) {
+    val avatarColor = remember(tx.merchant) { merchantAvatarColor(tx.merchant) }
+    val initial = tx.merchant.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            // Category icon in circle
+            // Merchant initial avatar
             Box(
-                modifier = Modifier.size(38.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(avatarColor.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    painter = painterResource(iconForCategory(categoryName)),
-                    contentDescription = null,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(22.dp),
+                Text(
+                    text = initial,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = avatarColor,
                 )
             }
             Spacer(Modifier.width(10.dp))
@@ -1211,7 +1239,7 @@ fun BudgetDetailScreenPreview() {
             ) {
                 item { BudgetSummaryCard("Food", limit, spent, left, progress, 1f, 15, left / 15) }
                 item { WeeklyBreakdownCard(weekPoints, 280.0, 1f) }
-                item { TopMerchantsCard(topMerchants, spent, "Food") }
+                item { TopMerchantsCard(topMerchants, spent) }
                 item {
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                         Text("Recent transactions", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -1236,7 +1264,7 @@ fun BudgetDetailScreenPreview() {
                             elevation = CardDefaults.cardElevation(0.dp)
                         ) {
                             dayTxs.forEachIndexed { idx, tx ->
-                                TransactionRow(tx, onClick = {}, categoryName = "Food")
+                                TransactionRow(tx, onClick = {})
                                 if (idx < dayTxs.lastIndex) HorizontalDivider(
                                     Modifier.padding(start = 64.dp),
                                     color = MaterialTheme.colorScheme.onBackground.copy(0.1f),
@@ -1308,7 +1336,7 @@ private fun RecentTransactionsPreview() {
                     elevation = CardDefaults.cardElevation(0.dp),
                 ) {
                     dayTxs.forEachIndexed { idx, tx ->
-                        TransactionRow(tx = tx, onClick = {}, categoryName = "Food")
+                        TransactionRow(tx = tx, onClick = {})
                         if (idx < dayTxs.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 64.dp),
