@@ -67,6 +67,53 @@ class AnalyticsViewModel @Inject constructor(
     private val _period = MutableStateFlow(AnalyticsPeriod.MONTH)
     private val _offset = MutableStateFlow(0)
 
+    // ── Filter state ──────────────────────────────────────────────────────────
+    private val _filterCategory = MutableStateFlow<String?>(null)
+    private val _filterMonth = MutableStateFlow<Int?>(null)
+    private val _filterYear = MutableStateFlow<Int?>(null)
+    private val _filterDateFrom = MutableStateFlow<Long?>(null)
+    private val _filterDateTo = MutableStateFlow<Long?>(null)
+
+    val filterCategory: StateFlow<String?> = _filterCategory.asStateFlow()
+    val filterMonth: StateFlow<Int?> = _filterMonth.asStateFlow()
+    val filterYear: StateFlow<Int?> = _filterYear.asStateFlow()
+    val filterDateFrom: StateFlow<Long?> = _filterDateFrom.asStateFlow()
+    val filterDateTo: StateFlow<Long?> = _filterDateTo.asStateFlow()
+
+    fun setFilterCategory(v: String?) { _filterCategory.value = v }
+    fun setFilterMonth(v: Int?) { _filterMonth.value = v }
+    fun setFilterYear(v: Int?) { _filterYear.value = v }
+    fun setFilterDateFrom(v: Long?) { _filterDateFrom.value = v }
+    fun setFilterDateTo(v: Long?) { _filterDateTo.value = v }
+    fun clearFilters() {
+        _filterCategory.value = null
+        _filterMonth.value = null
+        _filterYear.value = null
+        _filterDateFrom.value = null
+        _filterDateTo.value = null
+    }
+
+    val activeFilterCount: StateFlow<Int> = combine(
+        _filterCategory, _filterMonth, _filterYear, _filterDateFrom, _filterDateTo,
+    ) { cat, month, year, from, to ->
+        listOfNotNull(cat, month, year, if (from != null || to != null) true else null).size
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /** Available categories derived from all transactions */
+    val availableCategories: StateFlow<List<String>> = expenseRepository.transactions
+        .map { txs -> txs.map { it.category }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Available years derived from all transactions */
+    val availableYears: StateFlow<List<Int>> = expenseRepository.transactions
+        .map { txs ->
+            txs.map {
+                Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                    .get(Calendar.YEAR)
+            }.distinct().sortedDescending()
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val selectedPeriod: StateFlow<AnalyticsPeriod> = _period.asStateFlow()
 
     fun setPeriod(p: AnalyticsPeriod) {
@@ -95,12 +142,27 @@ class AnalyticsViewModel @Inject constructor(
         )
     }
 
+    // Combine all 9 flows so any filter change immediately re-computes uiState.
+    // combine() only supports up to 5 args natively; chain two combine() calls.
+    private data class FilterSnapshot(
+        val category: String?,
+        val month: Int?,
+        val year: Int?,
+        val dateFrom: Long?,
+        val dateTo: Long?,
+    )
+
+    private val _filters: Flow<FilterSnapshot> = combine(
+        _filterCategory, _filterMonth, _filterYear, _filterDateFrom, _filterDateTo,
+    ) { cat, month, year, from, to -> FilterSnapshot(cat, month, year, from, to) }
+
     val uiState: StateFlow<AnalyticsUiState> = combine(
         expenseRepository.transactions,
         budgetRepository.budgets,
         _period,
         _offset,
-    ) { txs, budgets, period, offset ->
+        _filters,
+    ) { txs, budgets, period, offset, filters ->
 
         val now = Calendar.getInstance()
         val (winStart, winEnd) = periodWindow(period, offset, now)
@@ -108,7 +170,23 @@ class AnalyticsViewModel @Inject constructor(
         val prevEnd = winStart - 1L
         val prevStart = prevEnd - duration
 
-        val current = txs.filter { it.timestamp in winStart..winEnd }
+        fun passes(tx: Transaction): Boolean {
+            if (filters.category != null && tx.category != filters.category) return false
+            if (filters.month != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+                if (cal.get(Calendar.MONTH) + 1 != filters.month) return false
+            }
+            if (filters.year != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+                if (cal.get(Calendar.YEAR) != filters.year) return false
+            }
+            if (filters.dateFrom != null && tx.timestamp < filters.dateFrom) return false
+            if (filters.dateTo != null && tx.timestamp > filters.dateTo) return false
+            return true
+        }
+
+        // Previous period does NOT apply category/month/year filters — it's for comparison only
+        val current = txs.filter { it.timestamp in winStart..winEnd && passes(it) }
         val previous = txs.filter { it.timestamp in prevStart..prevEnd }
 
         val totalSpent = current.sumOf { it.amount }
@@ -277,10 +355,10 @@ class AnalyticsViewModel @Inject constructor(
                 val dow = cal.get(Calendar.DAY_OF_WEEK)
                 val toMon = if (dow == Calendar.SUNDAY) 6 else dow - Calendar.MONDAY
                 cal.add(Calendar.DAY_OF_YEAR, -toMon + (offset * 7))
-                val d1 = cal.get(Calendar.DAY_OF_MONTH);
+                val d1 = cal.get(Calendar.DAY_OF_MONTH)
                 val m1 = monthShort(cal.get(Calendar.MONTH))
                 cal.add(Calendar.DAY_OF_YEAR, 6)
-                val d2 = cal.get(Calendar.DAY_OF_MONTH);
+                val d2 = cal.get(Calendar.DAY_OF_MONTH)
                 val m2 = monthShort(cal.get(Calendar.MONTH))
                 if (m1 == m2) "$d1–$d2 $m1" else "$d1 $m1 – $d2 $m2"
             }

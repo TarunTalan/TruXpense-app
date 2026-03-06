@@ -312,22 +312,22 @@ private fun BudgetOverviewCard(
                 ) {
                     Canvas(modifier = Modifier.size(88.dp)) {
                         val stroke = 8.dp.toPx()
-                        val inset  = stroke / 2f
-                        val arcSz  = Size(size.width - stroke, size.height - stroke)
+                        val inset = stroke / 2f
+                        val arcSz = Size(size.width - stroke, size.height - stroke)
                         val arcOff = Offset(inset, inset)
                         drawArc(
-                            color      = arcColor.copy(alpha = 0.15f),
+                            color = arcColor.copy(alpha = 0.15f),
                             startAngle = 0f, sweepAngle = 360f,
-                            useCenter  = false,
-                            topLeft    = arcOff, size = arcSz,
-                            style      = Stroke(width = stroke),
+                            useCenter = false,
+                            topLeft = arcOff, size = arcSz,
+                            style = Stroke(width = stroke),
                         )
                         drawArc(
-                            color      = arcColor,
+                            color = arcColor,
                             startAngle = -90f, sweepAngle = arcSweep,
-                            useCenter  = false,
-                            topLeft    = arcOff, size = arcSz,
-                            style      = Stroke(width = stroke, cap = StrokeCap.Round),
+                            useCenter = false,
+                            topLeft = arcOff, size = arcSz,
+                            style = Stroke(width = stroke, cap = StrokeCap.Round),
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -417,13 +417,13 @@ private fun BudgetOverviewCard(
             if (alertCategory != null) {
                 val overshoot = (alertCategory.category.spent - alertCategory.category.total).coerceAtLeast(0)
                 val colorVar = if (isSystemInDarkTheme()) Color(0xFFE07A7A)
-                               else MaterialTheme.colorScheme.onErrorContainer
+                else MaterialTheme.colorScheme.onErrorContainer
                 Spacer(Modifier.height(14.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.onError)
+                        .background(Color.Transparent)
                         .border(1.dp, color = colorVar, shape = RoundedCornerShape(10.dp))
                         .padding(horizontal = 10.dp, vertical = 9.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -437,7 +437,9 @@ private fun BudgetOverviewCard(
                     )
                     Text(
                         text = if (overshoot > 0)
-                            "Heads up! At this pace you'll exceed ${alertCategory.category.name} budget by ${overshoot.toDouble().toCurrency(fmt)} by month-end."
+                            "Heads up! At this pace you'll exceed ${alertCategory.category.name} budget by ${
+                                overshoot.toDouble().toCurrency(fmt)
+                            } by month-end."
                         else
                             "You're close to exceeding your ${alertCategory.category.name} budget.",
                         fontSize = 11.5.sp,
@@ -512,11 +514,7 @@ private fun BudgetCategoryCard(
     val pctUsed = (p * 100).toInt()
 
     Box(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(bgColor).border(
-            width = 1.dp,
-            color = borderColor,
-            shape = RoundedCornerShape(14.dp),
-        ).clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = onClick),
     ) {
         // Colored left accent
         Box(
@@ -558,12 +556,20 @@ private fun BudgetCategoryCard(
             Spacer(Modifier.height(7.dp))
 
             // Footer
-            Text(
-                text = "${remaining.toDouble().toCurrency(fmt)} left this month · $pctUsed% used",
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = footerColor,
-            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "${remaining.toDouble().toCurrency(fmt)} left this month · $pctUsed% used",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = footerColor,
+                )
+                Icon(
+                    painterResource(R.drawable.right_arrow),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

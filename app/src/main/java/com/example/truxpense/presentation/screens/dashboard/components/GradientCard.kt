@@ -1,6 +1,5 @@
 package com.example.truxpense.presentation.screens.dashboard.components
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,10 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -27,23 +23,24 @@ import com.example.truxpense.presentation.theme.TruXpenseTheme
 val GradientCardShape = RoundedCornerShape(DashboardDimens.cornerCard)
 
 /**
- * Reusable card with a blurred diagonal gradient background (background → surfaceContainer).
- * Content is rendered sharp on top of the blurred background.
+ * Reusable card with a clean diagonal gradient background (surfaceContainer → background).
+ * Content is rendered on top of the gradient.
  *
- * Blur requires API 31+; on older devices the gradient renders without blur.
+ * Blur was removed — BlurEffect bleeds outside clip boundaries in Compose, causing
+ * visible distortion around card edges.
  *
- * @param modifier      Applied to the outer container.
- * @param cardBrush     Optional custom brush; defaults to background→surfaceContainer gradient.
- * @param elevation     Shadow elevation. Defaults to 2.dp.
- * @param blurRadius    Blur radius for the background layer (API 31+). Defaults to 40f.
- * @param content       Sharp content rendered on top.
+ * @param modifier    Applied to the outer container.
+ * @param cardBrush   Optional custom brush; defaults to surfaceContainer→background gradient.
+ * @param elevation   Shadow elevation. Defaults to 2.dp.
+ * @param content     Content rendered on top of the gradient.
  */
 @Composable
 fun GradientCard(
     modifier: Modifier = Modifier,
     cardBrush: Brush? = null,
     elevation: Dp = 2.dp,
-    blurRadius: Float = 40f,
+    // kept for binary compat — ignored now that blur is removed
+    @Suppress("UNUSED_PARAMETER") blurRadius: Float = 0f,
     content: @Composable () -> Unit,
 ) {
     val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
@@ -61,25 +58,8 @@ fun GradientCard(
         modifier = modifier
             .shadow(elevation = elevation, shape = GradientCardShape, clip = false)
             .clip(GradientCardShape)
+            .background(brush)           // gradient applied directly to the outer Box — no inner layer needed
     ) {
-        // Blurred gradient background layer
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(brush)
-                .then(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        Modifier.graphicsLayer {
-                            renderEffect = BlurEffect(
-                                radiusX = blurRadius,
-                                radiusY = blurRadius,
-                                edgeTreatment = TileMode.Clamp,
-                            )
-                        }
-                    } else Modifier
-                )
-        )
-        // Sharp content layer
         content()
     }
 }
