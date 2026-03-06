@@ -1,18 +1,48 @@
 package com.example.truxpense.presentation.utils
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.abs
 
-fun progressColor(progress: Float, errorColor: Color): Color {
+/**
+ * Returns the interval-based bar/accent color for a budget progress value.
+ *
+ * Matches the 3-interval theme used across budget cards:
+ *   >= 80%  → danger  red    #D64545
+ *   >= 45%  → warning amber  #F2C06A
+ *   < 45%   → safe    teal   #1B6F73
+ */
+fun progressColor(progress: Float, @Suppress("UNUSED_PARAMETER") errorColor: Color = Color.Unspecified): Color {
     val p = progress.coerceIn(0f, 1f)
     return when {
-        p <= 0.4f -> lerp(Color(0xFF4CAF50), Color(0xFFFFC107), p / 0.4f)
-        p <= 0.6f -> lerp(Color(0xFFFFC107), Color(0xFFFFA726), (p - 0.4f) / 0.2f)
-        p <= 0.8f -> lerp(Color(0xFFFFA726), errorColor, (p - 0.6f) / 0.2f)
-        else -> errorColor
+        p >= 0.80f -> Color(0xFFD64545)
+        p >= 0.45f -> Color(0xFFF2C06A)
+        else       -> Color(0xFF1B6F73)
+    }
+}
+
+/**
+ * Returns the interval-based background color for a budget card (light-mode).
+ */
+fun progressBgColor(progress: Float): Color {
+    val p = progress.coerceIn(0f, 1f)
+    return when {
+        p >= 0.80f -> Color(0xFFFDECEC)
+        p >= 0.45f -> Color(0xFFFFF4E5)
+        else       -> Color(0xFFE6F4F2)
+    }
+}
+
+/**
+ * Returns the interval-based border color for a budget card (light-mode).
+ */
+fun progressBorderColor(progress: Float): Color {
+    val p = progress.coerceIn(0f, 1f)
+    return when {
+        p >= 0.80f -> Color(0xFF9C2D2D)
+        p >= 0.45f -> Color(0xFFB3741A)
+        else       -> Color(0xFF1B6F73)
     }
 }
 

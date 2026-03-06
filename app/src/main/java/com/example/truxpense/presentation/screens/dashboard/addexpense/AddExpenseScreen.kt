@@ -50,12 +50,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.CategoryPickerGrid
+import com.example.truxpense.presentation.screens.dashboard.components.AmountInputCard
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.screens.dashboard.home.HomeTransactionItem
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.AppCategories
-import com.example.truxpense.presentation.utils.amountAbbreviationHint
-import com.example.truxpense.presentation.utils.amountDisplayText
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -255,9 +255,9 @@ fun AddExpenseScreenContent(
         ) {
             Spacer(Modifier.height(2.dp))
 
-            AmountCard(rawAmount = rawAmount, onRawChange = onRawChange)
+            AmountInputCard(rawAmount = rawAmount, onRawChange = onRawChange)
 
-            CategorySection(
+            CategoryPickerGrid(
                 categories = categories,
                 selected = selectedCategory,
                 onSelect = onSelectCategory,
@@ -295,204 +295,6 @@ fun AddExpenseScreenContent(
     }
 }
 
-// ─── ① Amount Card ────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AmountCard(rawAmount: String, onRawChange: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "How much did you spend?",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(12.dp))
-            AmountInputZone(rawAmount = rawAmount, onRawChange = onRawChange)
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AmountInputZone(rawAmount: String, onRawChange: (String) -> Unit) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-    val textMeasurer = rememberTextMeasurer()
-    val scope = rememberCoroutineScope()
-
-    // BringIntoViewRequester scrolls the card into the visible area when
-    // the keyboard opens and the amount field is focused.
-    val bringIntoView = remember { BringIntoViewRequester() }
-
-    val displayStyle = MaterialTheme.typography.displaySmall.copy(
-        color = MaterialTheme.colorScheme.onBackground,
-        fontWeight = FontWeight.SemiBold,
-        textAlign = TextAlign.Center,
-        letterSpacing = 1.12.sp,
-    )
-
-    val displayText = amountDisplayText(rawAmount)
-    val currencyText = "₹"
-
-    val amountPx = textMeasurer.measure(AnnotatedString(displayText), style = displayStyle).size.width
-    val currencyPx = textMeasurer.measure(AnnotatedString(currencyText), style = displayStyle).size.width
-    val totalDp = with(LocalDensity.current) { (amountPx + currencyPx).toDp() }
-    val fieldWidth = totalDp + 8.dp
-
-    val hint = amountAbbreviationHint(rawAmount, "INR")
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-            ) { focusRequester.requestFocus(); keyboardController?.show() },
-            contentAlignment = Alignment.Center,
-        ) {
-            BasicTextField(
-                value = rawAmount,
-                onValueChange = { typed ->
-                    onRawChange(typed.filter { it.isDigit() })
-                },
-                singleLine = true,
-                modifier = Modifier.widthIn(min = 48.dp).width(fieldWidth).focusRequester(focusRequester)
-                    .onFocusChanged { state ->
-                        if (state.isFocused) {
-                            // Delay matches the keyboard slide-in animation (~300 ms)
-                            scope.launch { delay(320); bringIntoView.bringIntoView() }
-                        }
-                    },
-                textStyle = displayStyle.copy(color = Color.Transparent),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { keyboardController?.hide() }),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
-                decorationBox = { inner ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = currencyText, style = displayStyle)
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = displayText,
-                                style = displayStyle.copy(
-                                    color = if (rawAmount.isEmpty()) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-                                    else MaterialTheme.colorScheme.onBackground,
-                                ),
-                            )
-                            inner()
-                        }
-                    }
-                },
-            )
-        }
-
-        AnimatedVisibility(
-            visible = hint != null,
-            enter = fadeIn(tween(200)) + expandVertically(tween(200)),
-            exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
-        ) {
-            Text(
-                text = hint ?: "",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
-}
-
-// ─── ② Category Section ───────────────────────────────────────────────────────
-
-@Composable
-private fun CategorySection(
-    categories: List<String>,
-    selected: String?,
-    onSelect: (String) -> Unit,
-) {
-    Column {
-        Text(
-            text = "Category",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-        val rows = categories.chunked(4)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            rows.forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    rowItems.forEach { cat ->
-                        CategoryChip(
-                            category = cat,
-                            isSelected = cat == selected,
-                            onSelect = onSelect,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    repeat(4 - rowItems.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryChip(
-    category: String,
-    isSelected: Boolean,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
-    val bgColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
-    else MaterialTheme.colorScheme.surfaceContainer
-    val borderWidth = if (isSelected) 1.5.dp else 1.dp
-
-    Column(
-        modifier = modifier.clip(RoundedCornerShape(12.dp)).background(bgColor)
-            .border(borderWidth, borderColor, RoundedCornerShape(12.dp)).clickable { onSelect(category) }
-            .padding(horizontal = 4.dp).padding(top = 6.dp, bottom = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(
-            painter = painterResource(iconForCategory(category)),
-            contentDescription = category,
-            tint = Color.Unspecified,
-            modifier = Modifier.size(32.dp),
-        )
-        Text(
-            text = category,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
 
 // ─── ③ Merchant Name Field ────────────────────────────────────────────────────
 
@@ -885,19 +687,4 @@ fun AddExpenseScreenPreview() {
             onDatePick = {}, onTimePick = {}, onSave = {}, onBack = {},
         )
     }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-private fun iconForCategory(category: String?): Int = when (category?.trim()?.lowercase()) {
-    "food" -> R.drawable.food
-    "transport" -> R.drawable.transport
-    "bills" -> R.drawable.bills_ic
-    "shopping" -> R.drawable.shopping
-    "travel" -> R.drawable.category_icon
-    "health" -> R.drawable.health
-    "education" -> R.drawable.category_icon
-    "entertainment" -> R.drawable.entertainment
-    "groceries" -> R.drawable.drink
-    else -> R.drawable.category_icon
 }
