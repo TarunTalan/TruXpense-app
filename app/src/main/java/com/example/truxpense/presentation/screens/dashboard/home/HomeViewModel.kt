@@ -12,6 +12,7 @@ import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
 import com.example.truxpense.data.repository.income.IncomeRepository
+import com.example.truxpense.data.repository.savings.SavingsRepository
 import com.example.truxpense.data.repository.sms.PendingTransactionRepository
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +28,7 @@ class HomeViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
     private val budgetRepository: BudgetRepository,
     private val incomeRepository: IncomeRepository,
+    private val savingsRepository: SavingsRepository,
     private val pendingTransactionRepository: PendingTransactionRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
@@ -108,11 +110,10 @@ class HomeViewModel @Inject constructor(
         incomeRepository.totalIncomeBetween(monthStartMs(), monthEndMs())
             .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
-    /** Savings = income – current-month expenses (clamped to ≥ 0). */
+    /** Sum of actual savings entries recorded in the current calendar month. */
     val monthlySavings: StateFlow<Double> =
-        combine(monthlyIncome, currentMonthExpenses) { income, spent ->
-            (income - spent).coerceAtLeast(0.0)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+        savingsRepository.totalSavingsBetween(monthStartMs(), monthEndMs())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val expenseCount: StateFlow<Int> =
         expenseRepository.transactions.map { it.size }

@@ -4,45 +4,52 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.income.IncomeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
     private val repository: ExpenseRepository,
+    private val incomeRepository: IncomeRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     init {
-        // If the dashboard sets a 'preselectCategory' in the savedStateHandle before or after
-        // navigating to the Transactions tab, observe it and apply the category filter once.
         viewModelScope.launch {
-            savedStateHandle.getStateFlow<String?>("preselectCategory", null).filterNotNull().collect { category ->
-                setCategory(category)
-                // remove to avoid reapplying on process death/restore
-                savedStateHandle.remove<String>("preselectCategory")
-            }
+            savedStateHandle.getStateFlow<String?>("preselectCategory", null)
+                .filterNotNull().collect { category ->
+                    setCategory(category)
+                    // remove to avoid reapplying on process death/restore
+                    savedStateHandle.remove<String>("preselectCategory")
+                }
         }
         viewModelScope.launch {
-            repository.transactions.first()
+            combine(
+                repository.transactions,
+                incomeRepository.allIncome,
+            ) { _, _ -> }.first()
             _isLoaded.value = true
         }
     }
+
+    // ── Type filter (All / Expense / Income) ──────────────────────────────────
+
+    private val _typeFilter = MutableStateFlow<EntryType?>(null) // null = All
+    val typeFilter: StateFlow<EntryType?> = _typeFilter.asStateFlow()
+
+    fun setTypeFilter(type: EntryType?) { _typeFilter.value = type }
 
     // ── Search ────────────────────────────────────────────────────────────────
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    fun setSearchQuery(q: String) {
-        _searchQuery.value = q
-    }
-
-    fun clearSearch() {
-        _searchQuery.value = ""
-    }
+    fun setSearchQuery(q: String) { _searchQuery.value = q }
+    fun clearSearch() { _searchQuery.value = "" }
 
     // ── Category filter ───────────────────────────────────────────────────────
 
@@ -62,169 +69,175 @@ class TransactionsViewModel @Inject constructor(
         _paymentMethod.value = method?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    // ── Month / date range ────────────────────────────────────────────────────
+    // ── Month / Year / Date range ─────────────────────────────────────────────
 
     private val _selectedMonth = MutableStateFlow<Int?>(null)
     val selectedMonth: StateFlow<Int?> = _selectedMonth.asStateFlow()
-
-    fun setMonth(month: Int?) {
-        _selectedMonth.value = month
-    }
-
-    // ── Year filter ───────────────────────────────────────────────────────────
+    fun setMonth(month: Int?) { _selectedMonth.value = month }
 
     private val _selectedYear = MutableStateFlow<Int?>(null)
     val selectedYear: StateFlow<Int?> = _selectedYear.asStateFlow()
-
-    fun setYear(year: Int?) {
-        _selectedYear.value = year
-    }
+    fun setYear(year: Int?) { _selectedYear.value = year }
 
     private val _dateFrom = MutableStateFlow<Long?>(null)
     val dateFrom: StateFlow<Long?> = _dateFrom.asStateFlow()
-
-    fun setDateFrom(ts: Long?) {
-        _dateFrom.value = ts
-    }
+    fun setDateFrom(ts: Long?) { _dateFrom.value = ts }
 
     private val _dateTo = MutableStateFlow<Long?>(null)
     val dateTo: StateFlow<Long?> = _dateTo.asStateFlow()
+    fun setDateTo(ts: Long?) { _dateTo.value = ts }
 
-    fun setDateTo(ts: Long?) {
-        _dateTo.value = ts
-    }
-
-    fun clearDateRange() {
-        _dateFrom.value = null
-        _dateTo.value = null
-    }
-
-    // ── Clear all filters ─────────────────────────────────────────────────────
+    fun clearDateRange() { _dateFrom.value = null; _dateTo.value = null }
 
     fun clearAllFilters() {
         _selectedCategory.value = null
         _paymentMethod.value = null
         _searchQuery.value = ""
         _selectedMonth.value = null
+        _selectedYear.value = null
         _dateFrom.value = null
         _dateTo.value = null
+        _typeFilter.value = null
     }
 
-    /** Number of active filters (for badge on the filter button). */
-    val activeFilterCount: StateFlow<Int> = combine(
-        _selectedCategory, _paymentMethod, _selectedMonth, _dateFrom,
-    ) { cat, pay, month, from ->
-        (if (cat != null) 1 else 0) + (if (pay != null) 1 else 0) + (if (month != null) 1 else 0) + (if (from != null) 1 else 0)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    // ── isLoaded ──────────────────────────────────────────────────────────────
 
-    // ── Month total dropdown ──────────────────────────────────────────────────
-
-    private val _totalExpanded = MutableStateFlow(false)
-    val totalExpanded: StateFlow<Boolean> = _totalExpanded.asStateFlow()
-
-    fun toggleTotalExpanded() {
-        _totalExpanded.update { !it }
-    }
-
-    /** True once Room has emitted its first value — used to fade the screen in. */
     private val _isLoaded = MutableStateFlow(false)
     val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
 
-    // ── Raw data from Room ────────────────────────────────────────────────────
+    // ── Active filter count ───────────────────────────────────────────────────
 
-    private val _rawTransactions: StateFlow<List<TransactionItem>> = repository.transactions.map { list ->
-        list.sortedByDescending { it.timestamp }.map { t ->
+    val activeFilterCount: StateFlow<Int> =
+        combine(_selectedCategory, _paymentMethod) { cat: String?, pay: String? ->
+            (if (cat != null) 1 else 0) + (if (pay != null) 1 else 0)
+        }.combine(combine(_selectedMonth, _selectedYear) { m: Int?, y: Int? ->
+            (if (m != null) 1 else 0) + (if (y != null) 1 else 0)
+        }) { a, b -> a + b }
+        .combine(combine(_dateFrom, _typeFilter) { from: Long?, type: EntryType? ->
+            (if (from != null) 1 else 0) + (if (type != null) 1 else 0)
+        }) { ab, cd -> ab + cd }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    // ── Raw merged feed ───────────────────────────────────────────────────────
+
+    /** All expenses + income merged, newest first, as unified TransactionItem list. */
+    private val _allItems: Flow<List<TransactionItem>> = combine(
+        repository.transactions,
+        incomeRepository.allIncome,
+    ) { expenses, incomes ->
+        val expenseItems = expenses.map { t ->
             TransactionItem(
                 id = t.id,
                 merchant = t.merchant,
                 category = t.category,
                 timeLabel = formatRelativeTime(t.timestamp),
-                amount = -t.amount,
+                amount = t.amount,
                 paymentMethod = t.paymentMethod,
+                entryType = EntryType.EXPENSE,
+                timestamp = t.timestamp,
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        val incomeItems = incomes.map { inc ->
+            TransactionItem(
+                id = inc.id,
+                merchant = inc.source,
+                category = inc.source,
+                timeLabel = formatRelativeTime(inc.timestamp),
+                amount = inc.amount,
+                paymentMethod = "",
+                entryType = EntryType.INCOME,
+                timestamp = inc.timestamp,
+            )
+        }
+        (expenseItems + incomeItems).sortedByDescending { it.timestamp }
+    }
 
-    /** All unique categories found in the user's expense data. */
-    val availableCategories: StateFlow<List<String>> =
-        _rawTransactions.map { txs -> txs.map { it.category }.distinct().sorted() }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    // ── Available filter options ──────────────────────────────────────────────
 
-    /** All unique payment methods found in the user's expense data. */
-    val availablePaymentMethods: StateFlow<List<String>> = _rawTransactions.map { txs ->
-        txs.map { it.paymentMethod }.filter { it.isNotBlank() }.distinct().sorted()
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val availableCategories: StateFlow<List<String>> = repository.transactions
+        .map { list -> list.map { it.category }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** All unique years found in the user's expense data, descending. */
-    val availableYears: StateFlow<List<Int>> = repository.transactions.map { list ->
-        list.map { t ->
-            java.util.Calendar.getInstance().apply { timeInMillis = t.timestamp }
-                .get(java.util.Calendar.YEAR)
-        }.distinct().sortedDescending()
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val availablePaymentMethods: StateFlow<List<String>> = repository.transactions
+        .map { list -> list.map { it.paymentMethod }.filter { it.isNotBlank() }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Total count before any filter/search (for the "X of Y" display). */
+    val availableYears: StateFlow<List<Int>> = _allItems
+        .map { list ->
+            list.map { Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.YEAR) }
+                .distinct().sortedDescending()
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val totalTransactionCount: StateFlow<Int> =
-        _rawTransactions.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+        _allItems.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    // ── Filtered transactions ─────────────────────────────────────────────────
 
     val transactions: StateFlow<List<TransactionItem>> = combine(
-        // Pre-filter by month + date range on the raw entity list first
-        combine(repository.transactions, _selectedMonth, _dateFrom, _dateTo) { raw, month, from, to ->
-            raw.filter { t ->
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = t.timestamp }
-                val matchesMonth = month == null || cal.get(java.util.Calendar.MONTH) + 1 == month
-                val matchesFrom = from == null || t.timestamp >= from
-                val matchesTo = to == null || t.timestamp <= to
-                matchesMonth && matchesFrom && matchesTo
-            }.sortedByDescending { it.timestamp }.map { t ->
-                TransactionItem(
-                    id = t.id,
-                    merchant = t.merchant,
-                    category = t.category,
-                    timeLabel = formatRelativeTime(t.timestamp),
-                    amount = -t.amount,
-                    paymentMethod = t.paymentMethod,
-                )
-            }
-        },
-        _selectedCategory,
-        _paymentMethod,
-        _searchQuery,
-    ) { list, category, payment, query ->
-        list.filter { tx ->
-            val matchesCategory = category == null || tx.category.equals(category, ignoreCase = true)
-            val matchesPayment = payment == null || tx.paymentMethod.equals(payment, ignoreCase = true)
-            val matchesSearch =
-                query.isBlank() || tx.merchant.contains(query, ignoreCase = true) || tx.category.contains(
-                    query, ignoreCase = true
-                )
-            matchesCategory && matchesPayment && matchesSearch
+        _allItems, _typeFilter, _selectedCategory, _paymentMethod,
+        _searchQuery, _selectedMonth, _selectedYear, _dateFrom, _dateTo,
+    ) { arr ->
+        @Suppress("UNCHECKED_CAST")
+        val items = arr[0] as List<TransactionItem>
+        val type = arr[1] as EntryType?
+        val cat = arr[2] as String?
+        val pay = arr[3] as String?
+        val q = arr[4] as String
+        val month = arr[5] as Int?
+        val year = arr[6] as Int?
+        val from = arr[7] as Long?
+        val to = arr[8] as Long?
+
+        items.filter { tx ->
+            val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+            val matchType = type == null || tx.entryType == type
+            val matchCat = cat == null || tx.category.equals(cat, ignoreCase = true)
+            val matchPay = pay == null || tx.paymentMethod.equals(pay, ignoreCase = true)
+            val matchSearch = q.isBlank() ||
+                tx.merchant.contains(q, ignoreCase = true) ||
+                tx.category.contains(q, ignoreCase = true)
+            val matchMonth = month == null || cal.get(Calendar.MONTH) + 1 == month
+            val matchYear = year == null || cal.get(Calendar.YEAR) == year
+            val matchFrom = from == null || tx.timestamp >= from
+            val matchTo = to == null || tx.timestamp <= to
+            matchType && matchCat && matchPay && matchSearch && matchMonth && matchYear && matchFrom && matchTo
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Count of results after applying all active filters + search. */
     val resultCount: StateFlow<Int> =
         transactions.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    /** Whether any filter or search is currently active. */
     val hasActiveFiltersOrSearch: StateFlow<Boolean> = combine(
-        combine(_selectedCategory, _paymentMethod, _searchQuery) { cat, pay, q ->
-            cat != null || pay != null || q.isNotBlank()
-        },
-        combine(_selectedMonth, _selectedYear, _dateFrom) { month, year, from ->
-            month != null || year != null || from != null
-        },
-    ) { left, right -> left || right }
+        _selectedCategory, _paymentMethod, _searchQuery,
+        _selectedMonth, _selectedYear,
+    ) { cat: String?, pay: String?, q: String, month: Int?, year: Int? ->
+        cat != null || pay != null || q.isNotBlank() || month != null || year != null
+    }.combine(combine(_dateFrom, _typeFilter) { from, type -> from != null || type != null }) { a, b -> a || b }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** Grouped for the UI list (derived from already-filtered [transactions]). */
+    /** Grouped for the UI list. */
     val monthGroups: StateFlow<List<TransactionMonthGroup>> =
-        transactions.map { buildMonthGroups(it) }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        transactions.map { buildMonthGroups(it) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val totalSpent: StateFlow<Double> = transactions.map { it.sumOf { tx -> -tx.amount } }
+    /** Total spent (expenses only) from current filtered set. */
+    val totalSpent: StateFlow<Double> = transactions
+        .map { it.filter { tx -> tx.entryType == EntryType.EXPENSE }.sumOf { tx -> tx.amount } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    /** Total income from current filtered set. */
+    val totalIncome: StateFlow<Double> = transactions
+        .map { it.filter { tx -> tx.entryType == EntryType.INCOME }.sumOf { tx -> tx.amount } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    // ── Bottom-sheet toggle ───────────────────────────────────────────────────
+
+    private val _totalExpanded = MutableStateFlow(false)
+    val totalExpanded: StateFlow<Boolean> = _totalExpanded.asStateFlow()
+    fun toggleTotalExpanded() { _totalExpanded.update { !it } }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun buildMonthGroups(items: List<TransactionItem>): List<TransactionMonthGroup> {
         if (items.isEmpty()) return emptyList()
@@ -232,7 +245,7 @@ class TransactionsViewModel @Inject constructor(
         val days = grouped.entries.map { (label, txs) ->
             TransactionDayGroup(dayLabel = label, items = txs)
         }
-        val total = items.sumOf { -it.amount }
+        val total = items.filter { it.entryType == EntryType.EXPENSE }.sumOf { it.amount }
         return listOf(TransactionMonthGroup("Recent", total, days))
     }
 
@@ -240,12 +253,12 @@ class TransactionsViewModel @Inject constructor(
         val delta = System.currentTimeMillis() - timestamp
         val days = delta / (1_000 * 60 * 60 * 24)
         return when {
-            delta < 1_000 * 60 * 60 -> "Today"
+            delta < 1_000 * 60 * 60 * 24 -> "Today"
             days == 1L -> "Yesterday"
             else -> {
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-                val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-                "${months[cal.get(java.util.Calendar.MONTH)]} ${cal.get(java.util.Calendar.DAY_OF_MONTH)}"
+                val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+                val months = listOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+                "${months[cal.get(Calendar.MONTH)]} ${cal.get(Calendar.DAY_OF_MONTH)}"
             }
         }
     }
