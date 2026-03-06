@@ -37,6 +37,18 @@ class IncomeRepository @Inject constructor(
         incomeDao.insertIncome(income.toEntity())
     }
 
+    suspend fun updateIncome(income: Income) {
+        incomeDao.updateIncome(
+            id = income.id,
+            amount = income.amount,
+            source = income.source,
+            notes = income.notes,
+            timestamp = income.timestamp,
+        )
+    }
+
+    suspend fun getById(id: String): Income? = incomeDao.getById(id)?.toDomain()
+
     suspend fun deleteIncome(id: String) {
         incomeDao.deleteIncome(id)
     }

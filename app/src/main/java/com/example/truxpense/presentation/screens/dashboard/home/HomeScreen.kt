@@ -31,6 +31,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.truxpense.presentation.screens.dashboard.savings.SavingsScreen
 import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
@@ -235,6 +236,9 @@ fun DashboardScreen(
                         onPendingReviewClick = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
+                        onSavings = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.Savings)
+                        },
                     )
                 }
             }
@@ -248,6 +252,13 @@ fun DashboardScreen(
 
             composable(Screen.Dashboard.Home.AddIncome) {
                 com.example.truxpense.presentation.screens.dashboard.addincome.AddIncomeScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                )
+            }
+
+
+            composable(Screen.Dashboard.Home.Savings) {
+                SavingsScreen(
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
