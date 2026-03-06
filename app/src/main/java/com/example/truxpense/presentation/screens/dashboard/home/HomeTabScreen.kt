@@ -45,9 +45,9 @@ import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyVi
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.theme.TruXpenseTheme
 import com.example.truxpense.presentation.utils.currencyFormat
-import com.example.truxpense.presentation.utils.toCurrency
 import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
 import com.example.truxpense.presentation.utils.progressColor
+import com.example.truxpense.presentation.utils.toCurrency
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.abs
@@ -79,6 +79,8 @@ fun HomeTabScreen(
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
     onNavigateToAnalytics: (() -> Unit)? = null,
+    onIncomeHistory: (() -> Unit)? = null,
+    onSavings: (() -> Unit)? = null,
 ) {
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
@@ -117,7 +119,9 @@ fun HomeTabScreen(
                 onNotificationsClick = onNotificationsClick,
                 onProfileClick = onProfileClick,
                 onPendingReviewClick = onPendingReviewClick,
-                onNavigateToAnalytics = onNavigateToAnalytics, // pass through
+                onNavigateToAnalytics = onNavigateToAnalytics,
+                onIncomeHistory = onIncomeHistory,
+                onSavings = onSavings,
             )
         }
     }
@@ -138,7 +142,9 @@ fun HomeTabContent(
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
-    onNavigateToAnalytics: (() -> Unit)? = null, // new optional callback here
+    onNavigateToAnalytics: (() -> Unit)? = null,
+    onIncomeHistory: (() -> Unit)? = null,
+    onSavings: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
     val notificationVm: NotificationViewModel = hiltViewModel()
@@ -222,6 +228,8 @@ fun HomeTabContent(
                     savings = monthlySavings,
                     budgetLeft = budgetLeft,
                     fmt = fmt,
+                    onIncomeClick = if (onIncomeHistory != null) onIncomeHistory else null,
+                    onSavingsClick = if (onSavings != null) onSavings else null,
                 )
             }
 
@@ -232,7 +240,7 @@ fun HomeTabContent(
                     onAddExpense = { onAddExpense?.invoke() },
                     onAddIncome = { onAddIncome?.invoke() },
                     onSetBudget = { onNavigateToBudget?.invoke() },
-                    onSavings = { /* TODO: savings goal screen */ },
+                    onSavings = { onSavings?.invoke() },
                 )
             }
 
@@ -354,6 +362,8 @@ private fun SpendThisMonthCard(
     savings: Double,
     budgetLeft: Double,
     fmt: NumberFormat,
+    onIncomeClick: (() -> Unit)? = null,
+    onSavingsClick: (() -> Unit)? = null,
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -403,7 +413,9 @@ private fun SpendThisMonthCard(
                 MiniStat(
                     label = "Income",
                     value = income.toCurrency(fmt),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).then(
+                        if (onIncomeClick != null) Modifier.clickable(onClick = onIncomeClick) else Modifier
+                    ),
                 )
                 VerticalDivider(
                     modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f)
@@ -411,7 +423,9 @@ private fun SpendThisMonthCard(
                 MiniStat(
                     label = "Savings",
                     value = savings.toCurrency(fmt),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).then(
+                        if (onSavingsClick != null) Modifier.clickable(onClick = onSavingsClick) else Modifier
+                    ),
                 )
                 VerticalDivider(modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f))
                 MiniStat(
@@ -893,7 +907,7 @@ private fun TxRow(tx: HomeTransactionItem) {
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (isCredit) MaterialTheme.colorScheme.tertiary
-                    else MaterialTheme.colorScheme.onBackground,
+            else MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

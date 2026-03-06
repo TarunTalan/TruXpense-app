@@ -92,6 +92,7 @@ fun AnalyticsScreen(
     val availableCategories by vm.availableCategories.collectAsState()
     val availableYears by vm.availableYears.collectAsState()
     val selectedPeriod by vm.selectedPeriod.collectAsState()
+    val filterType by vm.filterType.collectAsState()
 
     if (!state.roomLoaded) return
 
@@ -119,7 +120,7 @@ fun AnalyticsScreen(
     )
 
     val hasFilters =
-        filterCategory != null || filterMonth != null || filterYear != null || filterDateFrom != null || filterDateTo != null
+        filterCategory != null || filterMonth != null || filterYear != null || filterType != null || filterDateFrom != null || filterDateTo != null
 
     // --------------------------
     // Apply filters to stats
@@ -374,6 +375,8 @@ fun AnalyticsScreen(
                 selectedPayment = null,
                 selectedMonth = filterMonth,
                 selectedYear = filterYear,
+                selectedType = filterType,
+                onSelectType = { vm.setFilterType(it) },
                 dateFrom = filterDateFrom,
                 dateTo = filterDateTo,
                 onSelectCategory = { vm.setFilterCategory(it) },

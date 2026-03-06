@@ -10,5 +10,6 @@ data class IncomeEntity(
     val source: String,          // e.g. "Salary", "Freelance", "Business"
     val notes: String = "",
     val timestamp: Long = System.currentTimeMillis(),
+    val paymentMethod: String = "",   // e.g. "Bank Transfer", "Cash", "UPI"
 )
 

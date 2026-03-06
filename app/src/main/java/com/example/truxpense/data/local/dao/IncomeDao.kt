@@ -10,6 +10,12 @@ interface IncomeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertIncome(income: IncomeEntity)
 
+    @Query("UPDATE income SET amount=:amount, source=:source, notes=:notes, timestamp=:timestamp, paymentMethod=:paymentMethod WHERE id=:id")
+    suspend fun updateIncome(id: String, amount: Double, source: String, notes: String, timestamp: Long, paymentMethod: String)
+
+    @Query("SELECT * FROM income WHERE id = :id")
+    suspend fun getById(id: String): IncomeEntity?
+
     @Query("SELECT * FROM income ORDER BY timestamp DESC")
     fun getAllIncome(): Flow<List<IncomeEntity>>
 

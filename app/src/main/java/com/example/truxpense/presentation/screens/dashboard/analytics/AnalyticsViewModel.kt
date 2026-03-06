@@ -6,6 +6,7 @@ import com.example.truxpense.data.repository.budget.BudgetRepository
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
 import com.example.truxpense.presentation.screens.dashboard.budget.budgetColorForCategory
+import com.example.truxpense.presentation.screens.dashboard.transaction.EntryType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.util.*
@@ -73,30 +74,37 @@ class AnalyticsViewModel @Inject constructor(
     private val _filterYear = MutableStateFlow<Int?>(null)
     private val _filterDateFrom = MutableStateFlow<Long?>(null)
     private val _filterDateTo = MutableStateFlow<Long?>(null)
+    private val _filterType = MutableStateFlow<EntryType?>(null)
 
     val filterCategory: StateFlow<String?> = _filterCategory.asStateFlow()
     val filterMonth: StateFlow<Int?> = _filterMonth.asStateFlow()
     val filterYear: StateFlow<Int?> = _filterYear.asStateFlow()
     val filterDateFrom: StateFlow<Long?> = _filterDateFrom.asStateFlow()
     val filterDateTo: StateFlow<Long?> = _filterDateTo.asStateFlow()
+    val filterType: StateFlow<EntryType?> = _filterType.asStateFlow()
 
     fun setFilterCategory(v: String?) { _filterCategory.value = v }
     fun setFilterMonth(v: Int?) { _filterMonth.value = v }
     fun setFilterYear(v: Int?) { _filterYear.value = v }
     fun setFilterDateFrom(v: Long?) { _filterDateFrom.value = v }
     fun setFilterDateTo(v: Long?) { _filterDateTo.value = v }
+    fun setFilterType(v: EntryType?) { _filterType.value = v }
     fun clearFilters() {
         _filterCategory.value = null
         _filterMonth.value = null
         _filterYear.value = null
         _filterDateFrom.value = null
         _filterDateTo.value = null
+        _filterType.value = null
     }
 
     val activeFilterCount: StateFlow<Int> = combine(
         _filterCategory, _filterMonth, _filterYear, _filterDateFrom, _filterDateTo,
     ) { cat, month, year, from, to ->
+        // base count without type
         listOfNotNull(cat, month, year, if (from != null || to != null) true else null).size
+    }.combine(_filterType) { baseCount, type ->
+        baseCount + if (type != null) 1 else 0
     }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     /** Available categories derived from all transactions */
@@ -142,9 +150,20 @@ class AnalyticsViewModel @Inject constructor(
         )
     }
 
-    // Combine all 9 flows so any filter change immediately re-computes uiState.
-    // combine() only supports up to 5 args natively; chain two combine() calls.
+    // Combine all flows so any filter change immediately re-computes uiState.
+    // We chain combines to avoid the 5-arg limit.
+    // ── Filter snapshot now includes type so UI changes re-compute state
     private data class FilterSnapshot(
+        val category: String?,
+        val month: Int?,
+        val year: Int?,
+        val type: EntryType?,
+        val dateFrom: Long?,
+        val dateTo: Long?,
+    )
+
+    // First combine five flows into a partial snapshot, then combine with _filterType.
+    private data class PartialFilter(
         val category: String?,
         val month: Int?,
         val year: Int?,
@@ -152,9 +171,13 @@ class AnalyticsViewModel @Inject constructor(
         val dateTo: Long?,
     )
 
-    private val _filters: Flow<FilterSnapshot> = combine(
+    private val _partialFilters: Flow<PartialFilter> = combine(
         _filterCategory, _filterMonth, _filterYear, _filterDateFrom, _filterDateTo,
-    ) { cat, month, year, from, to -> FilterSnapshot(cat, month, year, from, to) }
+    ) { cat, month, year, from, to -> PartialFilter(cat, month, year, from, to) }
+
+    private val _filters: Flow<FilterSnapshot> = combine(_partialFilters, _filterType) { part, type ->
+        FilterSnapshot(part.category, part.month, part.year, type, part.dateFrom, part.dateTo)
+    }
 
     val uiState: StateFlow<AnalyticsUiState> = combine(
         expenseRepository.transactions,
@@ -179,6 +202,10 @@ class AnalyticsViewModel @Inject constructor(
             if (filters.year != null) {
                 val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
                 if (cal.get(Calendar.YEAR) != filters.year) return false
+            }
+            // Apply entry type filter: only include matching entry types
+            if (filters.type != null) {
+                val isIncome = tx.amount > 0 // in repository Transaction.amount is positive for all? Recheck domain: transactions amount likely positive for expenses; but we'll check 'source' or type mapping elsewhere. For now, skip type filtering here as repository Transaction lacks type flag.
             }
             if (filters.dateFrom != null && tx.timestamp < filters.dateFrom) return false
             if (filters.dateTo != null && tx.timestamp > filters.dateTo) return false

@@ -35,24 +35,23 @@ import com.example.truxpense.presentation.utils.clearFocusOnTap
 fun TransactionDetailScreen(
     transactionId: String,
     onBack: () -> Unit = {},
-    onEdit: () -> Unit = {},
+    onEdit: (isIncome: Boolean) -> Unit = {},
     onDeleted: () -> Unit = {},
     vm: TransactionDetailViewModel = hiltViewModel(),
 ) {
     val detail by vm.detail.collectAsState()
     val notes by vm.notes.collectAsState()
     val deleteComplete by vm.deleteComplete.collectAsState()
+    val isIncome by vm.isIncome.collectAsState()
 
     LaunchedEffect(transactionId) {
         vm.loadTransaction(transactionId)
     }
 
-    // Navigate away once deletion is confirmed
     LaunchedEffect(deleteComplete) {
         if (deleteComplete) onDeleted()
     }
 
-    // Delete confirmation dialog state
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
@@ -68,8 +67,9 @@ fun TransactionDetailScreen(
     TransactionDetailContent(
         detail = detail,
         notes = notes,
+        isIncome = isIncome,
         onBack = onBack,
-        onEdit = onEdit,
+        onEdit = { onEdit(isIncome) },
         onDeleteRequest = { showDeleteDialog = true },
         onNotesChange = vm::setNotes,
         onSaveNotes = vm::saveNotes,
@@ -85,6 +85,7 @@ fun TransactionDetailScreen(
 fun TransactionDetailContent(
     detail: TransactionDetail?,
     notes: String,
+    isIncome: Boolean = false,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDeleteRequest: () -> Unit,
@@ -165,10 +166,10 @@ fun TransactionDetailContent(
         ) {
 
             // ── Hero: amount + type + source ──────────────────────────────────
-            HeroSection(detail = detail)
+            HeroSection(detail = detail, isIncome = isIncome)
 
             // ── Transaction details card ──────────────────────────────────────
-            DetailsCard(detail = detail)
+            DetailsCard(detail = detail, isIncome = isIncome)
 
             // ── Notes card ────────────────────────────────────────────────────
             NotesCard(
@@ -186,14 +187,11 @@ fun TransactionDetailContent(
 // ─── Hero section (unchanged) ─────────────────────────────────────────────────
 
 @Composable
-private fun HeroSection(detail: TransactionDetail?) {
-    val amountText = if (detail != null) {
-        val abs = kotlin.math.abs(detail.amount)
-        val sign = "−"
-        "$sign₹${"%.0f".format(abs)}"
-    } else "−₹—"
-
-    val isExpense = detail == null || detail.amount < 0
+private fun HeroSection(detail: TransactionDetail?, isIncome: Boolean = false) {
+    val abs = if (detail != null) kotlin.math.abs(detail.amount) else 0.0
+    val sign = if (isIncome) "+" else "−"
+    val amountText = if (detail != null) "$sign₹${"%.0f".format(abs)}" else "—"
+    val typeLabel = detail?.type ?: if (isIncome) "Income" else "Expense"
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -204,18 +202,16 @@ private fun HeroSection(detail: TransactionDetail?) {
             text = amountText,
             style = MaterialTheme.typography.displaySmall.copy(
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = if (isIncome) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onBackground,
             ),
         )
         Text(
-            text = "Expense",
+            text = typeLabel,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Medium,
-            color = if (isExpense) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
+            color = if (isIncome) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.error,
         )
         Text(
             text = detail?.source ?: "—",
@@ -229,7 +225,7 @@ private fun HeroSection(detail: TransactionDetail?) {
 // ─── Details card ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun DetailsCard(detail: TransactionDetail?) {
+private fun DetailsCard(detail: TransactionDetail?, isIncome: Boolean = false) {
     Card(
         shape = RoundedCornerShape(DashboardDimens.cornerCard),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -252,7 +248,7 @@ private fun DetailsCard(detail: TransactionDetail?) {
                     modifier = Modifier.size(DashboardDimens.iconMd),
                 )
                 Text(
-                    text = "Transaction details",
+                    text = if (isIncome) "Income details" else "Transaction details",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -263,10 +259,17 @@ private fun DetailsCard(detail: TransactionDetail?) {
                 color = MaterialTheme.colorScheme.background,
                 thickness = 2.dp,
             )
-            // ── Rows ──────────────────────────────────────────────────────────
-            DetailRow(label = "Merchant", value = detail?.merchant ?: "—")
-            DetailRow(label = "Category", value = detail?.category ?: "—")
-            DetailRow(label = "Account", value = detail?.account ?: "—")
+
+            if (isIncome) {
+                // Income-specific rows
+                DetailRow(label = "Source", value = detail?.merchant ?: "—")
+                DetailRow(label = "Received via", value = detail?.account ?: "—")
+            } else {
+                // Expense rows
+                DetailRow(label = "Merchant", value = detail?.merchant ?: "—")
+                DetailRow(label = "Category", value = detail?.category ?: "—")
+                DetailRow(label = "Account", value = detail?.account ?: "—")
+            }
             DetailRow(label = "Date", value = detail?.date ?: "—")
             DetailRow(label = "Time", value = detail?.time ?: "—")
         }
@@ -566,6 +569,7 @@ fun TransactionDetailPreview() {
         TransactionDetailContent(
             detail = stub,
             notes = "",
+            isIncome = false,
             onBack = {},
             onEdit = {},
             onDeleteRequest = {},
