@@ -12,6 +12,7 @@ import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
 import com.example.truxpense.data.repository.income.IncomeRepository
+import com.example.truxpense.data.repository.savings.SavingsRepository
 import com.example.truxpense.data.repository.sms.PendingTransactionRepository
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +28,7 @@ class HomeViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
     private val budgetRepository: BudgetRepository,
     private val incomeRepository: IncomeRepository,
+    private val savingsRepository: SavingsRepository,
     private val pendingTransactionRepository: PendingTransactionRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
@@ -75,19 +77,41 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { pendingTransactionRepository.reject(id) }
     }
 
-    // ── Recent transactions (top 4) ───────────────────────────────────────────
+    // ── Recent transactions (top 5, expenses + income merged) ───────────────
 
     val recentTransactions: StateFlow<List<HomeTransactionItem>> =
-        expenseRepository.transactions.map { list ->
-            list.sortedByDescending { it.timestamp }.take(4).map { t ->
+        combine(
+            expenseRepository.transactions,
+            incomeRepository.allIncome,
+        ) { expenses, incomes ->
+            val expenseItems = expenses.map { t ->
                 HomeTransactionItem(
                     id = t.id,
                     title = t.merchant,
                     category = t.category,
                     amount = t.amount,
                     currencyCode = "INR",
+                    isExpense = true,
                 )
             }
+            val incomeItems = incomes.map { i ->
+                HomeTransactionItem(
+                    id = i.id,
+                    title = i.source,
+                    category = i.source,
+                    amount = i.amount,
+                    currencyCode = "INR",
+                    isExpense = false,
+                )
+            }
+            (expenseItems + incomeItems)
+                .sortedByDescending { item ->
+                    // Use original timestamp for sorting; look it up from each repo list
+                    expenses.firstOrNull { it.id == item.id }?.timestamp
+                        ?: incomes.firstOrNull { it.id == item.id }?.timestamp
+                        ?: 0L
+                }
+                .take(5)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Aggregated totals ─────────────────────────────────────────────────────
@@ -108,11 +132,10 @@ class HomeViewModel @Inject constructor(
         incomeRepository.totalIncomeBetween(monthStartMs(), monthEndMs())
             .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
-    /** Savings = income – current-month expenses (clamped to ≥ 0). */
+    /** Sum of actual savings entries recorded in the current calendar month. */
     val monthlySavings: StateFlow<Double> =
-        combine(monthlyIncome, currentMonthExpenses) { income, spent ->
-            (income - spent).coerceAtLeast(0.0)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+        savingsRepository.totalSavingsBetween(monthStartMs(), monthEndMs())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val expenseCount: StateFlow<Int> =
         expenseRepository.transactions.map { it.size }

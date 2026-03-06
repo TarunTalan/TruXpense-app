@@ -16,6 +16,7 @@ data class Income(
     val source: String,
     val notes: String = "",
     val timestamp: Long = System.currentTimeMillis(),
+    val paymentMethod: String = "",
 )
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -37,6 +38,19 @@ class IncomeRepository @Inject constructor(
         incomeDao.insertIncome(income.toEntity())
     }
 
+    suspend fun updateIncome(income: Income) {
+        incomeDao.updateIncome(
+            id = income.id,
+            amount = income.amount,
+            source = income.source,
+            notes = income.notes,
+            timestamp = income.timestamp,
+            paymentMethod = income.paymentMethod,
+        )
+    }
+
+    suspend fun getById(id: String): Income? = incomeDao.getById(id)?.toDomain()
+
     suspend fun deleteIncome(id: String) {
         incomeDao.deleteIncome(id)
     }
@@ -53,6 +67,7 @@ class IncomeRepository @Inject constructor(
         source = source,
         notes = notes,
         timestamp = timestamp,
+        paymentMethod = paymentMethod,
     )
 
     private fun IncomeEntity.toDomain() = Income(
@@ -61,6 +76,7 @@ class IncomeRepository @Inject constructor(
         source = source,
         notes = notes,
         timestamp = timestamp,
+        paymentMethod = paymentMethod,
     )
 }
 

@@ -4,6 +4,7 @@ package com.example.truxpense.presentation.screens.dashboard.transaction
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.income.IncomeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TransactionDetailViewModel @Inject constructor(
     private val repo: ExpenseRepository,
+    private val incomeRepo: IncomeRepository,
 ) : ViewModel() {
 
 
@@ -40,20 +42,26 @@ class TransactionDetailViewModel @Inject constructor(
     private val _deleteComplete = MutableStateFlow(false)
     val deleteComplete: StateFlow<Boolean> = _deleteComplete.asStateFlow()
 
+    /** Exposed so the screen can route Edit → EditIncomeScreen vs EditExpenseScreen. */
+    private val _isIncome = MutableStateFlow(false)
+    val isIncome: StateFlow<Boolean> = _isIncome.asStateFlow()
+
+    /** Track whether the currently loaded entry is an income record. */
+    private var isIncomeEntry = false
+
 
     fun loadTransaction(transactionId: String) {
         viewModelScope.launch {
-            // `transactions` is a Flow<List<Transaction>> — read the latest list
-            // and then search the list for the id.
             val txList = repo.transactions.firstOrNull() ?: emptyList()
             val match = txList.firstOrNull { it.id == transactionId }
 
-            _detail.value = if (match != null) {
-                // Map repository Transaction → TransactionDetail
+            if (match != null) {
+                isIncomeEntry = false
+                _isIncome.value = false
                 val cal = Calendar.getInstance().apply { timeInMillis = match.timestamp }
                 val dateFmt = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
                 val timeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
-                TransactionDetail(
+                _detail.value = TransactionDetail(
                     id = match.id,
                     merchant = match.merchant,
                     category = match.category,
@@ -66,8 +74,32 @@ class TransactionDetailViewModel @Inject constructor(
                     notes = match.notes,
                 )
             } else {
-                // Preview / not-yet-persisted stub
-                stubDetail(transactionId)
+                // Not an expense — check income repository
+                val incomeList = incomeRepo.allIncome.firstOrNull() ?: emptyList()
+                val income = incomeList.firstOrNull { it.id == transactionId }
+                if (income != null) {
+                    isIncomeEntry = true
+                    _isIncome.value = true
+                    val cal = Calendar.getInstance().apply { timeInMillis = income.timestamp }
+                    val dateFmt = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+                    val timeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
+                    _detail.value = TransactionDetail(
+                        id = income.id,
+                        merchant = income.source,
+                        category = income.source,
+                        account = income.paymentMethod.ifBlank { "—" },
+                        date = dateFmt.format(cal.time),
+                        time = timeFmt.format(cal.time),
+                        amount = income.amount,          // positive = income
+                        type = "Income",
+                        source = "Added manually",
+                        notes = income.notes,
+                    )
+                } else {
+                    isIncomeEntry = false
+                    _isIncome.value = false
+                    _detail.value = stubDetail(transactionId)
+                }
             }
 
             _notes.value = _detail.value?.notes ?: ""
@@ -81,9 +113,14 @@ class TransactionDetailViewModel @Inject constructor(
     fun saveNotes() {
         viewModelScope.launch {
             val current = _detail.value ?: return@launch
-            val txList = repo.transactions.firstOrNull() ?: emptyList()
-            val tx = txList.firstOrNull { it.id == current.id } ?: return@launch
-            repo.updateExpense(tx.copy(notes = _notes.value.trim()))
+            if (isIncomeEntry) {
+                val income = incomeRepo.getById(current.id) ?: return@launch
+                incomeRepo.updateIncome(income.copy(notes = _notes.value.trim()))
+            } else {
+                val txList = repo.transactions.firstOrNull() ?: emptyList()
+                val tx = txList.firstOrNull { it.id == current.id } ?: return@launch
+                repo.updateExpense(tx.copy(notes = _notes.value.trim()))
+            }
             _detail.value = current.copy(notes = _notes.value.trim())
         }
     }
@@ -95,7 +132,11 @@ class TransactionDetailViewModel @Inject constructor(
     fun deleteTransaction() {
         viewModelScope.launch {
             val id = _detail.value?.id ?: return@launch
-            repo.deleteExpense(id)
+            if (isIncomeEntry) {
+                incomeRepo.deleteIncome(id)
+            } else {
+                repo.deleteExpense(id)
+            }
             _deleteComplete.value = true
         }
     }

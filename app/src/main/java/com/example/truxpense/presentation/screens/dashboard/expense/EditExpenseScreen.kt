@@ -1,19 +1,13 @@
-package com.example.truxpense.presentation.screens.dashboard.transaction
+package com.example.truxpense.presentation.screens.dashboard.expense
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.graphics.drawable.ColorDrawable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreenContent
-import com.example.truxpense.presentation.theme.DashboardDimens
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.core.graphics.drawable.toDrawable
@@ -108,21 +102,5 @@ fun EditExpenseScreen(
         onBack           = onCancel,
         screenTitle      = "Edit expense",
         saveLabel        = if (isSaving) "Saving…" else "Save changes",
-        extraBottomContent = {
-            OutlinedButton(
-                onClick  = onCancel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DashboardDimens.buttonHeight),
-                shape  = RoundedCornerShape(DashboardDimens.cornerCard),
-                border = ButtonDefaults.outlinedButtonBorder(enabled = true),
-            ) {
-                Text(
-                    text       = "Cancel",
-                    fontWeight = FontWeight.SemiBold,
-                    color      = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        },
     )
 }

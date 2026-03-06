@@ -26,6 +26,7 @@ object Screen {
             const val AddExpense = "home/add_expense"
             const val AddExpenseResult = "home/add_expense/result"
             const val AddIncome = "home/add_income"
+            const val Savings = "home/savings"
         }
 
         // ── Transactions tab ──────────────────────────────────────────────────
@@ -38,11 +39,17 @@ object Screen {
             fun detailRoute(transactionId: String): String =
                 "transactions/detail/${java.net.URLEncoder.encode(transactionId, "UTF-8")}"
 
-            // Edit route for editing an existing transaction
+            // Edit route for editing an existing expense transaction
             const val Edit = "transactions/edit/{transactionId}"
 
             fun editRoute(transactionId: String): String =
                 "transactions/edit/${java.net.URLEncoder.encode(transactionId, "UTF-8")}"
+
+            // Edit route for editing an existing income entry
+            const val EditIncome = "transactions/edit_income/{incomeId}"
+
+            fun editIncomeRoute(incomeId: String): String =
+                "transactions/edit_income/${java.net.URLEncoder.encode(incomeId, "UTF-8")}"
         }
 
         // ── Budget tab ────────────────────────────────────────────────────────

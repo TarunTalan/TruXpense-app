@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -35,7 +36,8 @@ import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
-import com.example.truxpense.presentation.screens.dashboard.addexpense.AddExpenseScreen
+import com.example.truxpense.presentation.screens.dashboard.expense.AddExpenseScreen
+import com.example.truxpense.presentation.screens.dashboard.income.EditIncomeScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
@@ -45,13 +47,13 @@ import com.example.truxpense.presentation.screens.dashboard.components.Dashboard
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationDeepLinkViewModel
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
+import com.example.truxpense.presentation.screens.dashboard.savings.SavingsScreen
 import com.example.truxpense.presentation.screens.dashboard.settings.*
-import com.example.truxpense.presentation.theme.DashboardDimens
-import com.example.truxpense.presentation.screens.dashboard.transaction.EditExpenseScreen
+import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
+import com.example.truxpense.presentation.screens.dashboard.expense.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
-import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
-import androidx.core.net.toUri
+import com.example.truxpense.presentation.theme.DashboardDimens
 
 // Dashboard shell: owns the NavController and tab routing
 
@@ -235,6 +237,9 @@ fun DashboardScreen(
                         onPendingReviewClick = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
+                        onSavings = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.Savings)
+                        },
                     )
                 }
             }
@@ -247,7 +252,14 @@ fun DashboardScreen(
             }
 
             composable(Screen.Dashboard.Home.AddIncome) {
-                com.example.truxpense.presentation.screens.dashboard.addincome.AddIncomeScreen(
+                com.example.truxpense.presentation.screens.dashboard.income.AddIncomeScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                )
+            }
+
+
+            composable(Screen.Dashboard.Home.Savings) {
+                SavingsScreen(
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
@@ -279,16 +291,34 @@ fun DashboardScreen(
                 TransactionDetailScreen(
                     transactionId = transactionId,
                     onBack = { dashboardNavController.popBackStack() },
-                    onEdit = {
-                        dashboardNavController.safeNavigate(
-                            Screen.Dashboard.Transactions.editRoute(transactionId)
-                        )
+                    onEdit = { isIncome ->
+                        if (isIncome) {
+                            dashboardNavController.safeNavigate(
+                                Screen.Dashboard.Transactions.editIncomeRoute(transactionId)
+                            )
+                        } else {
+                            dashboardNavController.safeNavigate(
+                                Screen.Dashboard.Transactions.editRoute(transactionId)
+                            )
+                        }
                     },
                     onDeleted = {
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                             popUpTo(Screen.Dashboard.Transactions.Root) { inclusive = false }
                         }
                     },
+                )
+            }
+
+            composable(
+                route = Screen.Dashboard.Transactions.EditIncome,
+                arguments = listOf(navArgument("incomeId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val incomeId = backStackEntry.arguments?.getString("incomeId") ?: ""
+                EditIncomeScreen(
+                    incomeId = incomeId,
+                    onCancel = { dashboardNavController.popBackStack() },
+                    onSaved  = { dashboardNavController.popBackStack() },
                 )
             }
 
@@ -300,11 +330,7 @@ fun DashboardScreen(
                 EditExpenseScreen(
                     transactionId = transactionId,
                     onCancel = { dashboardNavController.popBackStack() },
-                    onSaved = {
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                            popUpTo(Screen.Dashboard.Transactions.Root) { inclusive = false }
-                        }
-                    },
+                    onSaved = { dashboardNavController.popBackStack() },
                 )
             }
 
