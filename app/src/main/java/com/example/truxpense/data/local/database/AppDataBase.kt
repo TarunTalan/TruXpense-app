@@ -15,7 +15,7 @@ import com.example.truxpense.data.local.entity.SavingsEntity
 
 @Database(
     entities = [ExpenseEntity::class, BudgetEntity::class, IncomeEntity::class, SavingsEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,6 +38,15 @@ abstract class AppDatabase : RoomDatabase() {
                         `timestamp` INTEGER NOT NULL
                     )
                     """.trimIndent()
+                )
+            }
+        }
+
+        /** Adds paymentMethod column to income table introduced in version 6. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `income` ADD COLUMN `paymentMethod` TEXT NOT NULL DEFAULT ''"
                 )
             }
         }

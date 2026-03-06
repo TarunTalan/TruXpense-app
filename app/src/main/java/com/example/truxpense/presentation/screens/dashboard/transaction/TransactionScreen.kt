@@ -33,6 +33,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavBackStackEntry
+import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ActiveFilterChipsRow
 import com.example.truxpense.presentation.screens.dashboard.components.FilterBottomSheet
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
@@ -81,8 +83,6 @@ fun TransactionsScreen(
     val activeFilterCount by vm.activeFilterCount.collectAsState()
     val isLoaded by vm.isLoaded.collectAsState()
     val typeFilter by vm.typeFilter.collectAsState()
-    val totalSpent by vm.totalSpent.collectAsState()
-    val totalIncome by vm.totalIncome.collectAsState()
 
     // Per-group toggle state — absent key = true (all start expanded)
     val monthExpandedStates = remember { mutableStateMapOf<String, Boolean>() }
@@ -255,29 +255,6 @@ fun TransactionsScreen(
 
                     item { Spacer(Modifier.height(DashboardDimens.spaceXxl)) }
 
-                    // ── ② Type toggle tabs (All / Expense / Income) ───────────────────
-                    item {
-                        TypeFilterTabBar(
-                            selected = typeFilter,
-                            onSelect = { vm.setTypeFilter(it) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = DashboardDimens.screenPaddingH),
-                        )
-                    }
-
-                    // ── ③ Net balance summary row ─────────────────────────────────────
-                    item {
-                        NetBalanceRow(
-                            totalIncome = totalIncome,
-                            totalSpent = totalSpent,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = DashboardDimens.screenPaddingH)
-                                .padding(top = 8.dp),
-                        )
-                    }
-
                     // ── ④ Month groups ────────────────────────────────────────────────
                     monthGroupsVal.forEachIndexed { monthIndex, monthGroup ->
                         val headerKey = "month-$monthIndex"
@@ -366,6 +343,8 @@ fun TransactionsScreen(
                     selectedPayment = selectedPayment,
                     selectedMonth = selectedMonth,
                     selectedYear = selectedYear,
+                    selectedType = typeFilter,
+                    onSelectType = { vm.setTypeFilter(it) },
                     dateFrom = dateFrom,
                     dateTo = dateTo,
                     onSelectCategory = { vm.setCategory(it) },
@@ -379,6 +358,7 @@ fun TransactionsScreen(
                         vm.setPaymentMethod(null)
                         vm.setMonth(null)
                         vm.setYear(null)
+                        vm.setTypeFilter(null)
                         vm.clearDateRange()
                     },
                     onDismiss = { showFilterSheet = false },
@@ -520,7 +500,7 @@ private fun FilterButton(
                 .background(if (activeCount > 0) primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer),
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.List,
+                painterResource(R.drawable.filter),
                 contentDescription = "Filter",
                 tint = if (activeCount > 0) primary else onSurfaceVar,
                 modifier = Modifier.size(DashboardDimens.iconMd),
@@ -598,130 +578,6 @@ private fun MonthGroupHeader(
                 modifier = Modifier.size(DashboardDimens.iconMd),
             )
         }
-    }
-}
-
-// ─── Type Filter Tabs ─────────────────────────────────────────────────────────
-
-@Composable
-private fun TypeFilterTabBar(
-    selected: EntryType?,
-    onSelect: (EntryType?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val tabs = listOf(null to "All", EntryType.EXPENSE to "Expense", EntryType.INCOME to "Income")
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        tabs.forEach { (type, label) ->
-            val isSelected = selected == type
-            val bgColor = when {
-                isSelected && type == EntryType.INCOME -> Color(0xFF1BAF9D)
-                isSelected && type == EntryType.EXPENSE -> MaterialTheme.colorScheme.error
-                isSelected -> MaterialTheme.colorScheme.primary
-                else -> Color.Transparent
-            }
-            val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(bgColor)
-                    .clickable { onSelect(type) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = textColor,
-                )
-            }
-        }
-    }
-}
-
-// ─── Net Balance Row ──────────────────────────────────────────────────────────
-
-@Composable
-private fun NetBalanceRow(
-    totalIncome: Double,
-    totalSpent: Double,
-    modifier: Modifier = Modifier,
-) {
-    val net = totalIncome - totalSpent
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NetStatItem(
-                label = "Income",
-                amount = totalIncome,
-                color = Color(0xFF1BAF9D),
-                prefix = "+",
-            )
-            // Vertical divider
-            Box(
-                modifier = Modifier
-                    .height(32.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(0.3f))
-            )
-            NetStatItem(
-                label = "Expense",
-                amount = totalSpent,
-                color = MaterialTheme.colorScheme.error,
-                prefix = "−",
-            )
-            // Vertical divider
-            Box(
-                modifier = Modifier
-                    .height(32.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(0.3f))
-            )
-            NetStatItem(
-                label = "Net",
-                amount = kotlin.math.abs(net),
-                color = if (net >= 0) Color(0xFF1BAF9D) else MaterialTheme.colorScheme.error,
-                prefix = if (net >= 0) "+" else "−",
-            )
-        }
-    }
-}
-
-@Composable
-private fun NetStatItem(
-    label: String,
-    amount: Double,
-    color: Color,
-    prefix: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = "$prefix₹${"%,.0f".format(amount)}",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-        )
     }
 }
 
@@ -833,16 +689,16 @@ private fun TransactionRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (isIncome) {
-                    Text(
-                        text = "Income",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF1BAF9D),
-                        modifier = Modifier
-                            .background(Color(0xFF1BAF9D).copy(alpha = 0.10f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 4.dp, vertical = 1.dp),
-                    )
-                }
+//                if (isIncome) {
+//                    Text(
+//                        text = "Income",
+//                        style = MaterialTheme.typography.labelSmall,
+//                        color = Color(0xFF1BAF9D),
+//                        modifier = Modifier
+//                            .background(Color(0xFF1BAF9D).copy(alpha = 0.10f), RoundedCornerShape(4.dp))
+//                            .padding(horizontal = 4.dp, vertical = 1.dp),
+//                    )
+//                }
             }
         }
 
