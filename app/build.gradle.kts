@@ -117,6 +117,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.foundation)
     implementation(libs.androidx.ui)
+    implementation(libs.foundation)
+    implementation(libs.ui.graphics)
     //kapt(libs.hilt.compiler) // removed: use explicit hilt-android-compiler to match version in libs.versions.toml
 
     // Ensure Dagger Hilt Android compiler is present explicitly (matches libs.toml hilt version)

@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.EmptyScreenContent
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 
 @Composable
 fun TransactionsTopBar() {
@@ -20,9 +19,7 @@ fun TransactionsTopBar() {
 @Composable
 fun TransactionsEmptyContent(
     modifier: Modifier = Modifier,
-    onAddTransaction: () -> Unit = {},
-    hasSmsPermission: Boolean = true,
-    onSmsGranted: (() -> Unit)? = null
+    onAddTransaction: () -> Unit = {}
 ) {
     EmptyScreenContent(
         modifier = modifier.fillMaxSize(),
@@ -31,18 +28,13 @@ fun TransactionsEmptyContent(
         subtitle = "Add your first transactions to see insights and summaries.",
         ctaText = "Add your first transaction",
         onCta = onAddTransaction,
-        topBanner = if (!hasSmsPermission) {
-            { SmsPermissionBanner(modifier = Modifier.fillMaxWidth(), onGranted = { onSmsGranted?.invoke() }) }
-        } else null,
     )
 }
 
 @Composable
 fun TransactionsEmptyScreen(
     modifier: Modifier = Modifier,
-    onAddTransaction: () -> Unit = {},
-    hasSmsPermission: Boolean = true,
-    onSmsGranted: (() -> Unit)? = null
+    onAddTransaction: () -> Unit = {}
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background, topBar = { TransactionsTopBar() }) { innerPadding ->
@@ -50,8 +42,6 @@ fun TransactionsEmptyScreen(
         TransactionsEmptyContent(
             modifier = modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
             onAddTransaction = onAddTransaction,
-            hasSmsPermission = hasSmsPermission,
-            onSmsGranted = onSmsGranted,
         )
     }
 }
@@ -60,6 +50,6 @@ fun TransactionsEmptyScreen(
 @Composable
 fun TransactionsEmptyScreenPreview() {
     MaterialTheme {
-        TransactionsEmptyScreen(hasSmsPermission = false)
+        TransactionsEmptyScreen()
     }
 }

@@ -28,9 +28,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.theme.DashboardDimens
+import androidx.compose.ui.tooling.preview.Preview
 
 // ── Brand colours ─────────────────────────────────────────────────────────────
 private val TealAccent = Color(0xFF26C6B4)
@@ -114,7 +116,7 @@ fun NotificationScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).clearFocusOnTap(),
             contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxxl),
         ) {
             groups.forEach { (groupLabel, items) ->
@@ -275,7 +277,7 @@ private fun SelectionTopBar(
                 Icon(
                     painter = painterResource(R.drawable.ic_close),
                     contentDescription = "Cancel selection",
-                    modifier = Modifier.size(DashboardDimens.iconMd),
+                    modifier = Modifier.size(28.dp),
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -463,7 +465,7 @@ private fun SelectionCircle(isSelected: Boolean) {
                     painter = painterResource(R.drawable.ic_check),
                     contentDescription = "Selected",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(DashboardDimens.iconLg),
                 )
             }
         } else {
@@ -640,3 +642,186 @@ private fun handleNavigation(
 
     NotificationDestination.TransactionList -> onTransactions()
 }
+
+// Previews
+@Preview(showBackground = true, widthDp = 360, name = "Notifications TopBar - unread")
+@Composable
+fun NotificationTopBarPreview() {
+    MaterialTheme {
+        NotificationTopBar(
+            unreadCount = 3,
+            hasUnread = true,
+            onBack = {},
+            onMarkAllRead = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, name = "Selection TopBar - 2 selected")
+@Composable
+fun SelectionTopBarPreview() {
+    MaterialTheme {
+        SelectionTopBar(
+            selectedCount = 2,
+            isAllSelected = false,
+            onClose = {},
+            onToggleSelectAll = {},
+            onDeleteSelected = {},
+            onDeleteAll = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 320, name = "Empty Notifications")
+@Composable
+fun EmptyNotificationsPreview() {
+    MaterialTheme {
+        EmptyNotifications(modifier = Modifier.fillMaxSize())
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, name = "NotificationRow - Unread")
+@Composable
+fun NotificationRowPreview_Unread() {
+    val sample = NotificationItem(
+        id = "n1",
+        title = "Budget warning: Food",
+        body = "You've used 88% of your Food budget this month.",
+        timeLabel = "Today",
+        timeMs = System.currentTimeMillis(),
+        isRead = false,
+        iconType = NotificationIconType.BUDGET_WARNING,
+        destination = NotificationDestination.BudgetDetail("Food", 10000.0, 8800.0)
+    )
+
+    MaterialTheme {
+        Surface(modifier = Modifier.fillMaxWidth()) {
+            NotificationRow(
+                item = sample,
+                isSelected = false,
+                isSelectionMode = false,
+                onClick = {},
+                onLongClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, name = "NotificationRow - Selected (Selection Mode)")
+@Composable
+fun NotificationRowPreview_SelectedSelectionMode() {
+    val sample = NotificationItem(
+        id = "n2",
+        title = "Budget exceeded: Transport",
+        body = "You've exceeded your Transport budget by ₹420.",
+        timeLabel = "Yesterday",
+        timeMs = System.currentTimeMillis(),
+        isRead = false,
+        iconType = NotificationIconType.BUDGET_EXCEEDED,
+        destination = NotificationDestination.BudgetDetail("Transport", 5000.0, 5420.0)
+    )
+
+    MaterialTheme {
+        Surface(modifier = Modifier.fillMaxWidth()) {
+            NotificationRow(
+                item = sample,
+                isSelected = true,
+                isSelectionMode = true,
+                onClick = {},
+                onLongClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, name = "NotificationRow - Selected (Highlight)")
+@Composable
+fun NotificationRowPreview_SelectedHighlight() {
+    val sample = NotificationItem(
+        id = "n3",
+        title = "Spending insight",
+        body = "Your dinner spending increased 40% vs last week.",
+        timeLabel = "2d",
+        timeMs = System.currentTimeMillis(),
+        isRead = true,
+        iconType = NotificationIconType.SPENDING_INSIGHT,
+        destination = NotificationDestination.WeeklyAnalytics
+    )
+
+    MaterialTheme {
+        Surface(modifier = Modifier.fillMaxWidth()) {
+            NotificationRow(
+                item = sample,
+                isSelected = true,
+                isSelectionMode = false,
+                onClick = {},
+                onLongClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 640, name = "Notifications - Selection Mode Preview")
+@Composable
+fun NotificationSelectionModePreview() {
+    val samples = listOf(
+        NotificationItem(
+            id = "s1",
+            title = "Budget exceeded: Groceries",
+            body = "You've exceeded your Groceries budget by ₹1200.",
+            timeLabel = "Today",
+            timeMs = System.currentTimeMillis(),
+            isRead = false,
+            iconType = NotificationIconType.BUDGET_EXCEEDED,
+            destination = NotificationDestination.BudgetDetail("Groceries", 8000.0, 9200.0)
+        ),
+        NotificationItem(
+            id = "s2",
+            title = "Budget warning: Eating out",
+            body = "You've used 92% of Eating out budget this month.",
+            timeLabel = "Today",
+            timeMs = System.currentTimeMillis(),
+            isRead = false,
+            iconType = NotificationIconType.BUDGET_WARNING,
+            destination = NotificationDestination.BudgetDetail("Eating out", 3000.0, 2760.0)
+        ),
+        NotificationItem(
+            id = "s3",
+            title = "Spending insight",
+            body = "Dinner spending increased 40% vs last week.",
+            timeLabel = "Yesterday",
+            timeMs = System.currentTimeMillis(),
+            isRead = true,
+            iconType = NotificationIconType.SPENDING_INSIGHT,
+            destination = NotificationDestination.WeeklyAnalytics
+        )
+    )
+
+    MaterialTheme {
+        Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            SelectionTopBar(
+                selectedCount = 1,
+                isAllSelected = false,
+                onClose = {},
+                onToggleSelectAll = {},
+                onDeleteSelected = {},
+                onDeleteAll = {}
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Show rows in selection mode — first item selected
+            samples.forEachIndexed { idx, item ->
+                NotificationRow(
+                    item = item,
+                    isSelected = idx == 0,
+                    isSelectionMode = true,
+                    onClick = {},
+                    onLongClick = {}
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+

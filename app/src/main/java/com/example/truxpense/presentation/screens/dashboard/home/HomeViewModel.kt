@@ -11,6 +11,8 @@ import com.example.truxpense.data.repository.budget.BudgetRepository
 import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
+import com.example.truxpense.data.repository.income.IncomeRepository
+import com.example.truxpense.data.repository.savings.SavingsRepository
 import com.example.truxpense.data.repository.sms.PendingTransactionRepository
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,6 +27,8 @@ class HomeViewModel @Inject constructor(
     private val prefs: AuthPreferences,
     private val expenseRepository: ExpenseRepository,
     private val budgetRepository: BudgetRepository,
+    private val incomeRepository: IncomeRepository,
+    private val savingsRepository: SavingsRepository,
     private val pendingTransactionRepository: PendingTransactionRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
@@ -73,49 +77,115 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { pendingTransactionRepository.reject(id) }
     }
 
-    // ── Recent transactions (top 4) ───────────────────────────────────────────
+    // ── Recent transactions (top 5, expenses + income merged) ───────────────
 
     val recentTransactions: StateFlow<List<HomeTransactionItem>> =
-        expenseRepository.transactions.map { list ->
-            list.sortedByDescending { it.timestamp }.take(4).map { t ->
+        combine(
+            expenseRepository.transactions,
+            incomeRepository.allIncome,
+        ) { expenses, incomes ->
+            val expenseItems = expenses.map { t ->
                 HomeTransactionItem(
                     id = t.id,
                     title = t.merchant,
                     category = t.category,
                     amount = t.amount,
                     currencyCode = "INR",
+                    isExpense = true,
                 )
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            val incomeItems = incomes.map { i ->
+                HomeTransactionItem(
+                    id = i.id,
+                    title = i.source,
+                    category = i.source,
+                    amount = i.amount,
+                    currencyCode = "INR",
+                    isExpense = false,
+                )
+            }
+            (expenseItems + incomeItems)
+                .sortedByDescending { item ->
+                    // Use original timestamp for sorting; look it up from each repo list
+                    expenses.firstOrNull { it.id == item.id }?.timestamp
+                        ?: incomes.firstOrNull { it.id == item.id }?.timestamp
+                        ?: 0L
+                }
+                .take(5)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Aggregated totals ─────────────────────────────────────────────────────
 
     val monthlySpend: StateFlow<Double> =
         expenseRepository.transactions.map { it.sumOf { t -> t.amount } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    /** Sum of expenses for the current calendar month only. */
+    val currentMonthExpenses: StateFlow<Double> =
+        expenseRepository.transactions.map { list ->
+            val start = monthStartMs()
+            list.filter { it.timestamp >= start }.sumOf { it.amount }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    /** Sum of income entries for the current calendar month. */
+    val monthlyIncome: StateFlow<Double> =
+        incomeRepository.totalIncomeBetween(monthStartMs(), monthEndMs())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    /** Sum of actual savings entries recorded in the current calendar month. */
+    val monthlySavings: StateFlow<Double> =
+        savingsRepository.totalSavingsBetween(monthStartMs(), monthEndMs())
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val expenseCount: StateFlow<Int> =
         expenseRepository.transactions.map { it.size }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /**
+     * Per-day spending for the current calendar month.
+     * Index 0 = day 1, index N-1 = last day of month.
+     * Size equals the number of days in the current month.
+     */
+    val dailySpendPoints: StateFlow<FloatArray> =
+        expenseRepository.transactions.map { list ->
+            val cal = Calendar.getInstance()
+            val year = cal.get(Calendar.YEAR)
+            val month = cal.get(Calendar.MONTH)
+            val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            val points = FloatArray(daysInMonth)
+            list.forEach { tx ->
+                val txCal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+                if (txCal.get(Calendar.YEAR) == year && txCal.get(Calendar.MONTH) == month) {
+                    val dayIndex = txCal.get(Calendar.DAY_OF_MONTH) - 1
+                    points[dayIndex] += tx.amount.toFloat()
+                }
+            }
+            points
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, FloatArray(0))
 
     /** True once the repository has emitted its first value (avoids UI flashing). */
-    val isLoaded: StateFlow<Boolean> =
-        expenseRepository.transactions
-            .map { true }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            expenseRepository.transactions.first()
+            _isLoaded.value = true
+        }
+    }
 
     val budgetLimit: StateFlow<Double> =
         budgetRepository.budgets.map { it.sumOf { b -> b.amount } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val budgetLeft: StateFlow<Double> =
         combine(budgetLimit, monthlySpend) { limit, spent -> limit - spent }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
     val budgetProgress: StateFlow<Float> =
         combine(budgetLimit, monthlySpend) { limit, spent ->
             if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     // ── Top spending categories ───────────────────────────────────────────────
 
@@ -127,7 +197,7 @@ class HomeViewModel @Inject constructor(
                     HomeSpendingCategory(cat, amt, if (total > 0) (amt / total).toFloat() else 0f)
                 }
                 .sortedByDescending { it.amount }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Deep-link helpers ─────────────────────────────────────────────────────
 
@@ -189,4 +259,22 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private fun monthStartMs(): Long = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    private fun monthEndMs(): Long = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+        set(Calendar.HOUR_OF_DAY, 23)
+        set(Calendar.MINUTE, 59)
+        set(Calendar.SECOND, 59)
+        set(Calendar.MILLISECOND, 999)
+    }.timeInMillis
 }

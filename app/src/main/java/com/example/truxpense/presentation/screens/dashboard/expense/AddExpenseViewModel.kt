@@ -1,4 +1,4 @@
-package com.example.truxpense.presentation.screens.dashboard.addexpense
+package com.example.truxpense.presentation.screens.dashboard.expense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,9 +7,14 @@ import androidx.work.WorkManager
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
 import com.example.truxpense.notification.workers.BudgetThresholdWorker
+import com.example.truxpense.presentation.utils.AppCategories
+import com.example.truxpense.presentation.utils.DateTimeUtils
+import com.example.truxpense.presentation.utils.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -39,8 +44,8 @@ class AddExpenseViewModel @Inject constructor(
 
     // ── 3. Selections (dropdown open/close now handled by components) ─────────
 
-    val categories = listOf("Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Groceries", "Other")
-    val accountList = listOf("HDFC Bank", "SBI", "ICICI Bank", "Axis Bank", "Cash", "UPI")
+    val categories = AppCategories.all
+    val accountList = listOf("Card", "Cash", "UPI")
 
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
@@ -48,8 +53,15 @@ class AddExpenseViewModel @Inject constructor(
     private val _selectedAccount = MutableStateFlow<String?>(null)
     val selectedAccount: StateFlow<String?> = _selectedAccount.asStateFlow()
 
-    private val _selectedDate = MutableStateFlow<String?>(null)
-    val selectedDate: StateFlow<String?> = _selectedDate.asStateFlow()
+    private val _selectedDate = MutableStateFlow(
+        SimpleDateFormat("MMM d", Locale.getDefault()).format(Date())
+    )
+    val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
+
+    private val _selectedTime = MutableStateFlow(
+        SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+    )
+    val selectedTime: StateFlow<String> = _selectedTime.asStateFlow()
 
     // ── 4. Save state ─────────────────────────────────────────────────────────
 
@@ -68,7 +80,7 @@ class AddExpenseViewModel @Inject constructor(
     // ── Events ────────────────────────────────────────────────────────────────
 
     fun setRawAmount(v: String) {
-        _rawAmount.value = v.filter { it.isDigit() || it == '.' }
+        _rawAmount.value = sanitizeAmountInput(v)
     }
 
     fun setMerchant(v: String) {
@@ -87,15 +99,15 @@ class AddExpenseViewModel @Inject constructor(
         _selectedAccount.value = acc
     }
 
-    fun setDate(date: String) {
-        _selectedDate.value = date
-    }
+    fun setDate(date: String) { _selectedDate.value = date }
+    fun setTime(time: String) { _selectedTime.value = time }
 
     fun saveExpense() {
         val amount = _rawAmount.value.toDoubleOrNull() ?: return
         val category = _selectedCategory.value ?: return
         val paymentMethod = _selectedAccount.value ?: "UPI"
-        val merchantName = _merchant.value.trim().ifBlank { category }
+        val merchantName = _merchant.value.trim().ifBlank { "Anonymous" }
+        val timestamp = DateTimeUtils.parseDateTimeToMillis(_selectedDate.value, _selectedTime.value)
 
         viewModelScope.launch {
             _isSaving.value = true
@@ -106,6 +118,9 @@ class AddExpenseViewModel @Inject constructor(
                         category = category,
                         paymentMethod = paymentMethod,
                         merchant = merchantName,
+                        notes = _notes.value.trim(),
+                        timestamp = timestamp,
+                        source = "manual",
                     )
                 )
                 // Trigger an immediate one-shot budget threshold check so the
@@ -130,6 +145,7 @@ class AddExpenseViewModel @Inject constructor(
         _notes.value = ""
         _selectedCategory.value = null
         _selectedAccount.value = null
-        _selectedDate.value = null
+        _selectedDate.value = SimpleDateFormat("MMM d", Locale.getDefault()).format(Date())
+        _selectedTime.value = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
     }
 }
