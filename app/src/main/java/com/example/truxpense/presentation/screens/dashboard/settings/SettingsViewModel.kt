@@ -10,9 +10,10 @@ import androidx.work.*
 import com.example.truxpense.data.local.datastore.AuthPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -24,9 +25,17 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
-    // ── Profile ───────────────────────────────────────────────────────────────
-    val username: Flow<String?> = prefs.username
-    val phone: Flow<String?> = prefs.phone
+    // ── Profile — Eagerly-started so the value is ready before first composition ──
+    val username: StateFlow<String?> = prefs.username.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
+    val phone: StateFlow<String?> = prefs.phone.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
 
     // ── SMS permission (runtime) ───────────────────────────────────────────────
     private val _smsEnabled = MutableStateFlow(

@@ -9,10 +9,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 
 @Composable
@@ -32,7 +35,7 @@ fun AboutScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = 32.dp, horizontal = 20.dp),
+                .padding(vertical = 32.dp, horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
@@ -44,11 +47,11 @@ fun AboutScreen(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "₹",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                Icon(
+                    painterResource(R.drawable.logo),
+                    contentDescription = "logo",
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(38.dp)
                 )
             }
 
@@ -72,7 +75,7 @@ fun AboutScreen(
             Text(
                 text = "AI-powered expense tracking that auto-reads your bank SMS, categorises spending, and delivers actionable insights — so you always know where your money goes.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                color = MaterialTheme.colorScheme.secondary.copy(0.9f),
                 textAlign = TextAlign.Center
             )
 
@@ -111,18 +114,10 @@ fun AboutScreen(
                 Text("⭐  Rate TruXpense on Play Store")
             }
 
-            TextButton(onClick = onViewLicences) {
-                Text(
-                    text = "Open-source Licences",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-
             Text(
                 text = "© 2025 TruXpense. All rights reserved.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center
             )
         }
