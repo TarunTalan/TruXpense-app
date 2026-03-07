@@ -11,6 +11,7 @@ import com.example.truxpense.data.session.TokenRefresher
 import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.remote.api.AuthApi
 import com.example.truxpense.data.remote.api.OnboardingApi
+import com.example.truxpense.data.remote.api.ProfileApi
 import com.example.truxpense.data.remote.interceptor.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -96,8 +97,8 @@ object NetworkModule {
     @Singleton
     @ApiRetrofit
     fun provideApiOkHttpClient(loggingInterceptor: HttpLoggingInterceptor, authInterceptor: AuthInterceptor, authAuthenticator: AuthAuthenticator): OkHttpClient = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
-        .addInterceptor(authInterceptor)
+        .addInterceptor(authInterceptor)      // auth first — token added before logging
+        .addInterceptor(loggingInterceptor)   // logging second — now sees Authorization header
         .authenticator(authAuthenticator)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -137,5 +138,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOnboardingApi(@ApiRetrofit retrofit: Retrofit): OnboardingApi = retrofit.create(OnboardingApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideProfileApi(@ApiRetrofit retrofit: Retrofit): ProfileApi = retrofit.create(ProfileApi::class.java)
 
 }
