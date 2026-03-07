@@ -36,8 +36,6 @@ import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
-import com.example.truxpense.presentation.screens.dashboard.expense.AddExpenseScreen
-import com.example.truxpense.presentation.screens.dashboard.income.EditIncomeScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
@@ -45,12 +43,14 @@ import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailS
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
+import com.example.truxpense.presentation.screens.dashboard.expense.AddExpenseScreen
+import com.example.truxpense.presentation.screens.dashboard.expense.EditExpenseScreen
+import com.example.truxpense.presentation.screens.dashboard.income.EditIncomeScreen
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationDeepLinkViewModel
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
 import com.example.truxpense.presentation.screens.dashboard.savings.SavingsScreen
 import com.example.truxpense.presentation.screens.dashboard.settings.*
 import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
-import com.example.truxpense.presentation.screens.dashboard.expense.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
 import com.example.truxpense.presentation.theme.DashboardDimens
@@ -318,7 +318,7 @@ fun DashboardScreen(
                 EditIncomeScreen(
                     incomeId = incomeId,
                     onCancel = { dashboardNavController.popBackStack() },
-                    onSaved  = { dashboardNavController.popBackStack() },
+                    onSaved = { dashboardNavController.popBackStack() },
                 )
             }
 
@@ -444,20 +444,95 @@ fun DashboardScreen(
 
             // ── Settings → Personal Info ──────────────────────────────────────
             composable(Screen.Dashboard.Settings.PersonalInfo) {
-                val settingsVm: SettingsViewModel = hiltViewModel()
-                val username by settingsVm.username.collectAsStateWithLifecycle(initialValue = "")
-                val phone by settingsVm.phone.collectAsStateWithLifecycle(initialValue = "")
-                val isSaving by settingsVm.isSavingProfile.collectAsStateWithLifecycle()
+                val vm: PersonalInfoViewModel = hiltViewModel()
+                val isLoaded  by vm.isLoaded.collectAsStateWithLifecycle()
+                val username  by vm.username.collectAsStateWithLifecycle()
+                val phone     by vm.phone.collectAsStateWithLifecycle()
+                val email     by vm.email.collectAsStateWithLifecycle()
+                val isSaving  by vm.isSaving.collectAsStateWithLifecycle()
+                val saveError by vm.saveError.collectAsStateWithLifecycle(initialValue = null)
+
+                // Wait for DataStore to emit all values before composing,
+                // so the screen never renders with blank/wrong initial values.
+                if (!isLoaded) return@composable
 
                 PersonalInfoScreen(
                     initialUsername = username ?: "",
-                    initialPhone = phone ?: "",
-                    isSaving = isSaving,
-                    onBack = { dashboardNavController.popBackStack() },
-                    onSave = { name, ph ->
-                        settingsVm.saveProfile(name, ph) {
-                            dashboardNavController.popBackStack()
+                    initialEmail    = email    ?: "",
+                    initialPhone    = phone    ?: "",
+                    isSaving        = isSaving,
+                    saveError       = saveError,
+                    onBack          = { dashboardNavController.popBackStack() },
+                    onSave          = { name ->
+                        vm.saveProfile(name) { dashboardNavController.popBackStack() }
+                    },
+                    onChangeEmail   = {
+                        vm.resetOtpState()
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Settings.changeContactOtpRoute("EMAIL")
+                        )
+                    },
+                    onChangePhone   = {
+                        vm.resetOtpState()
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Settings.changeContactOtpRoute("PHONE")
+                        )
+                    },
+                )
+            }
+
+            // ── Settings → Change Contact OTP ─────────────────────────────────
+            composable(
+                route     = Screen.Dashboard.Settings.ChangeContactOtp,
+                arguments = listOf(
+                    navArgument("type") { type = NavType.StringType },
+                ),
+            ) { backStackEntry ->
+                val rawType     = backStackEntry.arguments?.getString("type") ?: "EMAIL"
+                val contactType = if (rawType == "PHONE") ContactType.PHONE else ContactType.EMAIL
+
+                val personalInfoEntry = remember(backStackEntry) {
+                    dashboardNavController.getBackStackEntry(Screen.Dashboard.Settings.PersonalInfo)
+                }
+                val vm: PersonalInfoViewModel = hiltViewModel(personalInfoEntry)
+                val otpState by vm.otpState.collectAsStateWithLifecycle()
+                val currentEmail by vm.email.collectAsStateWithLifecycle(initialValue = "")
+                val currentPhone by vm.phone.collectAsStateWithLifecycle(initialValue = "")
+
+                // PHONE has no OTP step — pop back automatically when phone is saved
+                LaunchedEffect(otpState.isSuccess) {
+                    if (otpState.isSuccess) {
+                        vm.resetOtpState()
+                        dashboardNavController.popBackStack(
+                            Screen.Dashboard.Settings.PersonalInfo, inclusive = false
+                        )
+                    }
+                }
+
+                ChangeContactOtpScreen(
+                    type            = contactType,
+                    currentContact  = if (contactType == ContactType.EMAIL)
+                                          currentEmail ?: ""
+                                      else
+                                          currentPhone ?: "",
+                    isSendingOtp = otpState.isSendingOtp,
+                    otpSent      = otpState.otpSent,
+                    isVerifying  = otpState.isVerifying,
+                    otpError     = otpState.otpError,
+                    onSendOtp    = { newContact ->
+                        vm.initiateContactChange(contactType, newContact)
+                    },
+                    onResendOtp  = { vm.resendOtp() },
+                    onVerifyOtp  = { otp ->
+                        vm.verifyOtp(otp) {
+                            dashboardNavController.popBackStack(
+                                Screen.Dashboard.Settings.PersonalInfo, inclusive = false
+                            )
                         }
+                    },
+                    onBack       = {
+                        vm.resetOtpState()
+                        dashboardNavController.popBackStack()
                     },
                 )
             }
@@ -474,6 +549,7 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onAddAccount = { /* TODO: launch bank-linking flow */ },
                     onRemoveAccount = settingsVm::removeLinkedAccount,
+                    onEnableSms = { vm.emitRequestSmsPermission() },
                 )
             }
 

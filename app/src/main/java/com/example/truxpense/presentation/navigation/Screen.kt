@@ -87,6 +87,12 @@ object Screen {
             const val Terms = "settings/terms"
             const val About = "settings/about"
             const val DeleteAccount = "settings/delete_account"
+
+            /** type = EMAIL | PHONE */
+            const val ChangeContactOtp = "settings/change_contact_otp/{type}"
+
+            fun changeContactOtpRoute(type: String): String =
+                "settings/change_contact_otp/$type"
         }
 
         // ── Notifications (not a bottom-nav tab; shown as a full screen) ──────

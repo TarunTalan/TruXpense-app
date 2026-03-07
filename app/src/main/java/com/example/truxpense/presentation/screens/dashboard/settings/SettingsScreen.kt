@@ -1,6 +1,5 @@
 package com.example.truxpense.presentation.screens.dashboard.settings
 
-import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import android.graphics.Color as AndroidColor
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ fun SettingsScreen(
     // Account section rows
     val accountItems = listOf(
         SettingsMenuItem(R.drawable.linked_accounts, "Linked accounts", "Bank / SMS source status"),
-        SettingsMenuItem(R.drawable.security,        "Security",        "Password and login method"),
+        SettingsMenuItem(R.drawable.security_, "Security", "Password and login method"),
     )
     val accountActions = listOf(onLinkedAccounts, onSecurity)
 
@@ -62,10 +62,10 @@ fun SettingsScreen(
 
     // Support section rows
     val supportItems = listOf(
-        SettingsMenuItem(R.drawable.help,          "Help & Support"),
-        SettingsMenuItem(R.drawable.privacy_policy,"Privacy policy"),
-        SettingsMenuItem(R.drawable.description,   "Terms of service"),
-        SettingsMenuItem(R.drawable.folder_icon,   "About TruXpense"),
+        SettingsMenuItem(R.drawable.help, "Help & Support"),
+        SettingsMenuItem(R.drawable.privacy_policy, "Privacy policy"),
+        SettingsMenuItem(R.drawable.description, "Terms of service"),
+        SettingsMenuItem(R.drawable.folder_icon, "About TruXpense"),
     )
     val supportActions = listOf(onHelp, onPrivacyPolicy, onTerms, onAbout)
 
@@ -74,13 +74,10 @@ fun SettingsScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(headerTitle = "Settings", showBack = false) }
-    ) { innerPadding ->
+        topBar = { ScreenTopBar(headerTitle = "Settings", showBack = false) }) { innerPadding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 40.dp),
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 40.dp),
         ) {
 
             // ── User header card ─────────────────────────────────────────
@@ -88,7 +85,7 @@ fun SettingsScreen(
                 UserHeader(
                     username = username,
                     phone = phone,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    modifier = Modifier.padding(vertical = 16.dp),
                     onEditProfile = onPersonalInfo
                 )
             }
@@ -98,23 +95,23 @@ fun SettingsScreen(
                 MenuSection(label = "Account") {
                     accountItems.forEachIndexed { i, item ->
                         MenuRow(
-                            iconRes  = item.iconRes,
-                            title    = item.title,
+                            iconRes = item.iconRes,
+                            title = item.title,
                             subtitle = item.subtitle,
-                            onClick  = accountActions[i]
+                            onClick = accountActions[i]
                         )
                         if (i < accountItems.lastIndex) SectionDivider()
                     }
                     SectionDivider()
                     // Destructive: Delete account
                     MenuRow(
-                        iconRes      = R.drawable.account,
-                        title        = "Delete account",
-                        subtitle     = "Permanently remove your account and data",
-                        onClick      = onDeleteAccount,
-                        titleColor   = MaterialTheme.colorScheme.error,
-                        iconTint     = MaterialTheme.colorScheme.error,
-                        subtitleColor= MaterialTheme.colorScheme.error.copy(alpha = 0.75f),
+                        iconRes = R.drawable.delete,
+                        title = "Delete account",
+                        subtitle = "Permanently remove your account and data",
+                        onClick = onDeleteAccount,
+                        titleColor = MaterialTheme.colorScheme.error,
+                        iconTint = MaterialTheme.colorScheme.error,
+                        subtitleColor = MaterialTheme.colorScheme.error.copy(alpha = 0.75f),
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -125,10 +122,10 @@ fun SettingsScreen(
                 MenuSection(label = "Preferences") {
                     prefItems.forEachIndexed { i, item ->
                         MenuRow(
-                            iconRes  = item.iconRes,
-                            title    = item.title,
+                            iconRes = item.iconRes,
+                            title = item.title,
                             subtitle = item.subtitle,
-                            onClick  = prefActions[i]
+                            onClick = prefActions[i]
                         )
                     }
                 }
@@ -140,10 +137,10 @@ fun SettingsScreen(
                 MenuSection(label = "Support") {
                     supportItems.forEachIndexed { i, item ->
                         MenuRow(
-                            iconRes  = item.iconRes,
-                            title    = item.title,
+                            iconRes = item.iconRes,
+                            title = item.title,
                             subtitle = item.subtitle,
-                            onClick  = supportActions[i]
+                            onClick = supportActions[i]
                         )
                         if (i < supportItems.lastIndex) SectionDivider()
                     }
@@ -158,9 +155,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .padding(horizontal = 20.dp)
-                        .clickable(onClick = { showLogoutDialog = true })
+                    modifier = Modifier.clickable(onClick = { showLogoutDialog = true })
                 )
             }
         }
@@ -183,8 +178,7 @@ fun SettingsScreen(
                     TextButton(onClick = { showLogoutDialog = false }) {
                         Text(text = "Cancel")
                     }
-                }
-            )
+                })
         }
     }
 }
@@ -211,15 +205,10 @@ private fun UserHeader(
         shape = MaterialTheme.shapes.medium
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(color = avatarBgColor, shape = CircleShape),
+                modifier = Modifier.size(72.dp).background(color = avatarBgColor, shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 val initial = username.trim().let {
@@ -240,22 +229,16 @@ private fun UserHeader(
                 color = MaterialTheme.colorScheme.tertiary
             )
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = phone.takeIf { it.isNotBlank() } ?: "+91 98XXXXXXXX",
+            Text(text = phone.takeIf { it.isNotBlank() } ?: "+91 98XXXXXXXX",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+                color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onEditProfile,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(MaterialTheme.shapes.medium)
+                modifier = Modifier.fillMaxWidth().height(48.dp).clip(MaterialTheme.shapes.medium)
                     .border((1.5).dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(text = "Edit profile")
@@ -269,7 +252,7 @@ private fun MenuSection(
     label: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
@@ -306,10 +289,7 @@ private fun MenuRow(
     iconTint: Color? = null,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -320,8 +300,7 @@ private fun MenuRow(
         )
         Spacer(Modifier.width(14.dp))
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = title,
@@ -341,7 +320,7 @@ private fun MenuRow(
             Icon(
                 painter = painterResource(R.drawable.right_arrow),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.outlineVariant,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -357,11 +336,9 @@ fun Toggle(
 ) {
     Box(modifier = modifier.scale(0.75f)) {
         Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor   = Color.White,
-                checkedTrackColor   = MaterialTheme.colorScheme.primary,
+            checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
             )

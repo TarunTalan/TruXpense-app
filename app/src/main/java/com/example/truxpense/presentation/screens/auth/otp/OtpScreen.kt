@@ -408,7 +408,7 @@ fun OtpDigitBox(
         modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(
                 width = 2.dp,
                 color = borderColor,

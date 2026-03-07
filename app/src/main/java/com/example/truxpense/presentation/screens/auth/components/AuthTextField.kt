@@ -43,6 +43,7 @@ fun AuthTextField(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
+            Spacer(Modifier.height(2.dp))
         }
 
         // Choose border color: error has priority, otherwise primary when focused, else outline
