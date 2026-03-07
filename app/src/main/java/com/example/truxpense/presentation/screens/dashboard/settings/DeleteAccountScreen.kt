@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 import androidx.compose.ui.tooling.preview.Preview
 
 private const val CONFIRM_PHRASE = "DELETE MY ACCOUNT"
@@ -39,7 +40,8 @@ fun DeleteAccountScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .clearFocusOnTap(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {

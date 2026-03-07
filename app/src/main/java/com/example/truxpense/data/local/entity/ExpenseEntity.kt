@@ -11,5 +11,7 @@ data class ExpenseEntity(
     val paymentMethod: String,
     val merchant: String,
     val timestamp: Long,
+    val notes: String = "",
+    val source: String = "manual",   // "manual" | "sms"
 )
 

@@ -32,6 +32,10 @@ class BudgetRepository @Inject constructor(
         budgetDao.insertBudget(budget.toEntity())
     }
 
+    suspend fun getBudgetByCategory(category: String): Budget? {
+        return budgetDao.getBudgetByCategory(category)?.toDomain()
+    }
+
     suspend fun deleteBudget(id: String) {
         budgetDao.deleteBudget(id)
     }

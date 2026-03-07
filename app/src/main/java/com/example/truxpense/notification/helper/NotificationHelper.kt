@@ -221,6 +221,31 @@ class NotificationHelper @Inject constructor(
 
     fun showMonthlyResetReminder(monthLabel: String) = notifyBudgetResetReminder(monthLabel)
 
+    // ── Unusual spending ───────────────────────────────────────────────────────
+
+    fun notifyUnusualSpending(todaySpend: Double, baselineDailyAvg: Double) {
+        if (!canNotify()) return
+        val pi = pendingIntent(NotificationConstants.NOTIF_UNUSUAL_SPENDING, NotificationConstants.DEST_ANALYTICS)
+        val multiplier = "%.1f".format(todaySpend / baselineDailyAvg)
+        val n = NotificationCompat.Builder(context, NotificationConstants.CHANNEL_BUDGET_ALERT)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Unusual spending detected")
+            .setContentText("Today's spend (${fmt(todaySpend)}) is ${multiplier}× your daily average")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(
+                        "You've spent ${fmt(todaySpend)} today — ${multiplier}× your usual daily average of ${fmt(baselineDailyAvg)}. " +
+                        "Tap to review your transactions and make sure everything looks right."
+                    )
+            )
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVibrate(longArrayOf(0L, 150L, 100L, 150L))
+            .build()
+        NotificationManagerCompat.from(context).notify(NotificationConstants.NOTIF_UNUSUAL_SPENDING, n)
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun pendingIntent(

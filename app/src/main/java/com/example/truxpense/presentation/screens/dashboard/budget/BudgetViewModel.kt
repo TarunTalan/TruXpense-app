@@ -42,6 +42,17 @@ class BudgetViewModel @Inject constructor(
         categories.map { it.isNotEmpty() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** True once Room has emitted its first value — prevents empty-screen flash on cold start. */
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            budgetRepository.budgets.first()
+            _isLoaded.value = true
+        }
+    }
+
     // ── Display items (pre-formatted for the UI row) ──────────────────────────
 
     val categoryDisplayItems: StateFlow<List<BudgetCategoryDisplay>> =

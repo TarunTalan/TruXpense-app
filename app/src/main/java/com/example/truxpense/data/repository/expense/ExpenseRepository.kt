@@ -16,7 +16,9 @@ data class Transaction(
     val category: String,
     val paymentMethod: String,
     val merchant: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val notes: String = "",
+    val timestamp: Long = System.currentTimeMillis(),
+    val source: String = "manual",   // "manual" | "sms"
 )
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -41,6 +43,7 @@ class ExpenseRepository @Inject constructor(
             category = transaction.category,
             paymentMethod = transaction.paymentMethod,
             merchant = transaction.merchant,
+            notes = transaction.notes,
             timestamp = transaction.timestamp,
         )
     }
@@ -53,7 +56,6 @@ class ExpenseRepository @Inject constructor(
         expenseDao.clearAll()
     }
 
-    // ── Mappers ───────────────────────────────────────────────────────────────
 
     private fun Transaction.toEntity() = ExpenseEntity(
         id = id,
@@ -61,7 +63,9 @@ class ExpenseRepository @Inject constructor(
         category = category,
         paymentMethod = paymentMethod,
         merchant = merchant,
+        notes = notes,
         timestamp = timestamp,
+        source = source,
     )
 
     private fun ExpenseEntity.toDomain() = Transaction(
@@ -70,7 +74,9 @@ class ExpenseRepository @Inject constructor(
         category = category,
         paymentMethod = paymentMethod,
         merchant = merchant,
+        notes = notes,
         timestamp = timestamp,
+        source = source,
     )
 }
 

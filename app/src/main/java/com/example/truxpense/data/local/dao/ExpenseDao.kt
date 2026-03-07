@@ -28,6 +28,7 @@ interface ExpenseDao {
                category = :category,
                paymentMethod = :paymentMethod,
                merchant = :merchant,
+               notes = :notes,
                timestamp = :timestamp
            WHERE id = :id"""
     )
@@ -37,6 +38,7 @@ interface ExpenseDao {
         category: String,
         paymentMethod: String,
         merchant: String,
+        notes: String,
         timestamp: Long,
     )
 

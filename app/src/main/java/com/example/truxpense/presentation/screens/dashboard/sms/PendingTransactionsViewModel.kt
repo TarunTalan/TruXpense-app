@@ -2,6 +2,8 @@ package com.example.truxpense.presentation.screens.dashboard.sms
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
 import com.example.truxpense.data.repository.sms.PendingTransactionRepository
 import com.example.truxpense.data.sms.model.Category
 import com.example.truxpense.data.sms.model.ParsedTransaction
@@ -14,7 +16,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PendingTransactionsViewModel @Inject constructor(
-    private val repository: PendingTransactionRepository
+    private val repository: PendingTransactionRepository,
+    private val expenseRepository: ExpenseRepository,
 ) : ViewModel() {
 
     val pendingTransactions: StateFlow<List<ParsedTransaction>> =
@@ -26,7 +29,24 @@ class PendingTransactionsViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     fun confirm(id: String, category: Category? = null) {
-        viewModelScope.launch { repository.confirm(id, category) }
+        viewModelScope.launch {
+            repository.confirm(id, category)
+            // Also persist to local expense DB so it appears in the Transactions screen
+            val tx = pendingTransactions.value.firstOrNull { it.id == id } ?: return@launch
+            expenseRepository.addExpense(
+                Transaction(
+                    id = tx.id,
+                    amount = -kotlin.math.abs(tx.amount),   // expenses are negative
+                    category = category?.name?.lowercase()?.replaceFirstChar { it.uppercaseChar() }
+                        ?: tx.category.name.lowercase().replaceFirstChar { it.uppercaseChar() },
+                    paymentMethod = tx.bank.ifBlank { "UPI" },
+                    merchant = tx.merchant ?: "Unknown",
+                    notes = "",
+                    timestamp = tx.timestamp,
+                    source = "sms",
+                )
+            )
+        }
     }
 
     fun reject(id: String) {
@@ -35,7 +55,21 @@ class PendingTransactionsViewModel @Inject constructor(
 
     fun confirmAll() {
         viewModelScope.launch {
-            pendingTransactions.value.forEach { repository.confirm(it.id) }
+            pendingTransactions.value.forEach { tx ->
+                repository.confirm(tx.id)
+                expenseRepository.addExpense(
+                    Transaction(
+                        id = tx.id,
+                        amount = -kotlin.math.abs(tx.amount),
+                        category = tx.category.name.lowercase().replaceFirstChar { it.uppercaseChar() },
+                        paymentMethod = tx.bank.ifBlank { "UPI" },
+                        merchant = tx.merchant ?: "Unknown",
+                        notes = "",
+                        timestamp = tx.timestamp,
+                        source = "sms",
+                    )
+                )
+            }
         }
     }
 

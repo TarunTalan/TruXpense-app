@@ -1,13 +1,9 @@
 package com.example.truxpense.presentation.screens.dashboard.transaction
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -18,15 +14,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.clearFocusOnTap
 
 
 // ─── Screen entry point ───────────────────────────────────────────────────────
@@ -35,25 +35,23 @@ import com.example.truxpense.presentation.theme.DashboardDimens
 fun TransactionDetailScreen(
     transactionId: String,
     onBack: () -> Unit = {},
-    onEdit: () -> Unit = {},
+    onEdit: (isIncome: Boolean) -> Unit = {},
     onDeleted: () -> Unit = {},
     vm: TransactionDetailViewModel = hiltViewModel(),
 ) {
     val detail by vm.detail.collectAsState()
     val notes by vm.notes.collectAsState()
-    val notesExpanded by vm.notesExpanded.collectAsState()
     val deleteComplete by vm.deleteComplete.collectAsState()
+    val isIncome by vm.isIncome.collectAsState()
 
     LaunchedEffect(transactionId) {
         vm.loadTransaction(transactionId)
     }
 
-    // Navigate away once deletion is confirmed
     LaunchedEffect(deleteComplete) {
         if (deleteComplete) onDeleted()
     }
 
-    // Delete confirmation dialog state
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
@@ -69,11 +67,12 @@ fun TransactionDetailScreen(
     TransactionDetailContent(
         detail = detail,
         notes = notes,
-        notesExpanded = notesExpanded,
+        isIncome = isIncome,
         onBack = onBack,
-        onEdit = onEdit,
+        onEdit = { onEdit(isIncome) },
         onDeleteRequest = { showDeleteDialog = true },
         onNotesChange = vm::setNotes,
+        onSaveNotes = vm::saveNotes,
         onToggleNotes = vm::toggleNotes,
     )
 }
@@ -86,12 +85,13 @@ fun TransactionDetailScreen(
 fun TransactionDetailContent(
     detail: TransactionDetail?,
     notes: String,
-    notesExpanded: Boolean,
+    isIncome: Boolean = false,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDeleteRequest: () -> Unit,
     onNotesChange: (String) -> Unit,
-    onToggleNotes: () -> Unit,
+    onSaveNotes: () -> Unit = {},
+    onToggleNotes: () -> Unit = {},
 ) {
     // 3-dot menu state
     var showMenu by remember { mutableStateOf(false) }
@@ -157,25 +157,25 @@ fun TransactionDetailContent(
         },
     ) { innerPadding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())
-                // ↓ changed: top spaceMd matches AddExpense; kept horizontal unchanged
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = DashboardDimens.screenPaddingH)
-                .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceXxl),
+                .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceXxl)
+                .clearFocusOnTap(),
             verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
         ) {
 
             // ── Hero: amount + type + source ──────────────────────────────────
-            HeroSection(detail = detail)
+            HeroSection(detail = detail, isIncome = isIncome)
 
             // ── Transaction details card ──────────────────────────────────────
-            DetailsCard(detail = detail)
+            DetailsCard(detail = detail, isIncome = isIncome)
 
             // ── Notes card ────────────────────────────────────────────────────
             NotesCard(
                 notes = notes,
-                expanded = notesExpanded,
                 onChange = onNotesChange,
-                onToggle = onToggleNotes,
+                onSave = onSaveNotes,
             )
 
             Spacer(Modifier.height(DashboardDimens.spaceXxl))
@@ -187,14 +187,11 @@ fun TransactionDetailContent(
 // ─── Hero section (unchanged) ─────────────────────────────────────────────────
 
 @Composable
-private fun HeroSection(detail: TransactionDetail?) {
-    val amountText = if (detail != null) {
-        val abs = kotlin.math.abs(detail.amount)
-        val sign = "−"
-        "$sign₹${"%.0f".format(abs)}"
-    } else "−₹—"
-
-    val isExpense = detail == null || detail.amount < 0
+private fun HeroSection(detail: TransactionDetail?, isIncome: Boolean = false) {
+    val abs = if (detail != null) kotlin.math.abs(detail.amount) else 0.0
+    val sign = if (isIncome) "+" else "−"
+    val amountText = if (detail != null) "$sign₹${"%.0f".format(abs)}" else "—"
+    val typeLabel = detail?.type ?: if (isIncome) "Income" else "Expense"
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -205,18 +202,16 @@ private fun HeroSection(detail: TransactionDetail?) {
             text = amountText,
             style = MaterialTheme.typography.displaySmall.copy(
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = if (isIncome) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onBackground,
             ),
         )
         Text(
-            text = "Expense",
+            text = typeLabel,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Medium,
-            color = if (isExpense) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
+            color = if (isIncome) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.error,
         )
         Text(
             text = detail?.source ?: "—",
@@ -230,7 +225,7 @@ private fun HeroSection(detail: TransactionDetail?) {
 // ─── Details card ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun DetailsCard(detail: TransactionDetail?) {
+private fun DetailsCard(detail: TransactionDetail?, isIncome: Boolean = false) {
     Card(
         shape = RoundedCornerShape(DashboardDimens.cornerCard),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -253,7 +248,7 @@ private fun DetailsCard(detail: TransactionDetail?) {
                     modifier = Modifier.size(DashboardDimens.iconMd),
                 )
                 Text(
-                    text = "Transaction details",
+                    text = if (isIncome) "Income details" else "Transaction details",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -264,10 +259,17 @@ private fun DetailsCard(detail: TransactionDetail?) {
                 color = MaterialTheme.colorScheme.background,
                 thickness = 2.dp,
             )
-            // ── Rows ──────────────────────────────────────────────────────────
-            DetailRow(label = "Merchant", value = detail?.merchant ?: "—")
-            DetailRow(label = "Category", value = detail?.category ?: "—")
-            DetailRow(label = "Account", value = detail?.account ?: "—")
+
+            if (isIncome) {
+                // Income-specific rows
+                DetailRow(label = "Source", value = detail?.merchant ?: "—")
+                DetailRow(label = "Received via", value = detail?.account ?: "—")
+            } else {
+                // Expense rows
+                DetailRow(label = "Merchant", value = detail?.merchant ?: "—")
+                DetailRow(label = "Category", value = detail?.category ?: "—")
+                DetailRow(label = "Account", value = detail?.account ?: "—")
+            }
             DetailRow(label = "Date", value = detail?.date ?: "—")
             DetailRow(label = "Time", value = detail?.time ?: "—")
         }
@@ -311,14 +313,16 @@ private fun RowDivider() {
 
 // ─── Notes card ───────────────────────────────────────────────────────────────
 
+private const val NOTES_MAX_CHARS = 100
+
 @Composable
 private fun NotesCard(
     notes: String,
-    expanded: Boolean,
     onChange: (String) -> Unit,
-    onToggle: () -> Unit,
+    onSave: () -> Unit = {},
 ) {
-    // ↓ changed: Card(surfaceContainer) instead of Surface(surfaceVariant 30%)
+    var editMode by remember { mutableStateOf(false) }
+
     Card(
         shape = RoundedCornerShape(DashboardDimens.cornerCard),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -326,12 +330,14 @@ private fun NotesCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Header (always visible) — structure unchanged
+
+            // ── Header ────────────────────────────────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(
-                    horizontal = DashboardDimens.screenPaddingH,
-                    vertical = DashboardDimens.spaceLg,
-                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = DashboardDimens.screenPaddingH,
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -347,71 +353,152 @@ private fun NotesCard(
                     )
                     Text(
                         text = "Notes",
-                        // ↓ changed: labelSmall to match AddExpense notes header style
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
-                // "+" when collapsed; "−" when expanded — unchanged
-                Box(
-                    modifier = Modifier.size(DashboardDimens.iconButtonSm).clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = if (expanded) "−" else "+",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                when {
+                    editMode -> TextButton(onClick = { editMode = false; onSave() }) {
+                        Text(
+                            text = "Done",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    notes.isNotEmpty() -> TextButton(onClick = { editMode = true }) {
+                        Text(
+                            text = "Edit",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    else -> TextButton(onClick = { editMode = true }) {
+                        Text(
+                            text = "Add",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
 
-            // Expandable notes input — structure unchanged
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(
-                        start = DashboardDimens.screenPaddingH,
-                        end = DashboardDimens.screenPaddingH,
-                        bottom = DashboardDimens.spaceLg,
-                    ),
-                ) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = DashboardDimens.dividerThin,
-                    )
-                    Spacer(Modifier.height(DashboardDimens.spaceMd))
-                    BasicTextField(
-                        value = notes,
-                        onValueChange = onChange,
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerChip))
-                            // ↓ changed: background instead of surfaceVariant, matching AddExpense
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(horizontal = DashboardDimens.spaceLg, vertical = DashboardDimens.spaceMdL)
-                            .defaultMinSize(minHeight = DashboardDimens.inputMinHeight),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground,
-                        ),
-                        maxLines = 5,
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        decorationBox = { inner ->
-                            if (notes.isEmpty()) {
-                                Text(
-                                    text = "Add a note about this transaction…",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                thickness = DashboardDimens.dividerThin,
+                modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
+            )
+
+            Spacer(Modifier.height(DashboardDimens.spaceMd))
+
+            // ── Body ──────────────────────────────────────────────────────────
+            when {
+                editMode -> {
+                    val focusRequester = remember { FocusRequester() }
+                    LaunchedEffect(Unit) {
+                        try { focusRequester.requestFocus() } catch (_: Exception) {}
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = DashboardDimens.screenPaddingH),
+                    ) {
+                        BasicTextField(
+                            value = notes,
+                            onValueChange = { if (it.length <= NOTES_MAX_CHARS) onChange(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(DashboardDimens.cornerChip))
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(
+                                    horizontal = DashboardDimens.spaceLg,
+                                    vertical = DashboardDimens.spaceMdL,
                                 )
-                            }
-                            inner()
-                        },
+                                .defaultMinSize(minHeight = DashboardDimens.inputMinHeight)
+                                .focusRequester(focusRequester),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onBackground,
+                            ),
+                            maxLines = 3,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            decorationBox = { inner ->
+                                if (notes.isEmpty()) {
+                                    Text(
+                                        text = "Add a note about this transaction…",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                inner()
+                            },
+                        )
+                        // Character counter
+                        Text(
+                            text = "${notes.length}/$NOTES_MAX_CHARS",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (notes.length >= NOTES_MAX_CHARS)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = DashboardDimens.spaceXxs),
+                        )
+                    }
+                }
+
+                notes.isNotEmpty() -> {
+                    // Read-only — max 3 lines, ellipsis if overflow
+                    Text(
+                        text = notes,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = DashboardDimens.screenPaddingH + DashboardDimens.spaceLg,
+                                vertical = DashboardDimens.spaceMdL,
+                            ),
                     )
                 }
+
+                else -> {
+                    // Empty state
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editMode = true }
+                            .padding(
+                                horizontal = DashboardDimens.screenPaddingH,
+                                vertical = DashboardDimens.spaceLg,
+                            ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.add_notes_icon),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Text(
+                            text = "No notes yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        )
+                        Text(
+                            text = "Tap to add a note about this transaction",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        )
+                    }
+                }
             }
+
+            Spacer(Modifier.height(DashboardDimens.spaceLg))
         }
     }
 }
@@ -482,12 +569,11 @@ fun TransactionDetailPreview() {
         TransactionDetailContent(
             detail = stub,
             notes = "",
-            notesExpanded = false,
+            isIncome = false,
             onBack = {},
             onEdit = {},
             onDeleteRequest = {},
             onNotesChange = {},
-            onToggleNotes = {},
         )
     }
 }

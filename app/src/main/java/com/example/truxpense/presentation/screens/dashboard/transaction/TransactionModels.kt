@@ -9,15 +9,20 @@ enum class TransactionFilter(val label: String) {
     CATEGORY("Category"), ACCOUNT("Account"),
 }
 
+/** Distinguishes expense vs income entries in the unified feed. */
+enum class EntryType { EXPENSE, INCOME }
+
 // ─── UI Models ────────────────────────────────────────────────────────────────
 
 data class TransactionItem(
     val id: String,
-    val merchant: String,
-    val category: String,
-    val timeLabel: String,       // e.g. "Yesterday", "2 days ago"
-    val amount: Double,          // negative = expense, positive = income
-    val paymentMethod: String,   // e.g. "UPI", "Card", "Cash"
+    val merchant: String,        // merchant name OR income source
+    val category: String,        // expense category OR income source label
+    val timeLabel: String,       // e.g. "Yesterday", "Mar 6"
+    val amount: Double,          // always positive; sign shown by entryType
+    val paymentMethod: String,   // e.g. "UPI", "Card", "" for income
+    val entryType: EntryType = EntryType.EXPENSE,
+    val timestamp: Long = 0L,
 )
 
 /**
@@ -53,9 +58,9 @@ data class TransactionMonthGroup(
 private fun dayGroup(day: String) = TransactionDayGroup(
     dayLabel = day,
     items = listOf(
-        TransactionItem("$day-1", "Zomato", "Food", "Yesterday", -500.0, "UPI"),
-        TransactionItem("$day-2", "Uber", "Transport", "Yesterday", -450.0, "UPI"),
-        TransactionItem("$day-3", "Zepto", "Groceries", "Yesterday", -350.0, "UPI"),
+        TransactionItem("$day-1", "Zomato", "Food", day, 500.0, "UPI", EntryType.EXPENSE),
+        TransactionItem("$day-2", "Uber", "Transport", day, 450.0, "UPI", EntryType.EXPENSE),
+        TransactionItem("$day-3", "Salary", "Salary", day, 50000.0, "", EntryType.INCOME),
     ),
 )
 

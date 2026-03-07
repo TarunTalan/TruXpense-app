@@ -183,7 +183,12 @@ class BudgetDetailViewModel @Inject constructor(
     fun updateBudgetLimit(newLimit: Double) {
         val cat = _categoryName.value.ifBlank { return }
         viewModelScope.launch {
-            budgetRepository.addBudget(Budget(category = cat, amount = newLimit))
+            // Use the direct suspend DAO query — avoids Flow.firstOrNull() race
+            // where no subscriber is active and null is returned, causing a new UUID.
+            val existing = budgetRepository.getBudgetByCategory(cat)
+            val updated = existing?.copy(amount = newLimit)
+                ?: Budget(category = cat, amount = newLimit)
+            budgetRepository.addBudget(updated)
             _updateComplete.value = true
         }
     }
@@ -195,7 +200,7 @@ class BudgetDetailViewModel @Inject constructor(
     fun deleteBudget() {
         val cat = _categoryName.value.ifBlank { return }
         viewModelScope.launch {
-            val budget = budgetRepository.budgets.firstOrNull()?.firstOrNull { it.category == cat }
+            val budget = budgetRepository.getBudgetByCategory(cat)
             if (budget != null) budgetRepository.deleteBudget(budget.id)
             _deleteComplete.value = true
         }
