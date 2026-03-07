@@ -14,7 +14,6 @@ import com.example.truxpense.data.remote.dto.response.VerifyLoginOtpResponse
 import com.example.truxpense.presentation.utils.ResponseHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.lang.reflect.Field
 import javax.inject.Inject
 
 class AuthRepository @Inject constructor(
@@ -209,50 +208,20 @@ class AuthRepository @Inject constructor(
      */
     private suspend fun saveUsername(body: VerifyLoginOtpResponse) {
         try {
-            val username = getUsernameFromResponse(body)
-            username?.takeIf { it.isNotBlank() }?.let {
-                prefs.saveUsername(it)
-            }
+            val user = body.user
 
-            // Extract phoneNumber from nested user object if present and persist it
-            try {
-                val userField: Field = body.javaClass.getDeclaredField("user")
-                userField.isAccessible = true
-                val user = userField.get(body) ?: return
+            // Username
+            user.username?.takeIf { it.isNotBlank() }?.let { prefs.saveUsername(it) }
 
-                val phoneField: Field = try {
-                    user.javaClass.getDeclaredField("phoneNumber")
-                } catch (e: NoSuchFieldException) {
-                    // fallback to other field name if API uses a different key
-                    user.javaClass.getDeclaredField("phone")
-                }
-                phoneField.isAccessible = true
-                val phoneValue = phoneField.get(user) as? String
-                phoneValue?.takeIf { it.isNotBlank() }?.let { prefs.savePhone(it) }
+            // Email — persisted here so PersonalInfo screen shows it immediately after login
+            user.email.takeIf { it.isNotBlank() }?.let { prefs.saveEmail(it) }
 
-            } catch (_: Exception) {
-                // ignore extraction errors — don't block login
-            }
+            // Phone
+            user.phoneNumber?.takeIf { it.isNotBlank() }?.let { prefs.savePhone(it) }
 
         } catch (_: Exception) {
             // Log error but don't fail the operation
         }
     }
-
-    /**
-     * Extract username from response using reflection
-     */
-    private fun getUsernameFromResponse(body: VerifyLoginOtpResponse): String? {
-        return try {
-            val userField: Field = body.javaClass.getDeclaredField("user")
-            userField.isAccessible = true
-            val user = userField.get(body) ?: return null
-
-            val usernameField: Field = user.javaClass.getDeclaredField("username")
-            usernameField.isAccessible = true
-            usernameField.get(user) as? String
-        } catch (_: Exception) {
-            null
-        }
-    }
 }
+
