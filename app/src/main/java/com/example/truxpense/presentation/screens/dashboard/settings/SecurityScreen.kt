@@ -30,34 +30,25 @@ fun SecurityScreen(
     onAppLockToggle: (Boolean) -> Unit = {},
     onChangePassword: (old: String, new: String) -> Unit = { _, _ -> },
 ) {
-    var bioEnabled  by remember { mutableStateOf(biometricsEnabled) }
+    var bioEnabled by remember { mutableStateOf(biometricsEnabled) }
     var lockEnabled by remember { mutableStateOf(appLockEnabled) }
 
     // Change password sheet state
     var showPasswordSheet by remember { mutableStateOf(false) }
 
     if (showPasswordSheet) {
-        ChangePasswordSheet(
-            onDismiss = { showPasswordSheet = false },
-            onConfirm = { old, new ->
-                onChangePassword(old, new)
-                showPasswordSheet = false
-            }
-        )
+        ChangePasswordSheet(onDismiss = { showPasswordSheet = false }, onConfirm = { old, new ->
+            onChangePassword(old, new)
+            showPasswordSheet = false
+        })
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(headerTitle = "Security", showBack = true, onBack = onBack) }
-    ) { padding ->
+        topBar = { ScreenTopBar(headerTitle = "Security", showBack = true, onBack = onBack) }) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 16.dp)
-                .clearFocusOnTap(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+                .padding(vertical = 16.dp).clearFocusOnTap(), verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
             // ── Login & Password section ────────────────────────────────────
@@ -66,8 +57,7 @@ fun SecurityScreen(
                     iconRes = R.drawable.security,
                     title = "Change Password",
                     subtitle = "Update your account password",
-                    onClick = { showPasswordSheet = true }
-                )
+                    onClick = { showPasswordSheet = true })
             }
 
             // ── App Lock section ────────────────────────────────────────────
@@ -81,32 +71,22 @@ fun SecurityScreen(
                         onCheckedChange = {
                             bioEnabled = it
                             onBiometricsToggle(it)
-                        }
-                    )
+                        })
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                 }
                 ToggleSettingRow(
-                    iconRes = R.drawable.app_lock,
+                    iconRes = R.drawable.lock,
                     title = "App Lock",
                     subtitle = "Require authentication when opening the app",
                     checked = lockEnabled,
                     onCheckedChange = {
                         lockEnabled = it
                         onAppLockToggle(it)
-                    }
-                )
+                    })
             }
-
-            // ── Info note ───────────────────────────────────────────────────
-            Text(
-                text = "Enabling App Lock adds an extra layer of protection so only you can open TruXpense.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                modifier = Modifier.padding(horizontal = 20.dp)
-            )
         }
     }
 }
@@ -119,26 +99,21 @@ private fun ChangePasswordSheet(
     onDismiss: () -> Unit,
     onConfirm: (old: String, new: String) -> Unit,
 ) {
-    var oldPass  by remember { mutableStateOf("") }
-    var newPass  by remember { mutableStateOf("") }
+    var oldPass by remember { mutableStateOf("") }
+    var newPass by remember { mutableStateOf("") }
     var confPass by remember { mutableStateOf("") }
-    var oldVisible  by remember { mutableStateOf(false) }
-    var newVisible  by remember { mutableStateOf(false) }
+    var oldVisible by remember { mutableStateOf(false) }
+    var newVisible by remember { mutableStateOf(false) }
     var confVisible by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Change Password",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                text = "Change Password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold
             )
 
             PasswordField(
@@ -146,42 +121,35 @@ private fun ChangePasswordSheet(
                 onValueChange = { oldPass = it; error = null },
                 label = "Current Password",
                 visible = oldVisible,
-                onToggleVisible = { oldVisible = !oldVisible }
-            )
+                onToggleVisible = { oldVisible = !oldVisible })
             PasswordField(
                 value = newPass,
                 onValueChange = { newPass = it; error = null },
                 label = "New Password",
                 visible = newVisible,
-                onToggleVisible = { newVisible = !newVisible }
-            )
+                onToggleVisible = { newVisible = !newVisible })
             PasswordField(
                 value = confPass,
                 onValueChange = { confPass = it; error = null },
                 label = "Confirm New Password",
                 visible = confVisible,
-                onToggleVisible = { confVisible = !confVisible }
-            )
+                onToggleVisible = { confVisible = !confVisible })
 
             if (error != null) {
                 Text(
-                    text = error!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    text = error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error
                 )
             }
 
             Button(
                 onClick = {
                     when {
-                        oldPass.isBlank()       -> error = "Enter your current password"
-                        newPass.length < 8      -> error = "New password must be at least 8 characters"
-                        newPass != confPass     -> error = "Passwords do not match"
-                        else                    -> onConfirm(oldPass, newPass)
+                        oldPass.isBlank() -> error = "Enter your current password"
+                        newPass.length < 8 -> error = "New password must be at least 8 characters"
+                        newPass != confPass -> error = "Passwords do not match"
+                        else -> onConfirm(oldPass, newPass)
                     }
-                },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = MaterialTheme.shapes.medium
+                }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = MaterialTheme.shapes.medium
             ) {
                 Text("Update Password")
             }
@@ -254,11 +222,8 @@ internal fun ClickableSettingRow(
     onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(Modifier.apply { }) // ripple via clickable below
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().then(Modifier.apply { }) // ripple via clickable below
+            .padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painter = painterResource(iconRes),
@@ -269,9 +234,7 @@ internal fun ClickableSettingRow(
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.tertiary
+                text = title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary
             )
             if (subtitle != null) {
                 Text(
@@ -300,9 +263,7 @@ internal fun ToggleSettingRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -314,9 +275,7 @@ internal fun ToggleSettingRow(
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.tertiary
+                text = title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary
             )
             if (subtitle != null) {
                 Text(

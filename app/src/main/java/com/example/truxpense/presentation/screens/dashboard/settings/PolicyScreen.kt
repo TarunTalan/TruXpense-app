@@ -29,13 +29,13 @@ private fun StaticContentScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(
                 text = "Last updated: $lastUpdated",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
             )
 
             sections.forEach { (header, body) ->
@@ -51,7 +51,7 @@ private fun StaticContentScreen(
                     Text(
                         text = body,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = MaterialTheme.typography.bodySmall.fontSize * 1.6
                     )
                 }

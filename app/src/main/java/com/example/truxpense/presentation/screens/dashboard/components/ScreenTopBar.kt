@@ -34,6 +34,7 @@ fun ScreenTopBar(
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
     unreadCount: Int = 0,
+    username: String = "",          // explicit name for the profile-icon initial
 ) {
     TopAppBar(
         title = {
@@ -119,11 +120,14 @@ fun ScreenTopBar(
                 }
 
                 // Profile icon AFTER notification
-                val namePart = remember(headerTitle) {
-                    headerTitle.split(',').getOrNull(1)?.trim()?.ifEmpty { headerTitle } ?: headerTitle
+                val namePart = remember(username, headerTitle) {
+                    username.ifBlank {
+                        // legacy fallback: try to extract name after comma in title
+                        headerTitle.split(',').getOrNull(1)?.trim()?.ifEmpty { headerTitle } ?: headerTitle
+                    }
                 }
                 val initial = remember(namePart) {
-                    namePart.split(' ').firstOrNull()?.firstOrNull()?.uppercaseChar()?.toString() ?: ""
+                    namePart.split(' ').firstOrNull()?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
                 }
                 val bgColor = remember(namePart) {
                     val hash = namePart.hashCode()

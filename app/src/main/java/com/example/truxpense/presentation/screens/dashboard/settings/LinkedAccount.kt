@@ -1,18 +1,28 @@
 package com.example.truxpense.presentation.screens.dashboard.settings
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
-import androidx.compose.ui.tooling.preview.Preview
+import com.example.truxpense.presentation.theme.DashboardDimens
 
 data class LinkedAccount(
     val bankName: String,
@@ -27,6 +37,7 @@ fun LinkedAccountsScreen(
     onBack: () -> Unit = {},
     onAddAccount: () -> Unit = {},
     onRemoveAccount: (LinkedAccount) -> Unit = {},
+    onEnableSms: () -> Unit = {},
 ) {
     var accountList  by remember { mutableStateOf(accounts) }
     var removeTarget by remember { mutableStateOf<LinkedAccount?>(null) }
@@ -66,9 +77,14 @@ fun LinkedAccountsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // SMS status banner
+            // SMS status banner — only shown when permission is NOT granted
             item {
-                SmsStatusBanner(granted = smsPermissionGranted)
+                if (!smsPermissionGranted) {
+                    SmsBanner(
+                        modifier = Modifier.fillMaxWidth(),
+                        onEnable = onEnableSms,
+                    )
+                }
             }
 
             item {
@@ -125,10 +141,10 @@ fun LinkedAccountsScreen(
                     onClick = onAddAccount,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(48.dp),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Text("+ Add Bank Account")
+                    Text("Add Bank Account")
                 }
             }
         }
@@ -136,47 +152,75 @@ fun LinkedAccountsScreen(
 }
 
 @Composable
-private fun SmsStatusBanner(granted: Boolean) {
-    val containerColor = if (granted) MaterialTheme.colorScheme.primaryContainer
-                         else MaterialTheme.colorScheme.errorContainer
-    val contentColor   = if (granted) MaterialTheme.colorScheme.onPrimaryContainer
-                         else MaterialTheme.colorScheme.onErrorContainer
-    val iconColor      = if (granted) MaterialTheme.colorScheme.primary
-                         else MaterialTheme.colorScheme.error
+private fun SmsBanner(
+    modifier: Modifier = Modifier,
+    onEnable: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val startGrd = colorScheme.surfaceContainerLowest
+    val endGrd = colorScheme.surfaceContainerHighest
+    val smsGradient = remember(startGrd, endGrd) {
+        Brush.horizontalGradient(0.0f to startGrd, 1f to endGrd)
+    }
+    val isDark = isSystemInDarkTheme()
+    val borderColor = Color(0xFFF4A62A)
+    val txtColor = if (isDark) colorScheme.surfaceContainerHighest else Color.White
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth()
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(DashboardDimens.cornerCard))
+            .background(smsGradient)
+            .border(
+                color = borderColor,
+                width = 1.dp,
+                shape = RoundedCornerShape(DashboardDimens.cornerCard),
+            )
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(
-                painter = painterResource(R.drawable.sms),
+                painter = painterResource(R.drawable.sms_icon),
                 contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(22.dp)
+                tint = colorScheme.errorContainer,
+                modifier = Modifier.size(DashboardDimens.iconMd),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Enable SMS access",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colorScheme.errorContainer,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Button(
+                onClick = onEnable,
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.errorContainer,
+                    contentColor = txtColor,
+                ),
+                modifier = Modifier.height(30.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+            ) {
                 Text(
-                    text = if (granted) "SMS Access Active" else "SMS Access Required",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "Enable",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = contentColor
-                )
-                Text(
-                    text = if (granted)
-                        "TruXpense is reading your bank SMS to auto-log transactions."
-                    else
-                        "Grant SMS permission so TruXpense can auto-detect transactions.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = 0.75f)
+                    textAlign = TextAlign.Center,
                 )
             }
         }
+        Text(
+            text = "Automatically track expenses from bank sms.",
+            fontSize = 11.sp,
+            color = colorScheme.errorContainer,
+            lineHeight = 15.sp,
+            maxLines = 1,
+        )
     }
 }
 
@@ -241,7 +285,7 @@ private fun LinkedAccountCard(
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showBackground = true, showSystemUi = true, name = "With accounts + SMS granted")
 @Composable
 fun LinkedAccountsScreenPreview() {
     val samples = listOf(
@@ -252,3 +296,12 @@ fun LinkedAccountsScreenPreview() {
         LinkedAccountsScreen(accounts = samples, smsPermissionGranted = true)
     }
 }
+
+@Preview(showBackground = true, showSystemUi = true, name = "Empty + SMS not granted")
+@Composable
+fun LinkedAccountsScreenSmsPreview() {
+    MaterialTheme {
+        LinkedAccountsScreen(accounts = emptyList(), smsPermissionGranted = false)
+    }
+}
+

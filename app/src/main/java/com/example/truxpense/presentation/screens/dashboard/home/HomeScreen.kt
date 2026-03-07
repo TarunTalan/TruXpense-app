@@ -445,11 +445,16 @@ fun DashboardScreen(
             // ── Settings → Personal Info ──────────────────────────────────────
             composable(Screen.Dashboard.Settings.PersonalInfo) {
                 val vm: PersonalInfoViewModel = hiltViewModel()
-                val username by vm.username.collectAsStateWithLifecycle(initialValue = "")
-                val phone by vm.phone.collectAsStateWithLifecycle(initialValue = "")
-                val email by vm.email.collectAsStateWithLifecycle(initialValue = "")
-                val isSaving by vm.isSaving.collectAsStateWithLifecycle()
+                val isLoaded  by vm.isLoaded.collectAsStateWithLifecycle()
+                val username  by vm.username.collectAsStateWithLifecycle()
+                val phone     by vm.phone.collectAsStateWithLifecycle()
+                val email     by vm.email.collectAsStateWithLifecycle()
+                val isSaving  by vm.isSaving.collectAsStateWithLifecycle()
                 val saveError by vm.saveError.collectAsStateWithLifecycle(initialValue = null)
+
+                // Wait for DataStore to emit all values before composing,
+                // so the screen never renders with blank/wrong initial values.
+                if (!isLoaded) return@composable
 
                 PersonalInfoScreen(
                     initialUsername = username ?: "",
@@ -544,6 +549,7 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onAddAccount = { /* TODO: launch bank-linking flow */ },
                     onRemoveAccount = settingsVm::removeLinkedAccount,
+                    onEnableSms = { vm.emitRequestSmsPermission() },
                 )
             }
 
