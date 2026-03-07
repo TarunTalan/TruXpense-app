@@ -130,7 +130,7 @@ fun ChangeContactOtpScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(scaffoldPadding).verticalScroll(rememberScrollState())
                 .imePadding()                       // scroll content rises above keyboard
-                .navigationBarsPadding().clearFocusOnTap().padding(horizontal = 20.dp),
+                .navigationBarsPadding().clearFocusOnTap().padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
 

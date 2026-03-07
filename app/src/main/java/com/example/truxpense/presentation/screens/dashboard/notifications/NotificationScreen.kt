@@ -117,7 +117,11 @@ fun NotificationScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding).clearFocusOnTap(),
-            contentPadding = PaddingValues(bottom = DashboardDimens.spaceXxxl),
+            contentPadding = PaddingValues(
+                start = DashboardDimens.screenPaddingH,
+                end = DashboardDimens.screenPaddingH,
+                bottom = DashboardDimens.spaceXxxl,
+            ),
         ) {
             groups.forEach { (groupLabel, items) ->
 
@@ -128,8 +132,6 @@ fun NotificationScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(
-                            start = DashboardDimens.screenPaddingH,
-                            end = DashboardDimens.screenPaddingH,
                             top = DashboardDimens.spaceLg,
                             bottom = DashboardDimens.spaceSm,
                         ),
@@ -379,7 +381,6 @@ private fun NotificationRow(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ).background(bgColor).padding(
-                horizontal = DashboardDimens.screenPaddingH,
                 vertical = DashboardDimens.spaceMd,
             ),
         verticalAlignment = Alignment.Top,
@@ -824,4 +825,6 @@ fun NotificationSelectionModePreview() {
         }
     }
 }
+
+
 

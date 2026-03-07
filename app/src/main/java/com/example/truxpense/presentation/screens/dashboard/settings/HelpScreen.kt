@@ -99,7 +99,7 @@ fun HelpSupportScreen(
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.help),
+                            painter = painterResource(R.drawable.email_icon),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(22.dp)
@@ -167,7 +167,7 @@ private fun FaqCard(faq: FaqItem) {
                     Text(
                         text = faq.answer,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                     )
                 }

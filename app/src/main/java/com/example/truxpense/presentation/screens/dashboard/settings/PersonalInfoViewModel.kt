@@ -6,7 +6,10 @@ import com.example.truxpense.data.local.datastore.AuthPreferences
 import com.example.truxpense.data.repository.profile.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,10 +35,36 @@ class PersonalInfoViewModel @Inject constructor(
     private val profileRepo: ProfileRepository,
 ) : ViewModel() {
 
-    // Persisted values exposed as Flows
-    val username = prefs.username
-    val phone    = prefs.phone
-    val email    = prefs.email
+    // Persisted values — Eagerly-started StateFlows so the value is ready
+    // before the first composition (eliminates the blank-then-filled flash).
+    // initialValue = null means "DataStore hasn't emitted yet".
+    // DataStore will always emit quickly (even an absent key emits null instantly).
+    val username: StateFlow<String?> = prefs.username.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
+    val phone: StateFlow<String?> = prefs.phone.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
+    val email: StateFlow<String?> = prefs.email.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
+
+    // True once all three DataStore flows have emitted at least one value.
+    // Use this to gate the first composition instead of null-checking individually
+    // (an absent key emits null, which would incorrectly block the screen forever).
+    val isLoaded: StateFlow<Boolean> = combine(
+        prefs.username, prefs.email, prefs.phone
+    ) { _, _, _ -> true }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false,
+    )
 
     // Save-profile state
     private val _isSaving  = MutableStateFlow(false)

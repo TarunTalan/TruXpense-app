@@ -17,15 +17,26 @@ import com.example.truxpense.presentation.screens.dashboard.components.SmsPermis
 fun EmptyHomeContent(
     onAddExpense: (() -> Unit)? = null,
     hasSmsPermission: Boolean,
-    onSmsGranted: (() -> Unit)? = null
+    onSmsGranted: (() -> Unit)? = null,
+    onNotificationsClick: (() -> Unit)? = null,
+    onProfileClick: (() -> Unit)? = null,
+    unreadCount: Int = 0,
+    username: String = "",
 ) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background, topBar = {
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
             ScreenTopBar(
-                headerTitle = "TruXpense", showBack = false, showProfileIcons = true
+                headerTitle = "TruXpense",
+                showBack = false,
+                showProfileIcons = true,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick,
+                unreadCount = unreadCount,
+                username = username,
             )
-        }) { innerPadding ->
-
+        }
+    ) { innerPadding ->
         EmptyScreenContent(
             modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
             illustrationRes = R.drawable.illustration_home,

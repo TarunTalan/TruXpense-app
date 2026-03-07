@@ -90,6 +90,11 @@ fun HomeTabScreen(
     val monthlySpend by vm.monthlySpend.collectAsState()
     val pendingCount by vm.pendingCount.collectAsState()
 
+    // Shared across both empty and content branches
+    val notificationVm: NotificationViewModel = hiltViewModel()
+    val unreadCount by notificationVm.unreadCount.collectAsState()
+    val username by vm.username.collectAsState(initial = "")
+
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by remember {
         derivedStateOf { currencyVm.selectedCurrency.value?.code ?: "INR" }
@@ -103,12 +108,19 @@ fun HomeTabScreen(
             EmptyHomeContent(
                 onAddExpense = onAddExpense,
                 hasSmsPermission = hasSmsPermission,
+                onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick,
+                unreadCount = unreadCount,
+                username = username ?: "",
             )
         } else {
             HomeTabContent(
                 monthlySpend = monthlySpend,
                 hasSmsPermission = hasSmsPermission,
                 pendingCount = pendingCount,
+                unreadCount = unreadCount,
+                username = username ?: "",
                 onAddExpense = onAddExpense,
                 onAddIncome = onAddIncome,
                 onSmsGranted = { vm.onSmsPermissionResult(true); vm.refreshSmsPermission() },
@@ -132,6 +144,8 @@ fun HomeTabContent(
     monthlySpend: Double,
     hasSmsPermission: Boolean,
     pendingCount: Int = 0,
+    unreadCount: Int = 0,
+    username: String = "",
     onAddExpense: (() -> Unit)? = null,
     onAddIncome: (() -> Unit)? = null,
     onSmsGranted: (() -> Unit)? = null,
@@ -147,8 +161,6 @@ fun HomeTabContent(
     onSavings: (() -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
-    val notificationVm: NotificationViewModel = hiltViewModel()
-    val unreadCount by notificationVm.unreadCount.collectAsState()
     val recentTx by vm.recentTransactions.collectAsState(initial = emptyList())
     val budgetVm: BudgetViewModel = hiltViewModel()
     val budgetDisplayItems by budgetVm.categoryDisplayItems.collectAsState(initial = emptyList())
@@ -182,6 +194,7 @@ fun HomeTabContent(
                 headerTitle = "TruXpense",
                 showProfileIcons = true,
                 unreadCount = unreadCount,
+                username = username,
                 onNotificationsClick = { onNotificationsClick?.invoke() },
                 onProfileClick = { onProfileClick?.invoke() },
             )
