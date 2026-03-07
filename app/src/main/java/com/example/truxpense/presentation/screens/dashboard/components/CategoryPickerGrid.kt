@@ -33,29 +33,24 @@ import com.example.truxpense.presentation.utils.AppCategories
 
 // ── All icons available in the custom-category icon picker ───────────────────
 private val customIconOptions: List<Pair<String, Int>> = listOf(
-    "Food" to R.drawable.food,
-    "Transport" to R.drawable.transport,
+    "water" to R.drawable.water,
+    "wifi" to R.drawable.wifi,
     "Bills" to R.drawable.bills_ic,
-    "Shopping" to R.drawable.shopping,
-    "Travel" to R.drawable.category_icon,
-    "Health" to R.drawable.health,
-    "Education" to R.drawable.education,
-    "Entertainment" to R.drawable.entertainment,
-    "Groceries" to R.drawable.drink,
-    "Money" to R.drawable.money,
-    "Business" to R.drawable.business,
-    "Investment" to R.drawable.home_investment,
-    "Gift" to R.drawable.gift,
+    "yoga" to R.drawable.yoga,
+    "Travel" to R.drawable.travel,
+    "books" to R.drawable.reading_books,
+    "maintenance" to R.drawable.maintenance,
+    "insurance" to R.drawable.insurance,
+    "home" to R.drawable.home_investment__1_,
+    "fuel" to R.drawable.fuel,
+    "fitness" to R.drawable.fitness,
+    "emi" to R.drawable.emi_calculator,
+    "electricity" to R.drawable.electricity,
     "Savings" to R.drawable.savings,
-    "Refund" to R.drawable.refund,
     "Cashback" to R.drawable.cashback,
-    "Analytics" to R.drawable.analytics,
     "Budget" to R.drawable.budget,
-    "Commission" to R.drawable.commission,
-    "Cosmetics" to R.drawable.cosmetics,
     "Bulb" to R.drawable.bulb,
     "Archive" to R.drawable.archive,
-    "Report" to R.drawable.report_ic,
     "Other" to R.drawable.categories,
 )
 
@@ -324,7 +319,7 @@ internal fun iconForCategory(category: String?): Int = when (category?.trim()?.l
     "transport" -> R.drawable.transport
     "bills" -> R.drawable.bills_ic
     "shopping" -> R.drawable.shopping
-    "travel" -> R.drawable.category_icon
+    "travel" -> R.drawable.travel
     "health" -> R.drawable.health
     "education" -> R.drawable.education
     "entertainment" -> R.drawable.entertainment
@@ -334,16 +329,16 @@ internal fun iconForCategory(category: String?): Int = when (category?.trim()?.l
 
 /** Icon resolver for income source categories. */
 fun iconForIncomeSource(source: String?): Int = when (source?.trim()?.lowercase()) {
-    "salary" -> R.drawable.money
+    "salary" -> R.drawable.salary
     "freelance" -> R.drawable.freelance
+    "bonus" -> R.drawable.commission
     "business" -> R.drawable.business
     "investment" -> R.drawable.home_investment
     "gift" -> R.drawable.gift
     "rental" -> R.drawable.savings
     "refund" -> R.drawable.refund
     "cashback" -> R.drawable.cashback
-    "other" -> R.drawable.categories
-    else -> R.drawable.add_inocme
+    else -> R.drawable.categories
 }
 
 // ── Previews ─────────────────────────────────────────────────────────────────
