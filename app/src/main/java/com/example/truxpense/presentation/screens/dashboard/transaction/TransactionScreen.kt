@@ -5,6 +5,7 @@ import android.view.Gravity
 import android.widget.TextView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -21,8 +22,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -263,7 +266,8 @@ fun TransactionsScreen(
                         item(key = headerKey) {
                             MonthGroupHeader(
                                 monthLabel = monthGroup.monthLabel,
-                                totalSpent = monthGroup.totalSpent,
+                                totalExpense = monthGroup.totalExpense,
+                                totalIncome = monthGroup.totalIncome,
                                 expanded = isMonthExpanded,
                                 onToggle = {
                                     monthExpandedStates[headerKey] = !isMonthExpanded
@@ -277,12 +281,10 @@ fun TransactionsScreen(
                             monthGroup.days.forEachIndexed { dayIndex, dayGroup ->
                                 val dayKey = "day-$monthIndex-$dayIndex"
                                 val isDayExpanded = dayExpandedStates[dayKey] ?: true
-                                val dayTotal = dayGroup.items.sumOf { kotlin.math.abs(it.amount) }
 
                                 item(key = dayKey) {
                                     DayGroupHeader(
                                         dayLabel = dayGroup.dayLabel,
-                                        totalSpent = dayTotal,
                                         expanded = isDayExpanded,
                                         onToggle = {
                                             dayExpandedStates[dayKey] = !isDayExpanded
@@ -539,12 +541,134 @@ private fun FilterButton(
 @Composable
 private fun MonthGroupHeader(
     monthLabel: String,
-    totalSpent: Double,
+    totalExpense: Double,
+    totalIncome: Double,
     expanded: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val formattedTotal = "₹${"%,.0f".format(totalSpent)}"
+    val net = totalIncome - totalExpense
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else -90f,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "monthChevron",
+    )
+
+    Column(
+        modifier = modifier.clickable(
+            indication = null,
+            interactionSource = remember { MutableInteractionSource() },
+            onClick = onToggle,
+        ),
+        verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
+    ) {
+        // ── Month label + animated chevron ────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = monthLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(DashboardDimens.iconMd)
+                    .graphicsLayer { rotationZ = chevronRotation },
+            )
+        }
+
+        // ── Income / Expense / Net summary chips ──────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
+        ) {
+            PeriodStatChip(
+                label = "Income",
+                amount = totalIncome,
+                positive = true,
+                modifier = Modifier.weight(1f),
+            )
+            PeriodStatChip(
+                label = "Expense",
+                amount = totalExpense,
+                positive = false,
+                modifier = Modifier.weight(1f),
+            )
+            PeriodStatChip(
+                label = "Net",
+                amount = net,
+                positive = net >= 0,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PeriodStatChip(
+    label: String,
+    amount: Double,
+    positive: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val tint = if (positive) Color(0xFF1BAF9D) else MaterialTheme.colorScheme.error
+    val prefix = if (positive) "+" else "−"
+    // Always format absolute value — prefix supplies the sign, avoiding double minus
+    val absAmt = kotlin.math.abs(amount)
+    val formatted = when {
+        absAmt >= 1_00_00_000.0 -> "₹${"%.1f".format(absAmt / 1_00_00_000.0)}Cr"
+        absAmt >= 1_00_000.0    -> "₹${"%.1f".format(absAmt / 1_00_000.0)}L"
+        else                    -> "₹${"%,.0f".format(absAmt)}"
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        color = tint.copy(alpha = 0.08f),
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                horizontal = DashboardDimens.spaceMd,
+                vertical = DashboardDimens.spaceSm,
+            ),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = tint.copy(alpha = 0.75f),
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "$prefix$formatted",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = tint,
+            )
+        }
+    }
+}
+
+// ─── Day Group Header ─────────────────────────────────────────────────────────
+
+@Composable
+private fun DayGroupHeader(
+    dayLabel: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else -90f,
+        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        label = "dayChevron",
+    )
 
     Row(
         modifier = modifier.clickable(
@@ -556,83 +680,19 @@ private fun MonthGroupHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text = monthLabel,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
+            text = dayLabel,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXxs),
-        ) {
-            Text(
-                text = formattedTotal,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(DashboardDimens.iconMd),
-            )
-        }
-    }
-}
-
-// ─── Day Group Header ─────────────────────────────────────────────────────────
-
-@Composable
-private fun DayGroupHeader(
-    dayLabel: String,
-    totalSpent: Double,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val formattedTotal = "₹${"%,.0f".format(totalSpent)}"
-
-    // Render the day header as a Card with onBackground container color
-    Card(
-        modifier = modifier.clickable(
-            indication = null,
-            interactionSource = remember { MutableInteractionSource() },
-            onClick = onToggle,
-        ).padding(top = DashboardDimens.spaceMd),
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = dayLabel,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXxs),
-            ) {
-                Text(
-                    text = formattedTotal,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(DashboardDimens.iconSm),
-                )
-            }
-        }
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier
+                .size(DashboardDimens.iconSm)
+                .graphicsLayer { rotationZ = chevronRotation },
+        )
     }
 }
 
@@ -821,7 +881,8 @@ fun TransactionsScreenPreview() {
                     item {
                         MonthGroupHeader(
                             monthLabel = mg.monthLabel,
-                            totalSpent = mg.totalSpent,
+                            totalExpense = mg.totalExpense,
+                            totalIncome = mg.totalIncome,
                             expanded = true,
                             onToggle = {},
                             modifier = Modifier.fillMaxWidth().padding(horizontal = DashboardDimens.screenPaddingH)
@@ -831,12 +892,13 @@ fun TransactionsScreenPreview() {
 
                     mg.days.forEach { dg ->
                         item {
-                            Text(
-                                text = dg.dayLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                                modifier = Modifier.padding(
-                                    horizontal = DashboardDimens.screenPaddingH, vertical = DashboardDimens.spaceSm
+                            DayGroupHeader(
+                                dayLabel = dg.dayLabel,
+                                expanded = true,
+                                onToggle = {},
+                                modifier = Modifier.fillMaxWidth().padding(
+                                    horizontal = DashboardDimens.screenPaddingH,
+                                    vertical = DashboardDimens.spaceSm,
                                 ),
                             )
                         }
