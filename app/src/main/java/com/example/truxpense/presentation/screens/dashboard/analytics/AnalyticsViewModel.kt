@@ -5,19 +5,20 @@ import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.budget.BudgetRepository
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.expense.Transaction
-import com.example.truxpense.presentation.screens.dashboard.budget.budgetColorForCategory
 import com.example.truxpense.presentation.screens.dashboard.transaction.EntryType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.util.*
 import javax.inject.Inject
+import androidx.compose.ui.graphics.Color
+import android.graphics.Color as AndroidColor
 
 // ── UI models ─────────────────────────────────────────────────────────────────
 
 data class CategorySpend(
     val name: String,
     val amount: Double,
-    val color: androidx.compose.ui.graphics.Color,
+    val color: Color,
 )
 
 /**
@@ -221,9 +222,52 @@ class AnalyticsViewModel @Inject constructor(
         val totalBudget = budgets.sumOf { it.amount }
         val changePercent = if (prevSpent > 0) (((totalSpent - prevSpent) / prevSpent) * 100).toInt() else 0
 
-        val categories = current.groupBy { it.category }
-            .map { (cat, items) -> CategorySpend(cat, items.sumOf { it.amount }, budgetColorForCategory(cat)) }
-            .sortedByDescending { it.amount }
+        val categories = run {
+            // Group current transactions by category
+            val groupedByCat = current.groupBy { it.category }
+            val cats = groupedByCat.keys.sorted()
+
+            // Reusable small fixed palette — use this when number of categories is small
+            val fixedPalette = listOf(
+                Color(0xFFEF4444), // red
+                Color(0xFF14B8A6), // teal
+                Color(0xFFF59E0B), // amber
+                Color(0xFF4F46E5), // indigo
+                Color(0xFF8B5CF6), // purple
+                Color(0xFF10B981), // green
+                Color(0xFF3B82F6), // blue
+                Color(0xFF06B6D4), // cyan
+                Color(0xFFFB7185), // pink
+                Color(0xFFF97316), // orange
+                Color(0xFF7C4DFF), // deep purple variant
+                Color(0xFF00BFA6), // mint
+                Color(0xFFFFB74D), // light orange
+                Color(0xFF4DB6AC), // light teal
+                Color(0xFFFF8A65), // coral
+                Color(0xFF90A4AE), // blue grey
+                Color(0xFF795548), // brown
+                Color(0xFF8E24AA), // magenta
+                Color(0xFF0097A7), // teal dark
+                Color(0xFFCDDC39)  // lime
+            )
+
+            val colorForIndex: (Int) -> Color = { idx ->
+                if (cats.size <= fixedPalette.size) fixedPalette[idx % fixedPalette.size]
+                else {
+                    // generate colors across the hue spectrum for larger counts
+                    val hue = (idx.toFloat() * 360f / cats.size)
+                    val hsv = floatArrayOf(hue, 0.65f, 0.85f)
+                    Color(AndroidColor.HSVToColor(hsv))
+                }
+            }
+
+            val catColors = cats.mapIndexed { idx, cat -> cat to colorForIndex(idx) }.toMap()
+
+            cats.map { cat ->
+                val items = groupedByCat[cat] ?: emptyList()
+                CategorySpend(cat, items.sumOf { it.amount }, catColors[cat] ?: Color(0xFF6B7280))
+            }.sortedByDescending { it.amount }
+        }
 
         val trendPoints = buildTrendPoints(current, period, offset, now)
 

@@ -34,11 +34,6 @@ import com.example.truxpense.R
 import com.example.truxpense.presentation.theme.DashboardDimens
 import androidx.compose.ui.tooling.preview.Preview
 
-// ── Brand colours ─────────────────────────────────────────────────────────────
-private val TealAccent = Color(0xFF26C6B4)
-private val RedAccent = Color(0xFFEF4444)
-private val AmberAccent = Color(0xFFF59E0B)
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,6 +184,8 @@ private fun NotificationTopBar(
     onBack: () -> Unit,
     onMarkAllRead: () -> Unit,
 ) {
+    val primary = MaterialTheme.colorScheme.primary
+
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
@@ -198,6 +195,7 @@ private fun NotificationTopBar(
                 Icon(
                     painter = painterResource(R.drawable.left_arrow),
                     contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(DashboardDimens.iconMd),
                 )
             }
@@ -211,6 +209,7 @@ private fun NotificationTopBar(
                     text = "Notifications",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 AnimatedVisibility(
                     visible = unreadCount > 0,
@@ -223,14 +222,14 @@ private fun NotificationTopBar(
                         label = "unread_count",
                     ) { count ->
                         Box(
-                            modifier = Modifier.clip(CircleShape).background(TealAccent)
+                            modifier = Modifier.clip(CircleShape).background(primary)
                                 .padding(horizontal = 7.dp, vertical = 2.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 text = count.toString(),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                             )
                         }
                     }
@@ -247,7 +246,7 @@ private fun NotificationTopBar(
                     Text(
                         text = "Mark all read",
                         style = MaterialTheme.typography.labelMedium,
-                        color = TealAccent,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }
@@ -305,7 +304,7 @@ private fun SelectionTopBar(
                 Text(
                     text = if (isAllSelected) "Deselect all" else "Select all",
                     style = MaterialTheme.typography.labelMedium,
-                    color = TealAccent,
+                    color = MaterialTheme.colorScheme.secondary,
                 )
             }
 
@@ -314,7 +313,7 @@ private fun SelectionTopBar(
                 Icon(
                     painter = painterResource(R.drawable.delete),
                     contentDescription = "Delete selected",
-                    tint = if (selectedCount > 0) RedAccent
+                    tint = if (selectedCount > 0) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                     modifier = Modifier.size(DashboardDimens.iconMd),
                 )
@@ -350,22 +349,17 @@ private fun NotificationRow(
         label = "row_bg_${item.id}",
     )
 
-    val titleColor by animateColorAsState(
-        targetValue = if (!item.isRead) MaterialTheme.colorScheme.onBackground
-        else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-        animationSpec = animSpec,
-        label = "title_color_${item.id}",
-    )
+    // Replace animated title color with a fixed theme color (always onBackground)
+    val titleColor = MaterialTheme.colorScheme.onBackground
 
     val bodyColor by animateColorAsState(
-        targetValue = if (!item.isRead) MaterialTheme.colorScheme.onSurfaceVariant
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        targetValue = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (!item.isRead) 1f else 0.8f),
         animationSpec = animSpec,
         label = "body_color_${item.id}",
     )
 
     val iconAlpha by animateFloatAsState(
-        targetValue = if (!item.isRead) 1f else 0.45f,
+        targetValue = if (!item.isRead) 1f else 0.8f,
         animationSpec = floatSpec,
         label = "icon_alpha_${item.id}",
     )
@@ -434,7 +428,7 @@ private fun NotificationRow(
         ) {
             Box(
                 modifier = Modifier.padding(top = 4.dp).size(8.dp).alpha(dotAlpha).clip(CircleShape)
-                    .background(TealAccent),
+                    .background(MaterialTheme.colorScheme.primary),
             )
         }
     }
@@ -459,13 +453,13 @@ private fun SelectionCircle(isSelected: Boolean) {
         if (isSelected) {
             // Filled teal circle with white tick
             Box(
-                modifier = Modifier.size((44 * scale).dp).clip(CircleShape).background(TealAccent),
+                modifier = Modifier.size((44 * scale).dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_check),
                     contentDescription = "Selected",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(DashboardDimens.iconLg),
                 )
             }
@@ -494,33 +488,34 @@ private fun NotificationIcon(type: NotificationIconType, isRead: Boolean) {
 
     val style = when (type) {
         NotificationIconType.BUDGET_EXCEEDED -> IconStyle(
-            bgColor = RedAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = RedAccent.copy(alpha = baseAlpha),
-            iconRes = R.drawable.ic_warning,
+            bgColor = MaterialTheme.colorScheme.error.copy(alpha = if (isRead) 0.06f else 0.12f),
+            iconColor = MaterialTheme.colorScheme.error.copy(alpha = baseAlpha),
+            iconRes = R.drawable.warning,
         )
 
         NotificationIconType.BUDGET_WARNING -> IconStyle(
-            bgColor = AmberAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = AmberAccent.copy(alpha = baseAlpha),
-            iconRes = R.drawable.ic_warning,
+            // Use error colors for warnings as well so both warning/exceeded are styled consistently
+            bgColor = MaterialTheme.colorScheme.error.copy(alpha = if (isRead) 0.06f else 0.12f),
+            iconColor = MaterialTheme.colorScheme.error.copy(alpha = baseAlpha),
+            iconRes = R.drawable.warning,
         )
 
         NotificationIconType.SPENDING_INSIGHT -> IconStyle(
-            bgColor = TealAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = TealAccent.copy(alpha = baseAlpha),
-            iconRes = R.drawable.ic_trending_up,
+            bgColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isRead) 0.06f else 0.12f),
+            iconColor = MaterialTheme.colorScheme.primary.copy(alpha = baseAlpha),
+            iconRes = R.drawable.splash_screen_icon,
         )
 
         NotificationIconType.ADD_EXPENSE_PROMPT -> IconStyle(
-            bgColor = TealAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = TealAccent.copy(alpha = baseAlpha),
-            iconRes = R.drawable.ic_lightbulb,
+            bgColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isRead) 0.06f else 0.12f),
+            iconColor = MaterialTheme.colorScheme.primary.copy(alpha = baseAlpha),
+            iconRes = R.drawable.add_notes_icon,
         )
 
         NotificationIconType.SYNC_SUCCESS -> IconStyle(
-            bgColor = TealAccent.copy(alpha = if (isRead) 0.06f else 0.12f),
-            iconColor = TealAccent.copy(alpha = baseAlpha),
-            iconRes = R.drawable.ic_sync,
+            bgColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isRead) 0.06f else 0.12f),
+            iconColor = MaterialTheme.colorScheme.primary.copy(alpha = baseAlpha),
+            iconRes = R.drawable.sync,
         )
     }
 
@@ -571,7 +566,7 @@ private fun DeleteConfirmDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = RedAccent),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) { Text("Delete") }
         },
         dismissButton = {
@@ -825,6 +820,3 @@ fun NotificationSelectionModePreview() {
         }
     }
 }
-
-
-

@@ -48,10 +48,13 @@ data class TransactionDayGroup(
 )
 
 data class TransactionMonthGroup(
-    val monthLabel: String,      // e.g. "Feb2026"
-    val totalSpent: Double,
+    val monthLabel: String,      // e.g. "Feb 2026"
+    val totalExpense: Double,
+    val totalIncome: Double,
     val days: List<TransactionDayGroup>,
-)
+) {
+    val net: Double get() = totalIncome - totalExpense
+}
 
 // ─── Sample data ─────────────────────────────────────────────────────────────
 
@@ -66,13 +69,14 @@ private fun dayGroup(day: String) = TransactionDayGroup(
 
 val sampleMonthGroups = listOf(
     TransactionMonthGroup(
-        monthLabel = "Feb2026",
-        totalSpent = 25_000.0,
+        monthLabel = "Feb 2026",
+        totalExpense = 25_000.0,
+        totalIncome = 50_000.0,
         days = listOf(
             dayGroup("Feb 1"),
-            dayGroup("Feb2"),
-            dayGroup("Feb3"),
-            dayGroup("Feb4"),
+            dayGroup("Feb 2"),
+            dayGroup("Feb 3"),
+            dayGroup("Feb 4"),
         ),
     ),
 )
