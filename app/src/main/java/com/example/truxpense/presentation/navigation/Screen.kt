@@ -105,4 +105,9 @@ object Screen {
             const val PendingReview = "sms/pending_review"
         }
     }
+
+    // ── Premium flow (Paywall / Payment / Success)
+    object Premium {
+        const val Root = "premium"
+    }
 }

@@ -26,6 +26,10 @@ import com.example.truxpense.presentation.screens.onboarding.permission.SmsPermi
 import com.example.truxpense.presentation.screens.onboarding.username.UsernameScreen
 import com.example.truxpense.presentation.screens.splash.SplashViewModel
 import kotlinx.coroutines.flow.first
+import com.example.truxpense.presentation.navigation.slideInFromLeft
+import com.example.truxpense.presentation.navigation.slideInFromRight
+import com.example.truxpense.presentation.navigation.slideOutToLeft
+import com.example.truxpense.presentation.navigation.slideOutToRight
 
 /**
  * Root navigation host for the entire application.
@@ -50,16 +54,23 @@ fun AppNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = { ExitTransition.None },
+        // Slide transitions for auth + onboarding flow
+        enterTransition    = { slideInFromRight() },
+        exitTransition     = { slideOutToLeft()   },
+        popEnterTransition = { slideInFromLeft()  },
+        popExitTransition  = { slideOutToRight()  },
     ) {
 
         // ══════════════════════════════════════════════════════════════════════
-        // SPLASH
+        // SPLASH  — instant, no transition
         // ══════════════════════════════════════════════════════════════════════
-        composable(Screen.Splash) {
+        composable(
+            route = Screen.Splash,
+            enterTransition    = { EnterTransition.None },
+            exitTransition     = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition  = { ExitTransition.None },
+        ) {
             SplashNavigator(
                 navController = navController,
                 contentPadding = contentPadding,
@@ -295,7 +306,13 @@ fun AppNavHost(
         // and all tab sub-graphs (Home, Transactions, Budget, Analytics, Settings).
         // Nothing inside the dashboard bleeds back into this outer NavHost.
         // ══════════════════════════════════════════════════════════════════════
-        composable(Screen.Dashboard.Root) {
+        composable(
+            route = Screen.Dashboard.Root,
+            enterTransition    = { EnterTransition.None },
+            exitTransition     = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition  = { ExitTransition.None },
+        ) {
             DashboardScreen(
                 onLogout = {
                     navController.safeNavigate(Screen.Intro) {

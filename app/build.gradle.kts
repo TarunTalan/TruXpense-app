@@ -108,6 +108,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    //noinspection UseTomlInstead
+    implementation(libs.material.icons.extended)
+    // Material icons (rounded/filled) used across premium & other screens
     implementation(libs.navigation.compose)
 
     implementation(libs.play.services.auth)

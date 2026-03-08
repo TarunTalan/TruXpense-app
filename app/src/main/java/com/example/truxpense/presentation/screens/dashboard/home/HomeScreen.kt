@@ -36,6 +36,10 @@ import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
 import com.example.truxpense.presentation.navigation.Screen
 import com.example.truxpense.presentation.navigation.safeNavigate
+import com.example.truxpense.presentation.navigation.slideInFromLeft
+import com.example.truxpense.presentation.navigation.slideInFromRight
+import com.example.truxpense.presentation.navigation.slideOutToLeft
+import com.example.truxpense.presentation.navigation.slideOutToRight
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
@@ -53,6 +57,7 @@ import com.example.truxpense.presentation.screens.dashboard.settings.*
 import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
+import com.example.truxpense.presentation.screens.premium.PremiumNavHost
 import com.example.truxpense.presentation.theme.DashboardDimens
 
 // Dashboard shell: owns the NavController and tab routing
@@ -197,16 +202,23 @@ fun DashboardScreen(
             navController = dashboardNavController,
             startDestination = Screen.Dashboard.Home.Root,
             modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()),
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None },
+            // Default: slide-left push / slide-right pop for every nested screen
+            enterTransition    = { slideInFromRight() },
+            exitTransition     = { slideOutToLeft()   },
+            popEnterTransition = { slideInFromLeft()  },
+            popExitTransition  = { slideOutToRight()  },
         ) {
 
             // ══════════════════════════════════════════════════════════════════
-            // HOME TAB
+            // HOME TAB  — no animation on tab switch
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Home.Root) {
+            composable(
+                route = Screen.Dashboard.Home.Root,
+                enterTransition    = { EnterTransition.None },
+                exitTransition     = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition  = { ExitTransition.None },
+            ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     HomeTabScreen(
                         vm = vm,
@@ -238,7 +250,8 @@ fun DashboardScreen(
                             dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
                         onSavings = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.Savings)
+                            // Route to premium paywall instead of Savings screen
+                            dashboardNavController.safeNavigate(Screen.Premium.Root)
                         },
                         onNavigateToAnalytics = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
@@ -270,10 +283,21 @@ fun DashboardScreen(
                 )
             }
 
+            // Register premium nav host route
+            composable(Screen.Premium.Root) {
+                PremiumNavHost(onExitPremiumFlow = { dashboardNavController.popBackStack() })
+            }
+
             // ══════════════════════════════════════════════════════════════════
-            // TRANSACTIONS TAB
+            // TRANSACTIONS TAB  — no animation on tab switch
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Transactions.Root) { backStackEntry ->
+            composable(
+                route = Screen.Dashboard.Transactions.Root,
+                enterTransition    = { EnterTransition.None },
+                exitTransition     = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition  = { ExitTransition.None },
+            ) { backStackEntry ->
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     TransactionsScreen(
                         navBackStackEntry = backStackEntry,
@@ -341,9 +365,15 @@ fun DashboardScreen(
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // BUDGET TAB
+            // BUDGET TAB  — no animation on tab switch
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Budget.Root) {
+            composable(
+                route = Screen.Dashboard.Budget.Root,
+                enterTransition    = { EnterTransition.None },
+                exitTransition     = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition  = { ExitTransition.None },
+            ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     BudgetTab(
                         onNavigateToAddBudget = {
@@ -415,9 +445,15 @@ fun DashboardScreen(
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // ANALYTICS TAB
+            // ANALYTICS TAB  — no animation on tab switch
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Analytics.Root) {
+            composable(
+                route = Screen.Dashboard.Analytics.Root,
+                enterTransition    = { EnterTransition.None },
+                exitTransition     = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition  = { ExitTransition.None },
+            ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     AnalyticsTab(
                         onAddExpense = {
@@ -435,9 +471,15 @@ fun DashboardScreen(
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // SETTINGS TAB  (root)
+            // SETTINGS TAB  — no animation on tab switch
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Settings.Root) {
+            composable(
+                route = Screen.Dashboard.Settings.Root,
+                enterTransition    = { EnterTransition.None },
+                exitTransition     = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition  = { ExitTransition.None },
+            ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     SettingsTab(
                         navController = dashboardNavController,
@@ -692,7 +734,7 @@ fun DashboardScreen(
     SmsPermissionDialogHandler(vm = vm)
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════���══════════════════════════════════════
 // PRIVATE TAB COMPOSABLES
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -824,3 +866,4 @@ private fun DashboardBottomBarPreview() {
         )
     }
 }
+
