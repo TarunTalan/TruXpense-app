@@ -70,6 +70,8 @@
                 android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <!-- FCM notification icon / colour -->
+        <!-- default_notification_icon: used by system when app is in background (notification payload) -->
+        <!-- For data-only messages, TruxpenseFirebaseMessagingService sets per-type icons in code -->
         <meta-data
                 android:name="com.google.firebase.messaging.default_notification_icon"
                 android:resource="@drawable/ic_notification"/>

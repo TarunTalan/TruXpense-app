@@ -3,6 +3,12 @@ package com.example.truxpense.service
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -97,6 +103,7 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
             destination = NotificationConstants.DEST_BUDGET_DETAIL,
             category = category,
             vibrate = longArrayOf(0L, 150L, 100L, 300L),
+            smallIconRes = R.drawable.warning,  // warning icon
         )
     }
 
@@ -111,6 +118,7 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
             destination = NotificationConstants.DEST_BUDGET_DETAIL,
             category = category,
             vibrate = longArrayOf(0L, 200L, 100L, 200L, 100L, 400L),
+            smallIconRes = R.drawable.warning,  // warning icon
         )
     }
 
@@ -122,6 +130,7 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
             channelId = NotificationChannels.MONTHLY_RESET,
             priority = NotificationCompat.PRIORITY_DEFAULT,
             destination = NotificationConstants.DEST_ANALYTICS,          // ← analytics tab
+            smallIconRes = R.drawable.splash_screen_icon,
         )
     }
 
@@ -132,7 +141,8 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
             body = body,
             channelId = NotificationChannels.DAILY_REMINDER,
             priority = NotificationCompat.PRIORITY_DEFAULT,
-            destination = NotificationConstants.DEST_ADD_EXPENSE,        // ← add expense
+            destination = NotificationConstants.DEST_ADD_EXPENSE,
+            smallIconRes = R.drawable.log,
         )
     }
 
@@ -144,6 +154,7 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
             channelId = NotificationChannels.MONTHLY_RESET,
             priority = NotificationCompat.PRIORITY_DEFAULT,
             destination = NotificationConstants.DEST_BUDGET_TAB,         // ← budget tab
+            smallIconRes = R.drawable.sync,
         )
     }
 
@@ -155,6 +166,7 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
             channelId = NotificationChannels.GENERAL_PUSH,
             priority = NotificationCompat.PRIORITY_DEFAULT,
             destination = NotificationConstants.DEST_DASHBOARD,
+            smallIconRes = R.drawable.splash_screen_icon,
         )
     }
 
@@ -170,6 +182,7 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
         destination: String,
         category: String? = null,
         vibrate: LongArray? = null,
+        smallIconRes: Int? = null,
     ) {
         val piFlags =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -183,9 +196,46 @@ class TruxpenseFirebaseMessagingService : FirebaseMessagingService() {
         val pi = PendingIntent.getActivity(this, notifId, intent, piFlags)
 
         val builder =
-            NotificationCompat.Builder(this, channelId).setSmallIcon(R.drawable.ic_notification).setContentTitle(title)
+            NotificationCompat.Builder(this, channelId).setSmallIcon(smallIconRes ?: R.drawable.ic_notification).setContentTitle(title)
                 .setContentText(body).setStyle(NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pi)
                 .setAutoCancel(true).setPriority(priority)
+
+        // ── Large icon ────────────────────────────────────────────────────────
+        // API < 26 : R.mipmap.ic_launcher_round resolves to a real WebP bitmap —
+        //            BitmapFactory decodes it, scale to the standard size, circle-clip.
+        // API 26+  : The mipmap entry is an adaptive-icon XML; BitmapFactory returns null.
+        //            Instead we manually composite background color + foreground vector
+        //            onto a Canvas, then circle-clip the result.
+        try {
+            val size = resources.getDimensionPixelSize(android.R.dimen.notification_large_icon_width)
+
+            val rawBmp: Bitmap? = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                // Bitmap WebP lives in mipmap-{hdpi,xhdpi,xxhdpi,xxxhdpi} — decode directly.
+                val decoded = android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher_round)
+                if (decoded != null) Bitmap.createScaledBitmap(decoded, size, size, true) else null
+            } else {
+                // Adaptive icon path: draw background + foreground onto a canvas.
+                val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                canvas.drawColor(android.graphics.Color.parseColor("#1F6F73"))
+                val fg = androidx.core.content.ContextCompat.getDrawable(
+                    this, R.drawable.ic_launcher_foreground
+                )
+                if (fg != null) { fg.setBounds(0, 0, size, size); fg.draw(canvas) }
+                bmp
+            }
+
+            if (rawBmp != null) {
+                // Circle-clip so it matches the round-icon style in the notification drawer.
+                val circleBmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                val circleCanvas = Canvas(circleBmp)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                circleCanvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+                circleCanvas.drawBitmap(rawBmp, Rect(0, 0, size, size), Rect(0, 0, size, size), paint)
+                builder.setLargeIcon(circleBmp)
+            }
+        } catch (_: Exception) { }
 
         if (vibrate != null) builder.setVibrate(vibrate)
 

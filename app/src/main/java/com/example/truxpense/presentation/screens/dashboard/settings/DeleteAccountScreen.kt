@@ -2,6 +2,7 @@ package com.example.truxpense.presentation.screens.dashboard.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,9 +14,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
-import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.utils.SimpleTextField
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.utils.clearFocusOnTap
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 
 private const val CONFIRM_PHRASE = "DELETE MY ACCOUNT"
 
@@ -158,14 +161,19 @@ fun DeleteAccountScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
                 )
-                AuthTextField(
-                    bgColor = MaterialTheme.colorScheme.background,
-                    label = null,
-                    placeholder = CONFIRM_PHRASE,
+                // confirmation input
+                SimpleTextField(
                     value = typed,
                     onValueChange = { typed = it },
-                    error = if (typed.isNotBlank() && !phraseMatches) "Phrase does not match" else null,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    bgColor = MaterialTheme.colorScheme.surfaceContainer,
+                    placeholder = CONFIRM_PHRASE,
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        capitalization = KeyboardCapitalization.Characters,
+                        imeAction = ImeAction.Done
+                    ),
+                    singleLine = true,
+                    contentPadding = 0,
                 )
                 Button(
                     onClick = onConfirmDelete,

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +30,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -373,7 +373,6 @@ fun AnalyticsScreen(
                         topCategoryOverride = topCategoryFiltered,
                         topMerchantOverride = topMerchantFiltered,
                         trendPointsOverride = filteredTrendPoints,
-                        totalSpentOverride = filteredTotalSpent,
                     )
                 }
             }
@@ -489,7 +488,7 @@ private fun PeriodNavigatorRow(
                         text = period.name.lowercase().replaceFirstChar { it.uppercase() },
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        color = if (isSelected) MaterialTheme.colorScheme.background
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -978,7 +977,7 @@ private fun InteractiveDonutChart(
 // ══════════════════════════════════════════════════════════════════════════════
 
 private data class InsightTile(
-    val emoji: String,
+    val iconRes: Int,
     val label: String,
     val primaryText: String,
     val secondaryText: String?,
@@ -995,7 +994,6 @@ private fun InsightsCard(
     topCategoryOverride: Pair<String, Double>? = null,
     topMerchantOverride: Pair<String, Double>? = null,
     trendPointsOverride: List<TrendPoint>? = null,
-    totalSpentOverride: Double? = null,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val error = MaterialTheme.colorScheme.error
@@ -1004,32 +1002,28 @@ private fun InsightsCard(
     val brush = remember(surf, bg) { cardBrush(surf, bg) }
 
     val trendPts = trendPointsOverride ?: state.trendPoints
-    val totalSpentVal = totalSpentOverride ?: state.totalSpent
     val nonZeroPts = trendPts.filter { it.amount > 0 }
-    val avg = if (nonZeroPts.isNotEmpty()) totalSpentVal / nonZeroPts.size else 0.0
     val peakPt = nonZeroPts.maxByOrNull { it.amount }
 
     val tiles = buildList {
         val tcat = topCategoryOverride ?: state.topCategory
         tcat?.let { (cat, amt) ->
-            add(InsightTile("🔥", "Top category", cat, fmt(amt), error))
+            // top category — use shopping drawable
+            add(InsightTile(R.drawable.shopping, "Top category", cat, fmt(amt), primary))
         }
         val tmerch = topMerchantOverride ?: state.topMerchant
         tmerch?.let { (merchant, amt) ->
-            add(InsightTile("🏪", "Top merchant", merchant, fmt(amt), primary))
-        }
-        if (avg > 0) {
-            add(InsightTile("📊", "Avg / period", fmt(avg), null, Color(0xFF8B5CF6)))
+            add(InsightTile(R.drawable.profile_icon, "Top merchant", merchant, fmt(amt), primary))
         }
         if (peakPt != null) {
-            add(InsightTile("📈", "Peak period", peakPt.label, fmt(peakPt.amount), Color(0xFFF59E0B)))
+            add(InsightTile(R.drawable.ic_trending_up, "Peak period", peakPt.label, fmt(peakPt.amount), Color(0xFFF59E0B)))
         }
         if (state.hasComparison) {
             val up = state.changePercent >= 0
             val color = if (up) error else primary
             add(
                 InsightTile(
-                    if (up) "📈" else "📉",
+                    if (up) R.drawable.upward_arrow else R.drawable.up_arrow_svgrepo_com,
                     "vs last period",
                     "${if (up) "+" else ""}${state.changePercent}%",
                     if (up) "Spent more" else "Spent less",
@@ -1053,7 +1047,7 @@ private fun InsightsCard(
                 Text(
                     text = "Insights",
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 val filterLabels = buildList {
@@ -1116,7 +1110,12 @@ private fun InsightTileCell(tile: InsightTile, modifier: Modifier = Modifier) {
                 .background(tile.accentColor.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(tile.emoji, fontSize = 18.sp)
+            Icon(
+                painter = painterResource(tile.iconRes),
+                contentDescription = tile.label,
+                tint = tile.accentColor,
+                modifier = Modifier.size(20.dp),
+            )
         }
         Column {
             Text(
@@ -1128,8 +1127,9 @@ private fun InsightTileCell(tile: InsightTile, modifier: Modifier = Modifier) {
             Text(
                 text = tile.primaryText,
                 fontSize = 13.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.SemiBold,
                 color = tile.accentColor,
+                lineHeight = 20.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
