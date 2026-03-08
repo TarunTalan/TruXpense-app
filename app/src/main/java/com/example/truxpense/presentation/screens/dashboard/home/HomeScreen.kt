@@ -240,6 +240,12 @@ fun DashboardScreen(
                         onSavings = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Home.Savings)
                         },
+                        onNavigateToAnalytics = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
+                                popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true; restoreState = true
+                            }
+                        },
                     )
                 }
             }
@@ -383,17 +389,15 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onDeleted = { dashboardNavController.popBackStack() },
                     onSeeAll = { category ->
-                        val cat = category?.trim()
+                        val cat = category.trim()
                         dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
                             popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true; restoreState = true
                         }
-                        if (!cat.isNullOrBlank()) {
+                        if (cat.isNotBlank()) {
                             try {
-                                dashboardNavController.getBackStackEntry(Screen.Dashboard.Transactions.Root).savedStateHandle.set(
-                                    "preselectCategory",
+                                dashboardNavController.getBackStackEntry(Screen.Dashboard.Transactions.Root).savedStateHandle["preselectCategory"] =
                                     cat
-                                )
                             } catch (_: Exception) {
                                 dashboardNavController.currentBackStackEntry?.savedStateHandle?.set(
                                     "preselectCategory",

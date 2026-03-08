@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +50,7 @@ import com.example.truxpense.presentation.utils.currencyFormat
 import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
 import com.example.truxpense.presentation.utils.progressColor
 import com.example.truxpense.presentation.utils.toCurrency
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.abs
@@ -55,7 +58,6 @@ import kotlin.math.abs
 
 private val BgColor = Color(0xFFF0F2F5)
 private val TealColor = Color(0xFF1BAF9D)
-private val AmberColor = Color(0xFFF5A623)
 private val SubColor = Color(0xFF8490A8)
 private val IconBlue = Color(0xFFEBF1FF)
 private val IconOrange = Color(0xFFFEF0E4)
@@ -79,8 +81,9 @@ fun HomeTabScreen(
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
     onNavigateToAnalytics: (() -> Unit)? = null,
-    onIncomeHistory: (() -> Unit)? = null,
     onSavings: (() -> Unit)? = null,
+    onNavigateToTransaction: ((String) -> Unit)? = null,
+    onNavigateToBudgetDetail: ((String, Double, Double) -> Unit)? = null,
 ) {
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
@@ -132,8 +135,9 @@ fun HomeTabScreen(
                 onProfileClick = onProfileClick,
                 onPendingReviewClick = onPendingReviewClick,
                 onNavigateToAnalytics = onNavigateToAnalytics,
-                onIncomeHistory = onIncomeHistory,
                 onSavings = onSavings,
+                onNavigateToTransaction = onNavigateToTransaction,
+                onNavigateToBudgetDetail = onNavigateToBudgetDetail,
             )
         }
     }
@@ -157,8 +161,9 @@ fun HomeTabContent(
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
     onNavigateToAnalytics: (() -> Unit)? = null,
-    onIncomeHistory: (() -> Unit)? = null,
     onSavings: (() -> Unit)? = null,
+    onNavigateToTransaction: ((String) -> Unit)? = null,
+    onNavigateToBudgetDetail: ((String, Double, Double) -> Unit)? = null,
 ) {
     val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
     val recentTx by vm.recentTransactions.collectAsState(initial = emptyList())
@@ -175,8 +180,14 @@ fun HomeTabContent(
     val monthlyIncome by vm.monthlyIncome.collectAsState()
     val monthlySavings by vm.monthlySavings.collectAsState()
 
+    // Month-over-month spend change (replaces hardcoded "12% vs Feb")
+    val monthlyChange by vm.monthOverMonthChange.collectAsState()
+
     // Per-day spending for the spending-trends chart
     val dailySpendPoints by vm.dailySpendPoints.collectAsState()
+
+    // Dynamic insight derived from real expense data
+    val insight by vm.spendingInsight.collectAsState()
 
     // Animated progress multiplier (fires once on enter)
     var progTriggered by remember { mutableStateOf(false) }
@@ -240,9 +251,8 @@ fun HomeTabContent(
                     income = monthlyIncome,
                     savings = monthlySavings,
                     budgetLeft = budgetLeft,
+                    monthlyChange = monthlyChange,
                     fmt = fmt,
-                    onIncomeClick = if (onIncomeHistory != null) onIncomeHistory else null,
-                    onSavingsClick = if (onSavings != null) onSavings else null,
                 )
             }
 
@@ -280,10 +290,39 @@ fun HomeTabContent(
             // ── AI Insight ────────────────────────────────────────────────────
 
             item {
+                val coroutineScope = rememberCoroutineScope()
                 InsightCard(
-                    message = "You spent more on food this week than usual",
-                    actionText = "Review food spending",
-                    onAction = { onNavigateToAnalytics?.invoke() }, // navigate when tapped
+                    message = insight.message,
+                    actionText = insight.actionText,
+                    onAction = {
+                        when (val t = insight.target) {
+                            is InsightTarget.AnalyticsRoot -> onNavigateToAnalytics?.invoke()
+                            is InsightTarget.AnalyticsCategory -> {
+                                // Navigate to analytics; host can decide how to apply category filter
+                                onNavigateToAnalytics?.invoke()
+                            }
+                            is InsightTarget.AnalyticsMerchant -> {
+                                onNavigateToAnalytics?.invoke()
+                            }
+                            is InsightTarget.TransactionDetail -> {
+                                onNavigateToTransaction?.invoke(t.txId)
+                            }
+                            is InsightTarget.BudgetDetailByCategory -> {
+                                // Need to resolve budget name, limit and spent via ViewModel (suspend)
+                                coroutineScope.launch {
+                                    val args = try {
+                                        vm.getBudgetDetailArgs(t.category)
+                                    } catch (e: Exception) { null }
+                                    if (args != null) {
+                                        onNavigateToBudgetDetail?.invoke(args.first, args.second, args.third)
+                                    } else {
+                                        // Fallback to budget list
+                                        onNavigateToBudget?.invoke()
+                                    }
+                                }
+                            }
+                        }
+                    },
                 )
             }
 
@@ -374,9 +413,8 @@ private fun SpendThisMonthCard(
     income: Double,
     savings: Double,
     budgetLeft: Double,
+    monthlyChange: MonthlyChangeData,
     fmt: NumberFormat,
-    onIncomeClick: (() -> Unit)? = null,
-    onSavingsClick: (() -> Unit)? = null,
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -396,24 +434,32 @@ private fun SpendThisMonthCard(
                 letterSpacing = (-0.8).sp,
                 lineHeight = 36.sp,
             )
-            // Change indicator
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(top = 6.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = AmberColor,
-                    modifier = Modifier.size(13.dp).graphicsLayer { rotationZ = -90f },
-                )
-                Text(
-                    text = "12% vs Feb",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.error,
-                )
+            // Change indicator — real data from previous month
+            val pct = monthlyChange.percentChange
+            if (pct != null) {
+                val isUp = pct >= 0
+                val absPct = kotlin.math.abs(pct).toInt()
+                val indicatorColor = if (isUp) MaterialTheme.colorScheme.error
+                                     else MaterialTheme.colorScheme.tertiary
+                val arrowRotation = if (isUp) -90f else 90f   // up arrow = -90, down = 90
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = indicatorColor,
+                        modifier = Modifier.size(13.dp).graphicsLayer { rotationZ = arrowRotation },
+                    )
+                    Text(
+                        text = "$absPct% vs ${monthlyChange.prevMonthLabel}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = indicatorColor,
+                    )
+                }
             }
             // Divider + mini stats
             HorizontalDivider(
@@ -426,9 +472,7 @@ private fun SpendThisMonthCard(
                 MiniStat(
                     label = "Income",
                     value = income.toCurrency(fmt),
-                    modifier = Modifier.weight(1f).then(
-                        if (onIncomeClick != null) Modifier.clickable(onClick = onIncomeClick) else Modifier
-                    ),
+                    modifier = Modifier.weight(1f)
                 )
                 VerticalDivider(
                     modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f)
@@ -436,9 +480,7 @@ private fun SpendThisMonthCard(
                 MiniStat(
                     label = "Savings",
                     value = savings.toCurrency(fmt),
-                    modifier = Modifier.weight(1f).then(
-                        if (onSavingsClick != null) Modifier.clickable(onClick = onSavingsClick) else Modifier
-                    ),
+                    modifier = Modifier.weight(1f)
                 )
                 VerticalDivider(modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f))
                 MiniStat(
@@ -537,8 +579,15 @@ private fun QuickActionItem(
     modifier: Modifier = Modifier,
     iconRes: Int? = null,
 ) {
+    // Use an explicit MutableInteractionSource and no indication to remove ripple effect
+    val interactionSource = remember { MutableInteractionSource() }
+
     Column(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(
+            indication = null,
+            interactionSource = interactionSource,
+            onClick = onClick,
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -604,6 +653,15 @@ private fun BudgetOverviewCard(
         }
     }
 
+    // Compute actual days remaining in the current month once per composition
+    val daysLeft = remember {
+        val cal = Calendar.getInstance()
+        cal.getActualMaximum(Calendar.DAY_OF_MONTH) - cal.get(Calendar.DAY_OF_MONTH) + 1
+    }
+    val safePerDay = remember(budgetLeft, daysLeft) {
+        if (daysLeft > 0) budgetLeft / daysLeft else 0.0
+    }
+
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -647,10 +705,7 @@ private fun BudgetOverviewCard(
                 }
                 Text(
                     text = buildAnnotatedString {
-                        val cal = Calendar.getInstance()
-                        val daysLeft = cal.getActualMaximum(Calendar.DAY_OF_MONTH) - cal.get(Calendar.DAY_OF_MONTH) + 1
-                        val safePerDay = if (daysLeft > 0) budgetLeft / daysLeft else 0.0
-                        append("$daysLeft more days · ")
+                        append("$daysLeft more day${if (daysLeft == 1) "" else "s"} · ")
                         withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
                             append("${safePerDay.toCurrency(fmt)}/day safe to spend")
                         }
@@ -1011,6 +1066,7 @@ private fun HomeTabContentPreview() {
                         income = 45000.0,
                         savings = 26450.0,
                         budgetLeft = 26000.0,
+                        monthlyChange = MonthlyChangeData(percentChange = 12.0, prevMonthLabel = "Feb"),
                         fmt = fmt,
                     )
                 }
@@ -1025,8 +1081,8 @@ private fun HomeTabContentPreview() {
                 item { SpendingTrendsCard() }
                 item {
                     InsightCard(
-                        message = "You spent more on food this week than usual",
-                        actionText = "Review food spending",
+                        message = "Food makes up 55% of your spending this month.",
+                        actionText = "View Food breakdown",
                         onAction = {},
                     )
                 }
