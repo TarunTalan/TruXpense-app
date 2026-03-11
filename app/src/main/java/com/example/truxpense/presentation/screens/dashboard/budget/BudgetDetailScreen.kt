@@ -39,15 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.AppConfirmDialog
 import com.example.truxpense.presentation.screens.dashboard.components.GradientCard
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
-import com.example.truxpense.presentation.utils.amountAbbreviationHint
-import com.example.truxpense.presentation.utils.clearFocusOnTap
-import com.example.truxpense.presentation.utils.currencyFormat
-import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
-import com.example.truxpense.presentation.utils.progressColor
-import com.example.truxpense.presentation.utils.sanitizeAmountInput
+import com.example.truxpense.presentation.utils.*
 import java.util.*
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -390,8 +387,7 @@ fun BudgetDetailScreen(
                         ) {
                             txsForDay.forEachIndexed { idx, tx ->
                                 TransactionRow(
-                                    tx = tx, onClick = { onTransactionClick(tx.id) }
-                                )
+                                    tx = tx, onClick = { onTransactionClick(tx.id) })
                                 if (idx < txsForDay.lastIndex) {
                                     HorizontalDivider(
                                         modifier = Modifier.padding(start = 64.dp),
@@ -734,10 +730,7 @@ private fun MerchantRow(
         // Avatar + name + orders
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(avatarColor.copy(alpha = 0.18f)),
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(avatarColor.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -803,10 +796,7 @@ private fun TransactionRow(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             // Merchant initial avatar
             Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(avatarColor.copy(alpha = 0.18f)),
+                modifier = Modifier.size(38.dp).clip(CircleShape).background(avatarColor.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -871,216 +861,206 @@ private fun EditBudgetBottomSheet(
         else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 0.dp,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceSm)
-                    .size(width = DashboardDimens.sheetHandleWidth, height = DashboardDimens.sheetHandleHeight)
-                    .clip(RoundedCornerShape(DashboardDimens.cornerSheetHandle))
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            )
-        },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = DashboardDimens.screenPaddingH)
-                .padding(vertical = DashboardDimens.sheetBottomPadding),
+    AppDialogTheme {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            tonalElevation = 0.dp,
+            dragHandle = {
+                Box(
+                    modifier = Modifier.padding(top = DashboardDimens.spaceMd, bottom = DashboardDimens.spaceSm)
+                        .size(width = DashboardDimens.sheetHandleWidth, height = DashboardDimens.sheetHandleHeight)
+                        .clip(RoundedCornerShape(DashboardDimens.cornerSheetHandle))
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                )
+            },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         ) {
-
-            // ── Header ───────────────────────────────────────────────────────
-            Text(
-                text = "Edit budget limit",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Spacer(Modifier.height(DashboardDimens.spaceXs))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs),
+            Column(
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                    .padding(horizontal = DashboardDimens.screenPaddingH)
+                    .padding(vertical = DashboardDimens.sheetBottomPadding),
             ) {
+
+                // ── Header ───────────────────────────────────────────────────────
                 Text(
-                    text = "Current limit:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = fmtINR(currentLimit),
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Edit budget limit",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
-            }
-
-            Spacer(Modifier.height(DashboardDimens.spaceXxl))
-
-            // ── Input label ──────────────────────────────────────────────────
-            Text(
-                text = "New monthly limit",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isFocused) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(DashboardDimens.spaceSm))
-
-            // ── Amount input field ───────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DashboardDimens.buttonHeight)
-                    .clip(RoundedCornerShape(DashboardDimens.cornerCard))
-                    .background(MaterialTheme.colorScheme.background)
-                    .border(
-                        width = if (isFocused || (rawAmount.isNotBlank() && !isValid))
-                            2.dp else DashboardDimens.borderStroke,
-                        color = borderColor,
-                        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-                    ),
-            ) {
+                Spacer(Modifier.height(DashboardDimens.spaceXs))
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = DashboardDimens.screenPaddingH),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
+                    horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXs),
                 ) {
                     Text(
-                        text = "₹",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (rawAmount.isNotBlank()) MaterialTheme.colorScheme.onBackground
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "Current limit:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    BasicTextField(
-                        value = rawAmount,
-                        onValueChange = { rawAmount = sanitizeAmountInput(it) },
-                        singleLine = true,
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
-                        modifier = Modifier
-                            .weight(1f)
-                            .onFocusChanged { isFocused = it.isFocused },
-                        textStyle = MaterialTheme.typography.titleMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.SemiBold,
+                    Text(
+                        text = fmtINR(currentLimit),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+
+                Spacer(Modifier.height(DashboardDimens.spaceXxl))
+
+                // ── Input label ──────────────────────────────────────────────────
+                Text(
+                    text = "New monthly limit",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isFocused) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(DashboardDimens.spaceSm))
+
+                // ── Amount input field ───────────────────────────────────────────
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight)
+                        .clip(RoundedCornerShape(DashboardDimens.cornerCard))
+                        .background(MaterialTheme.colorScheme.background).border(
+                            width = if (isFocused || (rawAmount.isNotBlank() && !isValid)) 2.dp else DashboardDimens.borderStroke,
+                            color = borderColor,
+                            shape = RoundedCornerShape(DashboardDimens.cornerCard),
                         ),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        decorationBox = { inner ->
-                            if (rawAmount.isEmpty()) {
-                                Text(
-                                    text = "Enter amount",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Normal,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = DashboardDimens.screenPaddingH),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
+                    ) {
+                        Text(
+                            text = "₹",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (rawAmount.isNotBlank()) MaterialTheme.colorScheme.onBackground
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        BasicTextField(
+                            value = rawAmount,
+                            onValueChange = { rawAmount = sanitizeAmountInput(it) },
+                            singleLine = true,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
+                            modifier = Modifier.weight(1f).onFocusChanged { isFocused = it.isFocused },
+                            textStyle = MaterialTheme.typography.titleMedium.copy(
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            decorationBox = { inner ->
+                                if (rawAmount.isEmpty()) {
+                                    Text(
+                                        text = "Enter amount",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    )
+                                }
+                                inner()
+                            },
+                        )
+                        if (rawAmount.isNotBlank()) {
+                            IconButton(
+                                onClick = { rawAmount = "" },
+                                modifier = Modifier.size(DashboardDimens.iconButtonMd),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(DashboardDimens.iconMd),
                                 )
                             }
-                            inner()
-                        },
-                    )
-                    if (rawAmount.isNotBlank()) {
-                        IconButton(
-                            onClick = { rawAmount = "" },
-                            modifier = Modifier.size(DashboardDimens.iconButtonMd),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(DashboardDimens.iconMd),
-                            )
                         }
                     }
                 }
-            }
 
-            // ── Abbreviation hint + helper / error text ──────────────────────
-            Spacer(Modifier.height(DashboardDimens.spaceXs))
-            if (abbrevHint != null) {
-                Text(
-                    text = abbrevHint,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(2.dp))
-            }
-            Text(
-                text = when {
-                    rawAmount.isNotBlank() && !isValid -> "Enter a valid amount greater than 0"
-                    else -> "Changes apply to the current month only"
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = when {
-                    rawAmount.isNotBlank() && !isValid -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-
-            Spacer(Modifier.height(DashboardDimens.spaceXxl))
-
-            // ── Divider ───────────────────────────────────────────────────────
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                thickness = DashboardDimens.dividerThin,
-            )
-
-            Spacer(Modifier.height(DashboardDimens.spaceXl))
-
-            // ── Action buttons ────────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
-            ) {
-                // Cancel
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).height(DashboardDimens.buttonHeight),
-                    shape = MaterialTheme.shapes.medium,
-                    border = androidx.compose.foundation.BorderStroke(
-                        DashboardDimens.borderStroke,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                ) {
+                // ── Abbreviation hint + helper / error text ──────────────────────
+                Spacer(Modifier.height(DashboardDimens.spaceXs))
+                if (abbrevHint != null) {
                     Text(
-                        "Cancel",
+                        text = abbrevHint,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
-                        fontSize = DashboardDimens.textXl,
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                    Spacer(Modifier.height(2.dp))
                 }
-                Button(
-                    onClick = {
-                        rawAmount.toDoubleOrNull()?.let { amount ->
-                            onApply(amount)
-                            onDismiss()
-                        }
+                Text(
+                    text = when {
+                        rawAmount.isNotBlank() && !isValid -> "Enter a valid amount greater than 0"
+                        else -> "Changes apply to the current month only"
                     },
-                    enabled = isValid,
-                    modifier = Modifier.weight(1f).height(DashboardDimens.buttonHeight),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.background,
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        disabledContentColor = MaterialTheme.colorScheme.background.copy(alpha = 0.4f),
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(0.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = when {
+                        rawAmount.isNotBlank() && !isValid -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+
+                Spacer(Modifier.height(DashboardDimens.spaceXxl))
+
+                // ── Divider ───────────────────────────────────────────────────────
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    thickness = DashboardDimens.dividerThin,
+                )
+
+                Spacer(Modifier.height(DashboardDimens.spaceXl))
+
+                // ── Action buttons ────────────────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
                 ) {
-                    Text(
-                        "Apply limit",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = DashboardDimens.textXl,
-                    )
+                    // Cancel
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(DashboardDimens.buttonHeight),
+                        shape = MaterialTheme.shapes.medium,
+                        border = androidx.compose.foundation.BorderStroke(
+                            DashboardDimens.borderStroke,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    ) {
+                        Text(
+                            "Cancel",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = DashboardDimens.textXl,
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            rawAmount.toDoubleOrNull()?.let { amount ->
+                                onApply(amount)
+                                onDismiss()
+                            }
+                        },
+                        enabled = isValid,
+                        modifier = Modifier.weight(1f).height(DashboardDimens.buttonHeight),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.background,
+                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            disabledContentColor = MaterialTheme.colorScheme.background.copy(alpha = 0.4f),
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(0.dp),
+                    ) {
+                        Text(
+                            "Apply limit",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = DashboardDimens.textXl,
+                        )
+                    }
                 }
             }
         }
@@ -1093,79 +1073,12 @@ private fun EditBudgetBottomSheet(
 
 @Composable
 private fun DeleteBudgetDialog(budgetName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        icon = {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.errorContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.delete),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.size(DashboardDimens.iconLg),
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "Delete \"$budgetName\"?",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        },
-        text = {
-            Text(
-                text = "This budget will be permanently removed. Your existing transactions will not be affected.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(0.8f)
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                modifier = Modifier.height(DashboardDimens.buttonHeight),
-                shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-                elevation = ButtonDefaults.buttonElevation(0.dp),
-            ) {
-                Text(
-                    text = "Delete",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = DashboardDimens.textXl,
-                )
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.height(DashboardDimens.buttonHeight),
-                shape = MaterialTheme.shapes.medium,
-                border = androidx.compose.foundation.BorderStroke(
-                    DashboardDimens.borderStroke,
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            ) {
-                Text(
-                    text = "Cancel",
-                    fontWeight = FontWeight.Medium,
-                    fontSize = DashboardDimens.textXl,
-                )
-            }
-        },
+    AppConfirmDialog(
+        title = "Delete \"$budgetName\"?",
+        message = "This budget will be permanently removed. Your existing transactions will not be affected.",
+        confirmLabel = "Delete",
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
     )
 }
 
@@ -1286,7 +1199,9 @@ fun BudgetDetailScreenPreview() {
 private fun RecentTransactionsPreview() {
     val txs = listOf(
         BudgetTransaction("1", 2200.0, "Expense", "manual", "Swiggy", "Food", "HDFC Bank", "6 Mar 2026", "2:34 PM"),
-        BudgetTransaction("2", 1000.0, "Expense", "manual", "Zomato", "Food", "HDFC Bank", "6 Mar 2026", "11:15 AM"),
+        BudgetTransaction(
+            "2", 1000.0, "Expense", "manual", "Zomato", "Food", "HDFC Bank", "6 Mar 2026", "11:15 AM"
+        ),
         BudgetTransaction(
             "3", 500.0, "Expense", "manual", "Cafe Coffee Hall", "Food", "ICICI Bank", "5 Mar 2026", "9:00 AM"
         ),

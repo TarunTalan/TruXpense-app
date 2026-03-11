@@ -113,7 +113,9 @@ private fun ChangePasswordSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Change Password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold
+                text = "Change Password",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
 
             PasswordField(
@@ -137,7 +139,9 @@ private fun ChangePasswordSheet(
 
             if (error != null) {
                 Text(
-                    text = error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error
+                    text = error!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
                 )
             }
 

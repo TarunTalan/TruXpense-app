@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.AppConfirmDialog
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import android.graphics.Color as AndroidColor
 
@@ -162,23 +163,14 @@ fun SettingsScreen(
 
         // Confirmation dialog shown when user taps Log out
         if (showLogoutDialog) {
-            AlertDialog(
-                onDismissRequest = { showLogoutDialog = false },
-                title = { Text(text = "Log out") },
-                text = { Text(text = "Are you sure you want to log out?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showLogoutDialog = false
-                        onLogout()
-                    }) {
-                        Text(text = "Log out", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showLogoutDialog = false }) {
-                        Text(text = "Cancel")
-                    }
-                })
+            AppConfirmDialog(
+                title = "Log out",
+                message = "Are you sure you want to log out?",
+                confirmLabel = "Log out",
+                onConfirm = { showLogoutDialog = false; onLogout() },
+                onDismiss = { showLogoutDialog = false },
+                iconRes = null,
+            )
         }
     }
 }

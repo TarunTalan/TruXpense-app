@@ -95,7 +95,8 @@ fun CustomCategoryDialog(
                 SimpleTextField(
                     value = name,
                     onValueChange = { if (it.length <= 20) name = it },
-                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).height(DashboardDimens.buttonHeight),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
+                        .height(DashboardDimens.buttonHeight),
                     bgColor = MaterialTheme.colorScheme.surfaceContainer,
                     placeholder = "Category name (max 20 chars)",
                     label = "",
@@ -191,6 +192,10 @@ fun CategoryPickerGrid(
     label: String? = "Category",
     /** Override to supply a different icon per label (e.g. income sources). */
     iconResolver: (String) -> Int = ::iconForCategory,
+    /** Whether to show the chip label text under each icon. */
+    showChipLabel: Boolean = true,
+    /** Override icon size/shape; defaults to a 32×32 square. */
+    iconModifier: Modifier = Modifier.size(32.dp),
     /**
      * Called when the user creates a custom category (name + chosen icon res).
      * If null the Custom chip behaves like a normal selectable chip.
@@ -201,7 +206,7 @@ fun CategoryPickerGrid(
 
     Column(modifier = modifier) {
         // ensure consistent inner horizontal padding when a bare modifier is provided
-        val innerModifier = if (modifier == Modifier) Modifier.padding(horizontal = 16.dp) else modifier
+        val innerModifier = if (modifier == Modifier) Modifier else modifier
 
         if (label != null) {
             Text(
@@ -235,6 +240,8 @@ fun CategoryPickerGrid(
                             },
                             modifier = Modifier.weight(1f),
                             iconRes = iconResolver(cat),
+                            showLabel = showChipLabel,
+                            iconModifier = iconModifier,
                         )
                     }
                     // Fill trailing empty slots so last row stays aligned
@@ -266,6 +273,8 @@ private fun CategoryGridChip(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
     iconRes: Int = iconForCategory(category),
+    showLabel: Boolean = true,
+    iconModifier: Modifier = Modifier.size(32.dp),
 ) {
     val borderColor = when {
         isDisabled -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
@@ -290,18 +299,20 @@ private fun CategoryGridChip(
             painter = painterResource(iconRes),
             contentDescription = category,
             tint = Color.Unspecified,
-            modifier = Modifier.size(32.dp),
+            modifier = iconModifier,
         )
-        Text(
-            text = category,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isSelected && !isDisabled) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
+        if (showLabel) {
+            Text(
+                text = category,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isSelected && !isDisabled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

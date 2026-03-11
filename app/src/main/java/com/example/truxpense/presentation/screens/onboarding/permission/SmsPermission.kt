@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,6 +32,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 
@@ -121,10 +121,11 @@ fun SmsPermission(
                 }
             }
         }
-    ) { _ ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .padding(top = 32.dp)
+                .padding(padding)
                 .fillMaxSize()
                 .clearFocusOnTap(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -198,50 +199,48 @@ fun SmsPermission(
 
     // Rationale dialog when permission denied but should show rationale
     if (showRationaleDialog) {
-        AlertDialog(
-            onDismissRequest = { closeRationale() },
-            shape = RoundedCornerShape(DashboardDimens.cornerCard),
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Why we need SMS access", color = MaterialTheme.colorScheme.onBackground) },
-            text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                Button(onClick = {
-                    closeRationale()
-                    permissionLauncher.launch(permission)
-                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
-                    Text("Grant")
+        AppDialogTheme {
+            AlertDialog(
+                onDismissRequest = { closeRationale() },
+                shape = RoundedCornerShape(DashboardDimens.cornerCard),
+                title = { Text("Why we need SMS access") },
+                text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.") },
+                confirmButton = {
+                    Button(onClick = {
+                        closeRationale()
+                        permissionLauncher.launch(permission)
+                    }) { Text("Grant") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { closeRationale() }) { Text("Cancel") }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { closeRationale() }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
-            }
-        )
+            )
+        }
     }
 
     // Permanently denied dialog: guide user to app settings
     if (showPermanentlyDeniedDialog) {
-        AlertDialog(
-            onDismissRequest = { closePermanentlyDenied() },
-            shape = RoundedCornerShape(DashboardDimens.cornerCard),
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Permission blocked", color = MaterialTheme.colorScheme.onBackground) },
-            text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                Button(onClick = {
-                    closePermanentlyDenied()
-                    // Open app settings
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", context.packageName, null)
-                    }
-                    context.startActivity(intent)
-                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
-                    Text("Open settings")
+        AppDialogTheme {
+            AlertDialog(
+                onDismissRequest = { closePermanentlyDenied() },
+                shape = RoundedCornerShape(DashboardDimens.cornerCard),
+                title = { Text("Permission blocked") },
+                text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.") },
+                confirmButton = {
+                    Button(onClick = {
+                        closePermanentlyDenied()
+                        // Open app settings
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(intent)
+                    }) { Text("Open settings") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { closePermanentlyDenied() }) { Text("Cancel") }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { closePermanentlyDenied() }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
-            }
-        )
+            )
+        }
     }
 }
 

@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.truxpense.R
 import com.example.truxpense.notification.datastore.NotificationSettings
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.theme.AppDialogTheme
 
 // ─── Model (kept for SettingsViewModel backward-compat) ──────────────────────
 
@@ -469,39 +470,35 @@ private fun TimePickerDialog(
     onConfirm: () -> Unit,
 ) {
     var useInput by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss, confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("OK", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-        }, dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.secondary) }
-        }, title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                TextButton(onClick = { useInput = !useInput }) {
-                    Text(
-                        if (useInput) "Use dial" else "Use keyboard",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+    AppDialogTheme {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = onConfirm) { Text("OK", fontWeight = FontWeight.SemiBold) }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = { useInput = !useInput }) {
+                        Text(if (useInput) "Use dial" else "Use keyboard", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
-            }
-        }, text = {
-            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (useInput) TimeInput(state = state) else TimePicker(state = state)
-            }
-        }, modifier = Modifier.wrapContentSize()
-    )
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (useInput) TimeInput(state = state) else TimePicker(state = state)
+                }
+            },
+            modifier = Modifier.wrapContentSize(),
+        )
+    }
 }
 
 // ─── Section divider ─────────────────────────────────────────────────────────

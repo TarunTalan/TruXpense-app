@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -32,9 +31,9 @@ import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.auth.AuthFlowType
 import com.example.truxpense.presentation.screens.auth.components.AuthButton
 import com.example.truxpense.presentation.screens.auth.components.AuthTextField
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.utils.blockTouchesWhen
 import com.example.truxpense.presentation.utils.clearFocusOnTap
-import com.example.truxpense.presentation.theme.DashboardDimens
 
 @Composable
 fun SignupScreen(
@@ -206,7 +205,8 @@ private fun SignupContent(
         Spacer(modifier = Modifier.height(26.dp))
 
         // Email Input with integrated lockout display
-        val lockMsg = if (otpLockSeconds > 0) "Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null
+        val lockMsg =
+            if (otpLockSeconds > 0) "Too many attempts. Try again in ${formatLockTime(otpLockSeconds)}" else null
         AuthTextField(
             bgColor = MaterialTheme.colorScheme.background,
             label = "Email Address",
@@ -314,53 +314,35 @@ private fun TncCheckbox(
 
 @Composable
 private fun TncDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        containerColor = MaterialTheme.colorScheme.surface,
-        title = { Text("Terms and Conditions", color = MaterialTheme.colorScheme.onBackground) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                Text("TruXpense reads only bank transaction messages to help you track your expenses automatically.")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "What we access:",
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text("• Bank transaction SMS messages")
-                Text("• App usage data for improvements")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "What we don't access:",
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text("• Personal messages")
-                Text("• OTPs from other apps")
-                Text("• Contacts or call logs")
-                Text("• Any other unrelated personal data")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    "By continuing, you agree to allow TruXpense to access the data listed above for the purpose of automatically categorizing and tracking your expenses.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close", color = MaterialTheme.colorScheme.primary)
-            }
-        }
-    )
+    AppDialogTheme {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Terms and Conditions") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("TruXpense reads only bank transaction messages to help you track your expenses automatically.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "What we access:", fontWeight = FontWeight.SemiBold)
+                    Text("• Bank transaction SMS messages")
+                    Text("• App usage data for improvements")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "What we don't access:", fontWeight = FontWeight.SemiBold)
+                    Text("• Personal messages")
+                    Text("• OTPs from other apps")
+                    Text("• Contacts or call logs")
+                    Text("• Any other unrelated personal data")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "By continuing, you agree to allow TruXpense to access the data listed above for the purpose of automatically categorizing and tracking your expenses.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text("Close") }
+            },
+        )
+    }
 }
 
 private fun formatLockTime(seconds: Int): String {

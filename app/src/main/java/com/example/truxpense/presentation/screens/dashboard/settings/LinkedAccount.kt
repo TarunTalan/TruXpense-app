@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 
 data class LinkedAccount(
@@ -43,25 +44,23 @@ fun LinkedAccountsScreen(
     var removeTarget by remember { mutableStateOf<LinkedAccount?>(null) }
 
     if (removeTarget != null) {
-        AlertDialog(
-            onDismissRequest = { removeTarget = null },
-            title = { Text("Remove Account") },
-            text = {
-                Text("Remove ${removeTarget!!.bankName} (${removeTarget!!.accountMasked}) from TruXpense?")
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onRemoveAccount(removeTarget!!)
-                    accountList = accountList - removeTarget!!
-                    removeTarget = null
-                }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { removeTarget = null }) { Text("Cancel") }
-            }
-        )
+        AppDialogTheme {
+            AlertDialog(
+                onDismissRequest = { removeTarget = null },
+                title = { Text("Remove Account") },
+                text = { Text("Remove ${removeTarget!!.bankName} (${removeTarget!!.accountMasked}) from TruXpense?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onRemoveAccount(removeTarget!!)
+                        accountList = accountList - removeTarget!!
+                        removeTarget = null
+                    }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { removeTarget = null }) { Text("Cancel") }
+                },
+            )
+        }
     }
 
     Scaffold(

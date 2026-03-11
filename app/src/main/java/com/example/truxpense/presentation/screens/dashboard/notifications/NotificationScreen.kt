@@ -27,12 +27,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.truxpense.presentation.utils.clearFocusOnTap
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.theme.DashboardDimens
-import androidx.compose.ui.tooling.preview.Preview
+import com.example.truxpense.presentation.screens.dashboard.components.AppConfirmDialog
+import com.example.truxpense.presentation.theme.AppDialogTheme
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen
@@ -545,36 +547,22 @@ private fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        containerColor = MaterialTheme.colorScheme.surface,
-        title = {
-            Text(
-                text = "Delete notifications",
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        },
-        text = {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) { Text("Delete") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MaterialTheme.colorScheme.primary)
-            }
-        },
-    )
+    AppDialogTheme {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(text = "Delete notifications") },
+            text = { Text(text = message) },
+            confirmButton = {
+                Button(
+                    onClick = onConfirm,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

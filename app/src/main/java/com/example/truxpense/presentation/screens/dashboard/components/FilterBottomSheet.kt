@@ -20,9 +20,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.truxpense.presentation.screens.dashboard.transaction.EntryType
 import com.example.truxpense.presentation.theme.DashboardDimens
 import java.util.*
-import com.example.truxpense.presentation.screens.dashboard.transaction.EntryType
 
 // ── Shared month labels ───────────────────────────────────────────────────────
 
@@ -79,38 +79,26 @@ fun FilterBottomSheet(
     val toPickerState = rememberDatePickerState(initialSelectedDateMillis = dateTo)
 
     if (showFromPicker) {
-        DatePickerDialog(
-            onDismissRequest = { showFromPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDateFromChange(fromPickerState.selectedDateMillis)
-                    showFromPicker = false
-                }) { Text("OK", color = MaterialTheme.colorScheme.primary) }
+        AppDatePickerDialog(
+            state = fromPickerState,
+            onDismiss = { showFromPicker = false },
+            onConfirm = { ms ->
+                onDateFromChange(ms)
+                showFromPicker = false
             },
-            dismissButton = {
-                TextButton(onClick = { showFromPicker = false }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-        ) { DatePicker(state = fromPickerState) }
+        )
     }
 
     if (showToPicker) {
-        DatePickerDialog(
-            onDismissRequest = { showToPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val endOfDay = toPickerState.selectedDateMillis?.let { it + 86_399_999L }
-                    onDateToChange(endOfDay)
-                    showToPicker = false
-                }) { Text("OK", color = MaterialTheme.colorScheme.primary) }
+        AppDatePickerDialog(
+            state = toPickerState,
+            onDismiss = { showToPicker = false },
+            onConfirm = { ms ->
+                val endOfDay = ms?.let { it + 86_399_999L }
+                onDateToChange(endOfDay)
+                showToPicker = false
             },
-            dismissButton = {
-                TextButton(onClick = { showToPicker = false }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-        ) { DatePicker(state = toPickerState) }
+        )
     }
 
     val hasAnyFilter =
@@ -165,7 +153,10 @@ fun FilterBottomSheet(
                 horizontalArrangement = Arrangement.spacedBy(DashboardDimens.spaceSm),
             ) {
                 item {
-                    SheetFilterChip(label = "All", isSelected = selectedType == null, onClick = { onSelectType(null) })
+                    SheetFilterChip(
+                        label = "All",
+                        isSelected = selectedType == null,
+                        onClick = { onSelectType(null) })
                 }
                 item {
                     SheetFilterChip(
@@ -200,7 +191,9 @@ fun FilterBottomSheet(
                 ) {
                     item {
                         SheetFilterChip(
-                            label = "All", isSelected = selectedCategory == null, onClick = { onSelectCategory(null) })
+                            label = "All",
+                            isSelected = selectedCategory == null,
+                            onClick = { onSelectCategory(null) })
                     }
                     items(availableCategories) { cat ->
                         SheetFilterChip(
@@ -226,7 +219,9 @@ fun FilterBottomSheet(
                 ) {
                     item {
                         SheetFilterChip(
-                            label = "All", isSelected = selectedPayment == null, onClick = { onSelectPayment(null) })
+                            label = "All",
+                            isSelected = selectedPayment == null,
+                            onClick = { onSelectPayment(null) })
                     }
                     items(availablePayments) { method ->
                         SheetFilterChip(
@@ -338,7 +333,8 @@ fun FilterBottomSheet(
             // ── Done button ───────────────────────────────────────────────────
             Button(
                 onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = DashboardDimens.screenPaddingH),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+                    .padding(horizontal = DashboardDimens.screenPaddingH),
                 shape = RoundedCornerShape(DashboardDimens.cornerCard),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             ) {

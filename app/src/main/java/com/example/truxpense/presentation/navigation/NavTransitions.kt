@@ -1,42 +1,37 @@
 package com.example.truxpense.presentation.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.navigation.NavBackStackEntry
 
-private const val SLIDE_DURATION = 320
+// ── Duration ──────────────────────────────────────────────────────────────────
+// 300 ms matches PremiumNavHost exactly. Compose's default FastOutSlowIn easing
+// is used (no custom easing) — the same spec that makes premium screens feel
+// snappy. Using longer durations or EaseOutCubic here desynchronised the feel.
+private const val DURATION = 300
 
-/**
- * Forward push — new screen slides in from the right.
- * Call inside a NavHost enterTransition / exitTransition lambda.
- */
+// ── Forward push ──────────────────────────────────────────────────────────────
+
+/** New screen slides in from the right. */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.slideInFromRight(): EnterTransition =
-    slideInHorizontally(tween(SLIDE_DURATION)) { it } +
-            fadeIn(tween(SLIDE_DURATION))
+    slideInHorizontally(tween(DURATION)) { it } + fadeIn(tween(DURATION))
 
 /**
- * Forward push — current screen slides out to the left (parallax).
+ * Current screen slides out fully to the left with a fade.
+ *
+ * Full-width exit (-it) + fadeOut matches PremiumNavHost's ContentTransform
+ * exactly. The earlier parallax (-it/4, no fade) felt slower because the old
+ * screen stayed visible for the entire duration, desynchronising the two layers.
  */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOutToLeft(): ExitTransition =
-    slideOutHorizontally(tween(SLIDE_DURATION)) { -it / 3 } +
-            fadeOut(tween(SLIDE_DURATION))
+    slideOutHorizontally(tween(DURATION)) { -it } + fadeOut(tween(DURATION))
 
-/**
- * Back pop — previous screen slides back in from the left (parallax).
- */
+// ── Back pop ──────────────────────────────────────────────────────────────────
+
+/** Previous screen slides back in from the left. */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.slideInFromLeft(): EnterTransition =
-    slideInHorizontally(tween(SLIDE_DURATION)) { -it / 3 } +
-            fadeIn(tween(SLIDE_DURATION))
+    slideInHorizontally(tween(DURATION)) { -it } + fadeIn(tween(DURATION))
 
-/**
- * Back pop — current screen slides out to the right.
- */
+/** Current screen slides out to the right. */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOutToRight(): ExitTransition =
-    slideOutHorizontally(tween(SLIDE_DURATION)) { it } +
-            fadeOut(tween(SLIDE_DURATION))
+    slideOutHorizontally(tween(DURATION)) { it } + fadeOut(tween(DURATION))

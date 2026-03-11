@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import com.example.truxpense.R
 import com.example.truxpense.presentation.navigation.BottomNavBarMenu
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -203,43 +204,37 @@ fun SmsPermissionBanner(
     }
 
     if (showRationaleDialog) {
-        AlertDialog(
-            onDismissRequest = { showRationaleDialog = false },
-            shape = RoundedCornerShape(DashboardDimens.cornerCard),
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Why we need SMS access", color = MaterialTheme.colorScheme.onBackground) },
-            text = { Text("We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                Button(onClick = {
-                    showRationaleDialog = false
-                    permissionLauncher.launch(permission)
-                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Grant") }
+        AppConfirmDialog(
+            title = "Why we need SMS access",
+            message = "We need access to your SMS to detect bank transaction messages and automatically categorize your expenses. Only transaction messages are read.",
+            confirmLabel = "Grant",
+            cancelLabel = "Cancel",
+            isDestructive = false,
+            iconRes = null,
+            onConfirm = {
+                showRationaleDialog = false
+                permissionLauncher.launch(permission)
             },
-            dismissButton = {
-                TextButton(onClick = { showRationaleDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
-            }
+            onDismiss = { showRationaleDialog = false },
         )
     }
 
     if (showPermanentlyDeniedDialog) {
-        AlertDialog(
-            onDismissRequest = { showPermanentlyDeniedDialog = false },
-            shape = RoundedCornerShape(DashboardDimens.cornerCard),
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Permission blocked", color = MaterialTheme.colorScheme.onBackground) },
-            text = { Text("SMS permission has been permanently denied. Open app settings to grant the permission.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                Button(onClick = {
-                    showPermanentlyDeniedDialog = false
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", context.packageName, null)
-                    }
-                    context.startActivity(intent)
-                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Open settings") }
+        AppConfirmDialog(
+            title = "Permission blocked",
+            message = "SMS permission has been permanently denied. Open app settings to grant the permission.",
+            confirmLabel = "Open settings",
+            cancelLabel = "Cancel",
+            isDestructive = false,
+            iconRes = null,
+            onConfirm = {
+                showPermanentlyDeniedDialog = false
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
             },
-            dismissButton = {
-                TextButton(onClick = { showPermanentlyDeniedDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
-            }
+            onDismiss = { showPermanentlyDeniedDialog = false },
         )
     }
 }

@@ -2,7 +2,6 @@ package com.example.truxpense.presentation.screens.dashboard.income
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import android.graphics.drawable.ColorDrawable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -11,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,9 +40,6 @@ fun AddIncomeScreen(
 
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
-    val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
-    val onPrimaryArgb = MaterialTheme.colorScheme.onPrimary.toArgb()
-    val onBackgroundArgb = MaterialTheme.colorScheme.onBackground.toArgb()
 
     fun openDatePicker() {
         val now = Calendar.getInstance()
@@ -56,14 +51,6 @@ fun AddIncomeScreen(
             },
             now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH),
         )
-        picker.setOnShowListener {
-            try {
-                picker.window?.setBackgroundDrawable(ColorDrawable(surfaceArgb))
-                picker.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
-                picker.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
-            } catch (_: Exception) {
-            }
-        }
         picker.show()
     }
 
@@ -79,14 +66,6 @@ fun AddIncomeScreen(
             },
             now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false,
         )
-        dialog.setOnShowListener {
-            try {
-                dialog.window?.setBackgroundDrawable(ColorDrawable(surfaceArgb))
-                dialog.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(onPrimaryArgb)
-                dialog.getButton(TimePickerDialog.BUTTON_NEGATIVE)?.setTextColor(onBackgroundArgb)
-            } catch (_: Exception) {
-            }
-        }
         dialog.show()
     }
 

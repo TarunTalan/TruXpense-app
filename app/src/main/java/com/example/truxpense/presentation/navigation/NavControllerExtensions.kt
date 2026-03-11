@@ -5,28 +5,22 @@ import android.os.Looper
 import androidx.navigation.NavController
 import androidx.navigation.NavOptionsBuilder
 
-// Safe navigate helper that ensures calls run on main thread
 fun NavController.safeNavigate(
     route: String,
     navOptionsBuilder: (NavOptionsBuilder.() -> Unit)? = null
 ) {
-    val performNavigation = {
+    // Post a tiny delay (~1 frame at 30fps) before navigating so we don't race
+    // Compose's first layout/measuring on cold start. This prevents missing-first-frame
+    // animations and reduces jank when the app restarts.
+    Handler(Looper.getMainLooper()).postDelayed({
         try {
-            this.navigate(route) {
-                // Apply caller options (popUpTo, launchSingleTop, restoreState, etc.)
-                navOptionsBuilder?.invoke(this)
-                // No anim override — transitions are handled at the NavHost level
+            if (navOptionsBuilder != null) {
+                navigate(route, navOptionsBuilder)
+            } else {
+                navigate(route)
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
-
-    if (Looper.myLooper() == Looper.getMainLooper()) {
-        performNavigation()
-    } else {
-        Handler(Looper.getMainLooper()).post {
-            performNavigation()
-        }
-    }
+    }, 32L)
 }

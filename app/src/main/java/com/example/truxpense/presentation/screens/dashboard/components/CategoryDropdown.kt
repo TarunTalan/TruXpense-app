@@ -24,13 +24,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.example.truxpense.R
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.AppCategories
-import java.util.*
 import kotlinx.coroutines.launch
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -439,8 +440,8 @@ private fun CategoryDropdownSheetContent(
                                 contentDescription = null,
                                 tint = when {
                                     isCustomItem -> MaterialTheme.colorScheme.primary
-                                    isSelected   -> MaterialTheme.colorScheme.primary
-                                    else         -> MaterialTheme.colorScheme.onBackground
+                                    isSelected -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onBackground
                                 },
                                 modifier = Modifier.size(DashboardDimens.iconMd),
                             )
