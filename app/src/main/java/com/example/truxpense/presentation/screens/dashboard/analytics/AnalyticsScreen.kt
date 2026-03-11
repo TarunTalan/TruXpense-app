@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -84,6 +85,7 @@ private fun cardBrush(c1: Color, c2: Color, c3: Color? = null): Brush = Brush.li
 @Composable
 fun AnalyticsScreen(
     vm: AnalyticsViewModel = hiltViewModel(),
+    onGenerateReport: (() -> Unit)? = null,
 ) {
     val state by vm.uiState.collectAsState()
     val filterCategory by vm.filterCategory.collectAsState()
@@ -100,6 +102,7 @@ fun AnalyticsScreen(
     if (!state.roomLoaded) return
 
     var showFilterSheet by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Donut entry animation
@@ -187,49 +190,90 @@ fun AnalyticsScreen(
                 headerTitle = "Analytics",
                 showBack = false,
                 actions = {
-                    // Glassy filter button with badge
-                    Box {
-                        IconButton(
-                            onClick = { showFilterSheet = true },
-                            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(DashboardDimens.cornerCard))
+                    // Filter badge indicator
+                    if (activeFilterCount > 0) {
+                        Badge(
+                            modifier = Modifier.offset((-4).dp, 4.dp),
+                            containerColor = MaterialTheme.colorScheme.primary,
                         ) {
-                            Box(
-                                modifier = Modifier.size(38.dp).border(
-                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-                                    CircleShape
-                                ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                // blurred background layer (behind the icon)
-                                Box(
-                                    modifier = Modifier.matchParentSize().background(
-                                        if (activeFilterCount > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                        else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.15f),
-                                        CircleShape
-                                    ).blur(8.dp)
-                                )
-
-                                Icon(
-                                    painter = painterResource(R.drawable.filter),
-                                    contentDescription = "Filter",
-                                    tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(DashboardDimens.iconMd),
-                                )
-                            }
+                            Text(
+                                activeFilterCount.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
                         }
-
-                        if (activeFilterCount > 0) {
-                            Badge(
-                                modifier = Modifier.align(Alignment.TopEnd).offset(4.dp, (-4).dp),
-                                containerColor = MaterialTheme.colorScheme.primary,
-                            ) {
-                                Text(
-                                    activeFilterCount.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.background,
-                                )
-                            }
+                    }
+                    // MoreVert overflow menu
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Box {
+                                        Icon(
+                                            painter = painterResource(R.drawable.filter),
+                                            contentDescription = null,
+                                            tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(DashboardDimens.iconMd),
+                                        )
+                                        if (activeFilterCount > 0) {
+                                            Badge(
+                                                modifier = Modifier.align(Alignment.TopEnd),
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                            ) {
+                                                Text(
+                                                    activeFilterCount.toString(),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onPrimary,
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                                text = {
+                                    Text(
+                                        "Filter",
+                                        color = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onBackground,
+                                        fontWeight = if (activeFilterCount > 0) FontWeight.SemiBold
+                                                     else FontWeight.Normal,
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    showFilterSheet = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.report),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(DashboardDimens.iconMd),
+                                    )
+                                },
+                                text = {
+                                    Text(
+                                        "Generate Report",
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onGenerateReport?.invoke()
+                                },
+                            )
                         }
                     }
                     Spacer(Modifier.width(DashboardDimens.spaceMd))

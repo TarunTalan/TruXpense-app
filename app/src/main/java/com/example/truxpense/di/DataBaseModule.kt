@@ -6,10 +6,13 @@ import com.example.truxpense.data.local.database.AppDatabase
 import com.example.truxpense.data.local.dao.BudgetDao
 import com.example.truxpense.data.local.dao.ExpenseDao
 import com.example.truxpense.data.local.dao.IncomeDao
-import com.example.truxpense.data.local.dao.SavingsDao
+import com.example.truxpense.data.repository.savings.SavingsDao
 import com.example.truxpense.data.repository.expense.ExpenseRepository
 import com.example.truxpense.data.repository.income.IncomeRepository
 import com.example.truxpense.data.repository.savings.SavingsRepository
+import com.example.truxpense.data.repository.report.ReportDao
+import com.example.truxpense.data.repository.report.ReportRepository
+import com.example.truxpense.data.repository.report.ReportRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,7 +28,12 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "truxpense_db")
-            .addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
+            .addMigrations(
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
+                AppDatabase.MIGRATION_6_7,
+                AppDatabase.MIGRATION_7_8,
+            )
             .build()
 
     @Provides @Singleton
@@ -41,6 +49,9 @@ object DatabaseModule {
     fun provideSavingsDao(db: AppDatabase): SavingsDao = db.savingsDao()
 
     @Provides @Singleton
+    fun provideReportDao(db: AppDatabase): ReportDao = db.reportDao()
+
+    @Provides @Singleton
     fun provideExpenseRepository(dao: ExpenseDao): ExpenseRepository = ExpenseRepository(dao)
 
     @Provides @Singleton
@@ -48,4 +59,7 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideSavingsRepository(dao: SavingsDao): SavingsRepository = SavingsRepository(dao)
+
+    @Provides @Singleton
+    fun provideReportRepository(dao: ReportDao): ReportRepository = ReportRepositoryImpl(dao)
 }

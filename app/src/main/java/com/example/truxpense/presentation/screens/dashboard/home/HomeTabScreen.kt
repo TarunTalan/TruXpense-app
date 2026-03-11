@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,11 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.data.repository.savings.SavingsGoalUi
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategory
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategoryDisplay
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
 import com.example.truxpense.presentation.screens.dashboard.components.*
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationViewModel
+import com.example.truxpense.presentation.screens.dashboard.savings.goalIconToDrawable
+import com.example.truxpense.presentation.screens.dashboard.savings.parseHexColor
 import com.example.truxpense.presentation.screens.onboarding.currency.CurrencyViewModel
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.theme.TruXpenseTheme
@@ -179,6 +181,7 @@ fun HomeTabContent(
     // Real income & savings from HomeViewModel
     val monthlyIncome by vm.monthlyIncome.collectAsState()
     val monthlySavings by vm.monthlySavings.collectAsState()
+    val savingsGoals by vm.savingsGoals.collectAsState()
 
     // Month-over-month spend change (replaces hardcoded "12% vs Feb")
     val monthlyChange by vm.monthOverMonthChange.collectAsState()
@@ -281,6 +284,19 @@ fun HomeTabContent(
                 }
             }
 
+            // ── Savings overview ──────────────────────────────────────────────
+
+            if (savingsGoals.isNotEmpty() || monthlySavings > 0) {
+                item {
+                    SavingsHomeCard(
+                        totalSavings = monthlySavings,
+                        goals = savingsGoals,
+                        currencyCode = currencyCode,
+                        onViewAll = { onSavings?.invoke() },
+                    )
+                }
+            }
+
             // ── Spending trends ───────────────────────────────────────────────
 
             item {
@@ -301,18 +317,23 @@ fun HomeTabContent(
                                 // Navigate to analytics; host can decide how to apply category filter
                                 onNavigateToAnalytics?.invoke()
                             }
+
                             is InsightTarget.AnalyticsMerchant -> {
                                 onNavigateToAnalytics?.invoke()
                             }
+
                             is InsightTarget.TransactionDetail -> {
                                 onNavigateToTransaction?.invoke(t.txId)
                             }
+
                             is InsightTarget.BudgetDetailByCategory -> {
                                 // Need to resolve budget name, limit and spent via ViewModel (suspend)
                                 coroutineScope.launch {
                                     val args = try {
                                         vm.getBudgetDetailArgs(t.category)
-                                    } catch (e: Exception) { null }
+                                    } catch (e: Exception) {
+                                        null
+                                    }
                                     if (args != null) {
                                         onNavigateToBudgetDetail?.invoke(args.first, args.second, args.third)
                                     } else {
@@ -438,9 +459,9 @@ private fun SpendThisMonthCard(
             val pct = monthlyChange.percentChange
             if (pct != null) {
                 val isUp = pct >= 0
-                val absPct = kotlin.math.abs(pct).toInt()
+                val absPct = abs(pct).toInt()
                 val indicatorColor = if (isUp) MaterialTheme.colorScheme.error
-                                     else MaterialTheme.colorScheme.tertiary
+                else MaterialTheme.colorScheme.tertiary
                 val arrowRotation = if (isUp) -90f else 90f   // up arrow = -90, down = 90
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -470,17 +491,13 @@ private fun SpendThisMonthCard(
                 modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
             ) {
                 MiniStat(
-                    label = "Income",
-                    value = income.toCurrency(fmt),
-                    modifier = Modifier.weight(1f)
+                    label = "Income", value = income.toCurrency(fmt), modifier = Modifier.weight(1f)
                 )
                 VerticalDivider(
                     modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f)
                 )
                 MiniStat(
-                    label = "Savings",
-                    value = savings.toCurrency(fmt),
-                    modifier = Modifier.weight(1f)
+                    label = "Savings", value = savings.toCurrency(fmt), modifier = Modifier.weight(1f)
                 )
                 VerticalDivider(modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f))
                 MiniStat(
@@ -994,7 +1011,7 @@ fun PendingSmsBanner(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         onClick = onClick,
     ) {
         Row(
@@ -1003,28 +1020,167 @@ fun PendingSmsBanner(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary),
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(1.5f)),
                 contentAlignment = Alignment.Center,
             ) { Text("💳", fontSize = 18.sp) }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "$count new transaction${if (count > 1) "s" else ""} detected",
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
                     text = "Tap to review and confirm",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                painter = painterResource(R.drawable.right_arrow),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(18.dp),
+
+                )
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SAVINGS HOME CARD
+// ══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun SavingsHomeCard(
+    totalSavings: Double,
+    goals: List<SavingsGoalUi>,
+    currencyCode: String,
+    onViewAll: () -> Unit,
+) {
+    val fmt = remember(currencyCode) { currencyFormat(currencyCode) }
+    val activeGoals = remember(goals) { goals.filter { it.savedAmount < it.targetAmount } }
+
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            // ── Header row ────────────────────────────────────────────────────
+            Text(
+                text = "Savings",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = totalSavings.toCurrency(fmt),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                letterSpacing = (-0.8).sp,
+                lineHeight = 36.sp,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── Active goals count + View link ────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "${activeGoals.size} active goal${if (activeGoals.size == 1) "" else "s"}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.clickable(onClick = onViewAll),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = "View",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+
+            // ── Goal rows (up to 3) ───────────────────────────────────────────
+            if (activeGoals.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
+                activeGoals.take(3).forEach { goal ->
+                    SavingsGoalRow(goal = goal, fmt = fmt)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.12f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavingsGoalRow(
+    goal: SavingsGoalUi,
+    fmt: NumberFormat,
+) {
+    val iconBg = remember(goal.colorHex) {
+        runCatching<Color> { parseHexColor(goal.colorHex).copy(alpha = 0.18f) }.getOrDefault(Color(0xFFF0EAFF))
+    }
+    val needed = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Coloured icon bubble (emoji)
+        Box(
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(iconBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(id = goalIconToDrawable(goal.icon)),
+                contentDescription = goal.name,
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(20.dp),
             )
         }
+
+        // Name + saved/target
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = goal.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${goal.savedAmount.toCurrency(fmt)} / ${goal.targetAmount.toCurrency(fmt)}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Need label
+        Text(
+            text = "Need ${needed.toCurrency(fmt)}",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.error,
+            maxLines = 1,
+        )
     }
 }
 

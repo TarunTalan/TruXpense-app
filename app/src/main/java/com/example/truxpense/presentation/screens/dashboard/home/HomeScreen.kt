@@ -13,7 +13,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -33,18 +32,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.truxpense.notification.deeplink.NotificationDeepLink
-import com.example.truxpense.presentation.navigation.BottomNavBarMenu
-import com.example.truxpense.presentation.navigation.Screen
-import com.example.truxpense.presentation.navigation.safeNavigate
-import com.example.truxpense.presentation.navigation.slideInFromLeft
-import com.example.truxpense.presentation.navigation.slideInFromRight
-import com.example.truxpense.presentation.navigation.slideOutToLeft
-import com.example.truxpense.presentation.navigation.slideOutToRight
+import com.example.truxpense.presentation.navigation.*
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
+import com.example.truxpense.presentation.screens.dashboard.components.AppConfirmDialog
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
 import com.example.truxpense.presentation.screens.dashboard.expense.AddExpenseScreen
@@ -52,12 +46,18 @@ import com.example.truxpense.presentation.screens.dashboard.expense.EditExpenseS
 import com.example.truxpense.presentation.screens.dashboard.income.EditIncomeScreen
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationDeepLinkViewModel
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
+import com.example.truxpense.presentation.screens.dashboard.report.CreateReportScreen
+import com.example.truxpense.presentation.screens.dashboard.savings.AddSavingsScreen
+import com.example.truxpense.presentation.screens.dashboard.savings.CreateGoalScreen
+import com.example.truxpense.presentation.screens.dashboard.savings.DistributiveScreen
+import com.example.truxpense.presentation.screens.dashboard.savings.GoalDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.savings.SavingsScreen
 import com.example.truxpense.presentation.screens.dashboard.settings.*
 import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
 import com.example.truxpense.presentation.screens.premium.PremiumNavHost
+import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 
 // Dashboard shell: owns the NavController and tab routing
@@ -80,15 +80,13 @@ fun DashboardScreen(
             when (link) {
 
                 // Daily expense reminder → Add Expense screen
-                is NotificationDeepLink.AddExpense ->
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
+                is NotificationDeepLink.AddExpense -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
 
                 // Budget reset / budget tab notification → Budget list screen
-                is NotificationDeepLink.BudgetTab ->
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true; restoreState = true
-                    }
+                is NotificationDeepLink.BudgetTab -> dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
+                }
 
                 // Budget alert (90% / exceeded) → look up live data, push Budget Detail screen
                 is NotificationDeepLink.BudgetDetailByCategory -> {
@@ -134,23 +132,20 @@ fun DashboardScreen(
                 }
 
                 // Spending insights → Analytics screen
-                is NotificationDeepLink.Analytics ->
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true; restoreState = true
-                    }
+                is NotificationDeepLink.Analytics -> dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
+                }
 
-                is NotificationDeepLink.Transactions ->
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true; restoreState = true
-                    }
+                is NotificationDeepLink.Transactions -> dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
+                }
 
-                is NotificationDeepLink.Home ->
-                    dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
-                        popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true; restoreState = true
-                    }
+                is NotificationDeepLink.Home -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.Root) {
+                    popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true; restoreState = true
+                }
             }
             deepLinkVm.consume()
         }
@@ -202,11 +197,13 @@ fun DashboardScreen(
             navController = dashboardNavController,
             startDestination = Screen.Dashboard.Home.Root,
             modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()),
-            // Default: slide-left push / slide-right pop for every nested screen
-            enterTransition    = { slideInFromRight() },
-            exitTransition     = { slideOutToLeft()   },
-            popEnterTransition = { slideInFromLeft()  },
-            popExitTransition  = { slideOutToRight()  },
+            // enterTransition is None at the NavHost level so the very first composition
+            // (cold start / app restart) never attempts to animate — avoids the glitchy
+            // missing-first-frame issue. Individual nested screens override with slideInFromRight.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { slideOutToLeft() },
+            popEnterTransition = { slideInFromLeft() },
+            popExitTransition = { slideOutToRight() },
         ) {
 
             // ══════════════════════════════════════════════════════════════════
@@ -214,10 +211,22 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             composable(
                 route = Screen.Dashboard.Home.Root,
-                enterTransition    = { EnterTransition.None },
-                exitTransition     = { ExitTransition.None },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition  = { ExitTransition.None },
+                enterTransition = { EnterTransition.None },
+                exitTransition = {
+                    // If target is another top-level tab, keep the switch instant.
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToLeft()
+                },
+                popEnterTransition = {
+                    // When returning to Home from a nested screen, use the slide-in.
+                    val from = initialState?.destination?.route
+                    if (from in topLevelRoutes) EnterTransition.None else slideInFromLeft()
+                },
+                popExitTransition = {
+                    // When Home is popped (rare), slide out to right if going to nested, else none.
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToRight()
+                },
             ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     HomeTabScreen(
@@ -229,10 +238,8 @@ fun DashboardScreen(
                             dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddIncome)
                         },
                         onNavigateToBudget = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
-                                popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true; restoreState = true
-                            }
+                            // Open Add Budget screen directly from Quick Actions "Set budget"
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Add)
                         },
                         onViewAll = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
@@ -250,8 +257,8 @@ fun DashboardScreen(
                             dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
                         onSavings = {
-                            // Route to premium paywall instead of Savings screen
-                            dashboardNavController.safeNavigate(Screen.Premium.Root)
+                            // Navigate to Savings screen instead of premium paywall
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.Savings)
                         },
                         onNavigateToAnalytics = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
@@ -263,28 +270,124 @@ fun DashboardScreen(
                 }
             }
 
-            composable(Screen.Dashboard.Home.AddExpense) {
+            composable(
+                route = Screen.Dashboard.Home.AddExpense,
+                enterTransition = { slideInFromRight() },
+            ) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onSave = { _ -> dashboardNavController.popBackStack() },
                 )
             }
 
-            composable(Screen.Dashboard.Home.AddIncome) {
+            composable(
+                route = Screen.Dashboard.Home.AddIncome,
+                enterTransition = { slideInFromRight() },
+            ) {
                 com.example.truxpense.presentation.screens.dashboard.income.AddIncomeScreen(
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
 
 
-            composable(Screen.Dashboard.Home.Savings) {
+// ── SAVINGS FLOW ──────────────────────────────────────────────────────────────
+
+            composable(
+                route = Screen.Dashboard.Home.Savings,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) {
                 SavingsScreen(
+                    onCreateGoal = { dashboardNavController.safeNavigate(Screen.Dashboard.Home.SavingsCreateGoal) },
+                    onAddSavings = { dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddSavings) },
+                    onGoalClick = { id ->
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Home.savingsDetailRoute(id)
+                        )
+                    },
+                    onDistribute = { dashboardNavController.safeNavigate(Screen.Dashboard.Home.SavingsDistribute) },
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
 
-            // Register premium nav host route
-            composable(Screen.Premium.Root) {
+            composable(
+                route = Screen.Dashboard.Home.AddSavings,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) {
+                AddSavingsScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onSaved = { dashboardNavController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.Dashboard.Home.SavingsCreateGoal,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) {
+                CreateGoalScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onCreated = { _ -> dashboardNavController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.Dashboard.Home.SavingsEditGoal,
+                arguments = listOf(navArgument("goalId") { type = NavType.LongType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) {
+                CreateGoalScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onCreated = { _ -> dashboardNavController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.Dashboard.Home.SavingsGoalDetail,
+                arguments = listOf(navArgument("goalId") { type = NavType.LongType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) {
+                GoalDetailScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onEdit = { id -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.savingsEditRoute(id)) },
+                    onGoalCompleted = {
+                        // Pop detail, then navigate to completed screen
+                        dashboardNavController.popBackStack()
+                        dashboardNavController.safeNavigate("home/savings/completed")
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.Dashboard.Home.SavingsDistribute,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) {
+                DistributiveScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onConfirmed = { dashboardNavController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.Premium.Root,
+                enterTransition = { slideInFromRight() },
+            ) {
                 PremiumNavHost(onExitPremiumFlow = { dashboardNavController.popBackStack() })
             }
 
@@ -293,10 +396,19 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             composable(
                 route = Screen.Dashboard.Transactions.Root,
-                enterTransition    = { EnterTransition.None },
-                exitTransition     = { ExitTransition.None },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition  = { ExitTransition.None },
+                enterTransition = { EnterTransition.None },
+                exitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToLeft()
+                },
+                popEnterTransition = {
+                    val from = initialState?.destination?.route
+                    if (from in topLevelRoutes) EnterTransition.None else slideInFromLeft()
+                },
+                popExitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToRight()
+                },
             ) { backStackEntry ->
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     TransactionsScreen(
@@ -316,6 +428,7 @@ fun DashboardScreen(
             composable(
                 route = Screen.Dashboard.Transactions.Detail,
                 arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
                 TransactionDetailScreen(
@@ -343,6 +456,7 @@ fun DashboardScreen(
             composable(
                 route = Screen.Dashboard.Transactions.EditIncome,
                 arguments = listOf(navArgument("incomeId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
             ) { backStackEntry ->
                 val incomeId = backStackEntry.arguments?.getString("incomeId") ?: ""
                 EditIncomeScreen(
@@ -355,6 +469,7 @@ fun DashboardScreen(
             composable(
                 route = Screen.Dashboard.Transactions.Edit,
                 arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
                 EditExpenseScreen(
@@ -369,10 +484,19 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             composable(
                 route = Screen.Dashboard.Budget.Root,
-                enterTransition    = { EnterTransition.None },
-                exitTransition     = { ExitTransition.None },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition  = { ExitTransition.None },
+                enterTransition = { EnterTransition.None },
+                exitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToLeft()
+                },
+                popEnterTransition = {
+                    val from = initialState?.destination?.route
+                    if (from in topLevelRoutes) EnterTransition.None else slideInFromLeft()
+                },
+                popExitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToRight()
+                },
             ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     BudgetTab(
@@ -392,7 +516,10 @@ fun DashboardScreen(
                 }
             }
 
-            composable(Screen.Dashboard.Budget.Add) {
+            composable(
+                route = Screen.Dashboard.Budget.Add,
+                enterTransition = { slideInFromRight() },
+            ) {
                 AddBudgetScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onSave = { dashboardNavController.popBackStack() },
@@ -406,6 +533,7 @@ fun DashboardScreen(
                     navArgument("monthlyLimit") { type = NavType.FloatType },
                     navArgument("spent") { type = NavType.FloatType },
                 ),
+                enterTransition = { slideInFromRight() },
             ) { backStackEntry ->
                 val args = backStackEntry.arguments
                 val name = java.net.URLDecoder.decode(args?.getString("budgetName") ?: "Budget", "UTF-8")
@@ -430,8 +558,7 @@ fun DashboardScreen(
                                     cat
                             } catch (_: Exception) {
                                 dashboardNavController.currentBackStackEntry?.savedStateHandle?.set(
-                                    "preselectCategory",
-                                    cat
+                                    "preselectCategory", cat
                                 )
                             }
                         }
@@ -449,21 +576,36 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             composable(
                 route = Screen.Dashboard.Analytics.Root,
-                enterTransition    = { EnterTransition.None },
-                exitTransition     = { ExitTransition.None },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition  = { ExitTransition.None },
+                enterTransition = { EnterTransition.None },
+                exitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToLeft()
+                },
+                popEnterTransition = {
+                    val from = initialState?.destination?.route
+                    if (from in topLevelRoutes) EnterTransition.None else slideInFromLeft()
+                },
+                popExitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToRight()
+                },
             ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     AnalyticsTab(
                         onAddExpense = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.AddExpense)
                         },
+                        onGenerateReport = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Report.Create)
+                        },
                     )
                 }
             }
 
-            composable(Screen.Dashboard.Analytics.AddExpense) {
+            composable(
+                route = Screen.Dashboard.Analytics.AddExpense,
+                enterTransition = { slideInFromRight() },
+            ) {
                 AddExpenseScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onSave = { _ -> dashboardNavController.popBackStack() },
@@ -475,10 +617,19 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             composable(
                 route = Screen.Dashboard.Settings.Root,
-                enterTransition    = { EnterTransition.None },
-                exitTransition     = { ExitTransition.None },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition  = { ExitTransition.None },
+                enterTransition = { EnterTransition.None },
+                exitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToLeft()
+                },
+                popEnterTransition = {
+                    val from = initialState?.destination?.route
+                    if (from in topLevelRoutes) EnterTransition.None else slideInFromLeft()
+                },
+                popExitTransition = {
+                    val to = targetState?.destination?.route
+                    if (to in topLevelRoutes) ExitTransition.None else slideOutToRight()
+                },
             ) {
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     SettingsTab(
@@ -489,13 +640,16 @@ fun DashboardScreen(
             }
 
             // ── Settings → Personal Info ──────────────────────────────────────
-            composable(Screen.Dashboard.Settings.PersonalInfo) {
+            composable(
+                route = Screen.Dashboard.Settings.PersonalInfo,
+                enterTransition = { slideInFromRight() },
+            ) {
                 val vm: PersonalInfoViewModel = hiltViewModel()
-                val isLoaded  by vm.isLoaded.collectAsStateWithLifecycle()
-                val username  by vm.username.collectAsStateWithLifecycle()
-                val phone     by vm.phone.collectAsStateWithLifecycle()
-                val email     by vm.email.collectAsStateWithLifecycle()
-                val isSaving  by vm.isSaving.collectAsStateWithLifecycle()
+                val isLoaded by vm.isLoaded.collectAsStateWithLifecycle()
+                val username by vm.username.collectAsStateWithLifecycle()
+                val phone by vm.phone.collectAsStateWithLifecycle()
+                val email by vm.email.collectAsStateWithLifecycle()
+                val isSaving by vm.isSaving.collectAsStateWithLifecycle()
                 val saveError by vm.saveError.collectAsStateWithLifecycle(initialValue = null)
 
                 // Wait for DataStore to emit all values before composing,
@@ -504,21 +658,21 @@ fun DashboardScreen(
 
                 PersonalInfoScreen(
                     initialUsername = username ?: "",
-                    initialEmail    = email    ?: "",
-                    initialPhone    = phone    ?: "",
-                    isSaving        = isSaving,
-                    saveError       = saveError,
-                    onBack          = { dashboardNavController.popBackStack() },
-                    onSave          = { name ->
+                    initialEmail = email ?: "",
+                    initialPhone = phone ?: "",
+                    isSaving = isSaving,
+                    saveError = saveError,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onSave = { name ->
                         vm.saveProfile(name) { dashboardNavController.popBackStack() }
                     },
-                    onChangeEmail   = {
+                    onChangeEmail = {
                         vm.resetOtpState()
                         dashboardNavController.safeNavigate(
                             Screen.Dashboard.Settings.changeContactOtpRoute("EMAIL")
                         )
                     },
-                    onChangePhone   = {
+                    onChangePhone = {
                         vm.resetOtpState()
                         dashboardNavController.safeNavigate(
                             Screen.Dashboard.Settings.changeContactOtpRoute("PHONE")
@@ -529,12 +683,11 @@ fun DashboardScreen(
 
             // ── Settings → Change Contact OTP ─────────────────────────────────
             composable(
-                route     = Screen.Dashboard.Settings.ChangeContactOtp,
-                arguments = listOf(
-                    navArgument("type") { type = NavType.StringType },
-                ),
+                route = Screen.Dashboard.Settings.ChangeContactOtp,
+                arguments = listOf(navArgument("type") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
             ) { backStackEntry ->
-                val rawType     = backStackEntry.arguments?.getString("type") ?: "EMAIL"
+                val rawType = backStackEntry.arguments?.getString("type") ?: "EMAIL"
                 val contactType = if (rawType == "PHONE") ContactType.PHONE else ContactType.EMAIL
 
                 val personalInfoEntry = remember(backStackEntry) {
@@ -556,27 +709,25 @@ fun DashboardScreen(
                 }
 
                 ChangeContactOtpScreen(
-                    type            = contactType,
-                    currentContact  = if (contactType == ContactType.EMAIL)
-                                          currentEmail ?: ""
-                                      else
-                                          currentPhone ?: "",
+                    type = contactType,
+                    currentContact = if (contactType == ContactType.EMAIL) currentEmail ?: ""
+                    else currentPhone ?: "",
                     isSendingOtp = otpState.isSendingOtp,
-                    otpSent      = otpState.otpSent,
-                    isVerifying  = otpState.isVerifying,
-                    otpError     = otpState.otpError,
-                    onSendOtp    = { newContact ->
+                    otpSent = otpState.otpSent,
+                    isVerifying = otpState.isVerifying,
+                    otpError = otpState.otpError,
+                    onSendOtp = { newContact ->
                         vm.initiateContactChange(contactType, newContact)
                     },
-                    onResendOtp  = { vm.resendOtp() },
-                    onVerifyOtp  = { otp ->
+                    onResendOtp = { vm.resendOtp() },
+                    onVerifyOtp = { otp ->
                         vm.verifyOtp(otp) {
                             dashboardNavController.popBackStack(
                                 Screen.Dashboard.Settings.PersonalInfo, inclusive = false
                             )
                         }
                     },
-                    onBack       = {
+                    onBack = {
                         vm.resetOtpState()
                         dashboardNavController.popBackStack()
                     },
@@ -584,7 +735,7 @@ fun DashboardScreen(
             }
 
             // ── Settings → Linked Accounts ────────────────────────────────────
-            composable(Screen.Dashboard.Settings.LinkedAccounts) {
+            composable(Screen.Dashboard.Settings.LinkedAccounts, enterTransition = { slideInFromRight() }) {
                 val settingsVm: SettingsViewModel = hiltViewModel()
                 val linkedAccounts by settingsVm.linkedAccounts.collectAsStateWithLifecycle()
                 val smsEnabled by settingsVm.smsEnabled.collectAsStateWithLifecycle()
@@ -600,7 +751,7 @@ fun DashboardScreen(
             }
 
             // ── Settings → Security ───────────────────────────────────────────
-            composable(Screen.Dashboard.Settings.Security) {
+            composable(Screen.Dashboard.Settings.Security, enterTransition = { slideInFromRight() }) {
                 val settingsVm: SettingsViewModel = hiltViewModel()
                 val biometrics by settingsVm.biometricsEnabled.collectAsStateWithLifecycle()
                 val appLock by settingsVm.appLockEnabled.collectAsStateWithLifecycle()
@@ -617,14 +768,14 @@ fun DashboardScreen(
             }
 
             // ── Settings → Notifications & Reminders ──────────────────────────
-            composable(Screen.Dashboard.Settings.Notifications) {
+            composable(Screen.Dashboard.Settings.Notifications, enterTransition = { slideInFromRight() }) {
                 NotificationsScreen(
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
 
             // ── Settings → Help & Support ─────────────────────────────────────
-            composable(Screen.Dashboard.Settings.Help) {
+            composable(Screen.Dashboard.Settings.Help, enterTransition = { slideInFromRight() }) {
                 val context = LocalContext.current
                 HelpSupportScreen(
                     onBack = { dashboardNavController.popBackStack() },
@@ -639,17 +790,17 @@ fun DashboardScreen(
             }
 
             // ── Settings → Privacy Policy ─────────────────────────────────────
-            composable(Screen.Dashboard.Settings.PrivacyPolicy) {
+            composable(Screen.Dashboard.Settings.PrivacyPolicy, enterTransition = { slideInFromRight() }) {
                 PrivacyPolicyScreen(onBack = { dashboardNavController.popBackStack() })
             }
 
             // ── Settings → Terms of Service ───────────────────────────────────
-            composable(Screen.Dashboard.Settings.Terms) {
+            composable(Screen.Dashboard.Settings.Terms, enterTransition = { slideInFromRight() }) {
                 TermsScreen(onBack = { dashboardNavController.popBackStack() })
             }
 
             // ── Settings → About TruXpense ────────────────────────────────────
-            composable(Screen.Dashboard.Settings.About) {
+            composable(Screen.Dashboard.Settings.About, enterTransition = { slideInFromRight() }) {
                 val context = LocalContext.current
                 AboutScreen(
                     onBack = { dashboardNavController.popBackStack() },
@@ -664,7 +815,7 @@ fun DashboardScreen(
             }
 
             // ── Settings → Delete Account ─────────────────────────────────────
-            composable(Screen.Dashboard.Settings.DeleteAccount) {
+            composable(Screen.Dashboard.Settings.DeleteAccount, enterTransition = { slideInFromRight() }) {
                 val settingsVm: SettingsViewModel = hiltViewModel()
                 val username by settingsVm.username.collectAsStateWithLifecycle(initialValue = "")
                 val isDeleting by settingsVm.isDeletingAccount.collectAsStateWithLifecycle()
@@ -685,13 +836,15 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             // NOTIFICATIONS (full-screen, no bottom bar)
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Notifications.Root) {
+            composable(Screen.Dashboard.Notifications.Root, enterTransition = { slideInFromRight() }) {
                 NotificationScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onNavigateToBudgetDetail = { budgetName, monthlyLimit, spent ->
                         // Push BudgetDetail on top of Notification — back returns here
                         dashboardNavController.safeNavigate(
-                            Screen.Dashboard.Budget.detailRoute(budgetName, monthlyLimit, spent)
+                            Screen.Dashboard.Budget.detailRoute(
+                                budgetName, monthlyLimit, spent
+                            )
                         )
                     },
                     onNavigateToWeeklyAnalytics = {
@@ -723,9 +876,35 @@ fun DashboardScreen(
             // ══════════════════════════════════════════════════════════════════
             // SMS PENDING REVIEW (full-screen, no bottom bar)
             // ══════════════════════════════════════════════════════════════════
-            composable(Screen.Dashboard.Sms.PendingReview) {
+            composable(Screen.Dashboard.Sms.PendingReview, enterTransition = { slideInFromRight() }) {
                 PendingTransactionsScreen(
-                    onBack = { dashboardNavController.popBackStack() }
+                    onBack = { dashboardNavController.popBackStack() })
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // CREATE REPORT (full-screen, no bottom bar)
+            // ══════════════════════════════════════════════════════════════════
+            composable(Screen.Dashboard.Report.Create, enterTransition = { slideInFromRight() }) {
+                CreateReportScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onPreview = { reportId ->
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Report.detailRoute(reportId))
+                    },
+                )
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // REPORT DETAIL (full-screen, no bottom bar)
+            // ══════════════════════════════════════════════════════════════════
+            composable(
+                route = Screen.Dashboard.Report.Detail,
+                arguments = listOf(navArgument("reportId") { type = NavType.StringType }),
+                enterTransition = { slideInFromRight() },
+            ) { backStackEntry ->
+                val reportId = backStackEntry.arguments?.getString("reportId") ?: ""
+                com.example.truxpense.presentation.screens.dashboard.report.ReportDetailScreen(
+                    reportId = reportId,
+                    onBack = { dashboardNavController.popBackStack() },
                 )
             }
         }
@@ -739,12 +918,14 @@ fun DashboardScreen(
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
+private fun AnalyticsTab(
+    onAddExpense: () -> Unit = {},
+    onGenerateReport: () -> Unit = {},
+) {
     val homeVm: HomeViewModel = hiltViewModel()
     val isLoaded by homeVm.isLoaded.collectAsState()
     val recentTx by homeVm.recentTransactions.collectAsState()
 
-    // Don't render anything until Room has delivered its first value — prevents empty-screen flash
     if (!isLoaded) return
 
     if (recentTx.isEmpty()) {
@@ -753,7 +934,7 @@ private fun AnalyticsTab(onAddExpense: () -> Unit = {}) {
             onAddExpense = onAddExpense,
         )
     } else {
-        AnalyticsScreen()
+        AnalyticsScreen(onGenerateReport = onGenerateReport)
     }
 }
 
@@ -811,36 +992,20 @@ private fun SmsPermissionDialogHandler(vm: HomeViewModel) {
     }
 
     if (showPermanentlyDeniedDialog) {
-        AlertDialog(
-            onDismissRequest = { },
-            shape = RoundedCornerShape(DashboardDimens.cornerCard),
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Permission blocked", color = MaterialTheme.colorScheme.onBackground) },
-            text = {
-                Text(
-                    "SMS permission has been permanently denied. Open app settings to grant access.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        context.startActivity(intent)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                ) { Text("Open settings") }
-            },
-            dismissButton = {
-                TextButton(onClick = { }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+        AppConfirmDialog(
+            title = "Permission blocked",
+            message = "SMS permission has been permanently denied. Open app settings to grant access.",
+            confirmLabel = "Open settings",
+            cancelLabel = "Cancel",
+            isDestructive = false,
+            iconRes = null,
+            onConfirm = {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
                 }
+                context.startActivity(intent)
             },
+            onDismiss = { },
         )
     }
 }
@@ -866,4 +1031,3 @@ private fun DashboardBottomBarPreview() {
         )
     }
 }
-
