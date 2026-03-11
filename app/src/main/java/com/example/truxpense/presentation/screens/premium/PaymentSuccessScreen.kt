@@ -1,45 +1,23 @@
 package com.example.truxpense.presentation.screens.premium
 
+import android.graphics.Color.rgb
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.EaseOut
-import androidx.compose.animation.core.EaseOutCubic
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
@@ -63,70 +41,67 @@ private data class UnlockedFeature(
 )
 
 private val unlockedFeatures = listOf(
-    UnlockedFeature(R.drawable.sms,       "SMS Auto-parsing",    "Transactions detected automatically"),
-    UnlockedFeature(R.drawable.analytics, "Advanced Analytics",  "Custom ranges & year-over-year"),
-    UnlockedFeature(R.drawable.report,    "Export Reports",      "PDF, CSV & Excel ready to share"),
+    UnlockedFeature(R.drawable.sms, "SMS Auto-parsing", "Transactions detected automatically"),
+    UnlockedFeature(R.drawable.analytics, "Advanced Analytics", "Custom ranges & year-over-year"),
+    UnlockedFeature(R.drawable.report, "Export Reports", "PDF, CSV & Excel ready to share"),
 )
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun PaymentSuccessScreen(onDone: () -> Unit = {}) {
-    val primary = MaterialTheme.colorScheme.primary
-    val brush = Brush.linearGradient(
-        colors = listOf(primary, primary.copy(alpha = 0.72f)),
-        start = Offset(0f, 0f),
-        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-    )
+    val primary = if (isSystemInDarkTheme())Color(rgb(203, 233, 228)) else MaterialTheme.colorScheme.primary
 
     // ── Per-section animatable alpha + translateY ──────────────────────────────
     // 0 = icon, 1 = title, 2 = features, 3 = button
-    val alphas     = remember { List(4) { Animatable(0f) } }
-    val offsets    = remember { List(4) { Animatable(40f) } }   // start 40dp below
+    val alphas = remember { List(4) { Animatable(0f) } }
+    val offsets = remember { List(4) { Animatable(40f) } }   // start 40dp below
 
     LaunchedEffect(Unit) {
         val delays = listOf(0L, 220L, 420L, 600L)
         alphas.zip(offsets).forEachIndexed { i, (alpha, offset) ->
             launch {
                 delay(delays[i])
-                launch { alpha.animateTo(1f,  tween(450, easing = EaseOut)) }
+                launch { alpha.animateTo(1f, tween(450, easing = EaseOut)) }
                 launch { offset.animateTo(0f, tween(450, easing = EaseOutCubic)) }
             }
         }
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(brush = brush),
+        modifier = Modifier.fillMaxSize().background(color = primary),
     ) {
         // ── Decorative background circles ─────────────────────────────────────
-        Box(modifier = Modifier.size(260.dp).align(Alignment.TopEnd)
-            .background(Color.White.copy(alpha = 0.06f), CircleShape))
-        Box(modifier = Modifier.size(160.dp).align(Alignment.TopEnd)
-            .background(Color.White.copy(alpha = 0.05f), CircleShape))
-        Box(modifier = Modifier.size(180.dp).align(Alignment.BottomStart)
-            .background(Color.White.copy(alpha = 0.05f), CircleShape))
-        Box(modifier = Modifier.size(100.dp).align(Alignment.CenterStart)
-            .background(Color.White.copy(alpha = 0.04f), CircleShape))
+        Box(
+            modifier = Modifier.size(260.dp).align(Alignment.TopEnd)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.06f), CircleShape)
+        )
+        Box(
+            modifier = Modifier.size(160.dp).align(Alignment.TopEnd)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.05f), CircleShape)
+        )
+        Box(
+            modifier = Modifier.size(180.dp).align(Alignment.BottomStart)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.05f), CircleShape)
+        )
+        Box(
+            modifier = Modifier.size(100.dp).align(Alignment.CenterStart)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.04f), CircleShape)
+        )
 
         // ── Scrollable content ────────────────────────────────────────────────
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = DashboardDimens.screenPaddingH),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding()
+                .navigationBarsPadding().padding(horizontal = DashboardDimens.screenPaddingH),
         ) {
             Spacer(modifier = Modifier.height(DashboardDimens.spaceXxxl))
 
             // ── Pulsing check icon ────────────────────────────────────────────
             Box(
                 modifier = Modifier.graphicsLayer {
-                    alpha       = alphas[0].value
+                    alpha = alphas[0].value
                     translationY = offsets[0].value.dp.toPx()
                 },
             ) {
@@ -139,15 +114,15 @@ fun PaymentSuccessScreen(onDone: () -> Unit = {}) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.graphicsLayer {
-                    alpha        = alphas[1].value
+                    alpha = alphas[1].value
                     translationY = offsets[1].value.dp.toPx()
                 },
             ) {
                 Text(
                     text = "You're all set!",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                     letterSpacing = (-0.5).sp,
                 )
@@ -156,14 +131,14 @@ fun PaymentSuccessScreen(onDone: () -> Unit = {}) {
                     text = "Your 7-day free trial has started.",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.9f),
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(DashboardDimens.spaceXs))
                 Text(
                     text = "Unlimited access to every Pro feature.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
                 )
             }
@@ -172,10 +147,8 @@ fun PaymentSuccessScreen(onDone: () -> Unit = {}) {
 
             // ── Unlocked features ─────────────────────────────────────────────
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        alpha        = alphas[2].value
+                modifier = Modifier.fillMaxWidth().graphicsLayer {
+                        alpha = alphas[2].value
                         translationY = offsets[2].value.dp.toPx()
                     },
                 verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceMd),
@@ -191,15 +164,12 @@ fun PaymentSuccessScreen(onDone: () -> Unit = {}) {
             Button(
                 onClick = onDone,
                 shape = MaterialTheme.shapes.medium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DashboardDimens.buttonHeight)
-                    .graphicsLayer {
-                        alpha        = alphas[3].value
+                modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight).graphicsLayer {
+                        alpha = alphas[3].value
                         translationY = offsets[3].value.dp.toPx()
                     },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.onPrimary,
                     contentColor = primary,
                 ),
             ) {
@@ -247,16 +217,22 @@ private fun PulsingSuccessIcon() {
     )
 
     Box(contentAlignment = Alignment.Center) {
-        Box(modifier = Modifier.size(96.dp).scale(pulseScale)
-            .background(Color.White.copy(alpha = pulseAlpha), CircleShape))
-        Box(modifier = Modifier.size(96.dp)
-            .background(Color.White.copy(alpha = 0.12f), CircleShape))
-        Box(modifier = Modifier.size(80.dp)
-            .background(Color.White.copy(alpha = 0.18f), CircleShape))
+        Box(
+            modifier = Modifier.size(96.dp).scale(pulseScale).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = pulseAlpha), CircleShape)
+        )
+        Box(
+            modifier = Modifier.size(96.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f), CircleShape)
+        )
+        Box(
+            modifier = Modifier.size(80.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f), CircleShape)
+        )
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(64.dp)
-                .background(Color.White.copy(alpha = 0.95f), CircleShape),
+            modifier = Modifier.size(64.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.95f), CircleShape),
         ) {
             Icon(
                 painter = painterResource(R.drawable.tick),
@@ -274,10 +250,8 @@ private fun PulsingSuccessIcon() {
 private fun FeatureUnlockedCard(feature: UnlockedFeature) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.12f), MaterialTheme.shapes.medium)
-            .padding(
+        modifier = Modifier.fillMaxWidth()
+            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f), MaterialTheme.shapes.medium).padding(
                 horizontal = DashboardDimens.cardPaddingComp,
                 vertical = DashboardDimens.spaceMdL,
             ),
@@ -285,14 +259,13 @@ private fun FeatureUnlockedCard(feature: UnlockedFeature) {
         // Icon circle
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(44.dp)
-                .background(Color.White.copy(alpha = 0.18f), CircleShape),
+            modifier = Modifier.size(44.dp)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f), CircleShape),
         ) {
             Icon(
                 painter = painterResource(id = feature.iconRes),
                 contentDescription = feature.title,
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(DashboardDimens.iconMd),
             )
         }
@@ -304,27 +277,26 @@ private fun FeatureUnlockedCard(feature: UnlockedFeature) {
                 text = feature.title,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = feature.description,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
             )
         }
 
         // Unlocked checkmark
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(DashboardDimens.iconLg)
-                .background(Color.White.copy(alpha = 0.25f), CircleShape),
+            modifier = Modifier.size(DashboardDimens.iconLg)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f), CircleShape),
         ) {
             Icon(
                 painter = painterResource(R.drawable.tick),
                 contentDescription = null,
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(DashboardDimens.iconXs),
             )
         }

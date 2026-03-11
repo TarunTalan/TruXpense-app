@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
@@ -44,6 +46,11 @@ fun SimpleTextField(
     onImeAction: (() -> Unit)? = null,
     singleLine: Boolean = true,
     contentPadding: Int = 0,
+    prefix: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    readOnly: Boolean = false,
+    height: androidx.compose.ui.unit.Dp = 48.dp,
+    textStyle: TextStyle? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -71,10 +78,12 @@ fun SimpleTextField(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.padding(horizontal = contentPadding.dp).fillMaxWidth().height(48.dp).clip(shape)
+            readOnly = readOnly,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
+            modifier = Modifier.padding(horizontal = contentPadding.dp).fillMaxWidth().height(height).clip(shape)
                 .background(bgColor).onFocusChanged { isFocused = it.isFocused }
                 .border(width = borderWidth, color = borderColor, shape = shape),
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
+            textStyle = (textStyle ?: MaterialTheme.typography.bodyLarge).copy(
                 color = MaterialTheme.colorScheme.onBackground
             ),
             keyboardOptions = keyboardOptions.copy(imeAction = imeAction),
@@ -89,7 +98,9 @@ fun SimpleTextField(
                     singleLine = singleLine,
                     visualTransformation = VisualTransformation.None,
                     interactionSource = interactionSource,
-                    placeholder = { if (placeholder != null) Text(placeholder) },
+                    placeholder = { if (placeholder != null) Text(placeholder, color = MaterialTheme.colorScheme.onBackground.copy(0.5f)) },
+                    prefix = prefix,
+                    trailingIcon = trailingIcon,
                     contentPadding = OutlinedTextFieldDefaults.contentPadding(
                         top = 0.dp,
                         bottom = 0.dp,

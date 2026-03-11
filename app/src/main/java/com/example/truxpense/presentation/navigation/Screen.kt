@@ -26,7 +26,17 @@ object Screen {
             const val AddExpense = "home/add_expense"
             const val AddExpenseResult = "home/add_expense/result"
             const val AddIncome = "home/add_income"
+
+            // ── Savings flow ─────────────────────────────────────────────────
             const val Savings = "home/savings"
+            const val SavingsCreateGoal = "home/savings/create"
+            const val SavingsEditGoal = "home/savings/edit/{goalId}"
+            const val SavingsGoalDetail = "home/savings/detail/{goalId}"
+            const val SavingsDistribute = "home/savings/distribute"
+            const val AddSavings = "home/savings/add"
+
+            fun savingsEditRoute(goalId: Long) = "home/savings/edit/$goalId"
+            fun savingsDetailRoute(goalId: Long) = "home/savings/detail/$goalId"
         }
 
         // ── Transactions tab ──────────────────────────────────────────────────
@@ -103,6 +113,13 @@ object Screen {
         // ── SMS Pending review ────────────────────────────────────────────────
         object Sms {
             const val PendingReview = "sms/pending_review"
+        }
+
+        // ── Report ────────────────────────────────────────────────────────────
+        object Report {
+            const val Create = "report/create"
+            const val Detail = "report/detail/{reportId}"
+            fun detailRoute(reportId: String) = "report/detail/$reportId"
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.premium
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,10 +16,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -109,17 +112,14 @@ private fun PaywallHeader(brush: Brush, onNavigateBack: () -> Unit) {
             .fillMaxWidth()
             .background(brush = brush),
     ) {
-        Box(
+        // Background layer image (added)
+        Image(
+            painter = painterResource(id = R.drawable.bg_layer),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(160.dp)
-                .align(Alignment.TopEnd)
-                .background(Color.White.copy(alpha = 0.07f), CircleShape),
-        )
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .align(Alignment.BottomStart)
-                .background(Color.White.copy(alpha = 0.05f), CircleShape),
+                .matchParentSize()
+                .alpha(0.06f)
         )
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(

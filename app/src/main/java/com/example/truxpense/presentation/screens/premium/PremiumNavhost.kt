@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.premium
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -34,6 +35,11 @@ private sealed interface PremiumDestination {
 fun PremiumNavHost(onExitPremiumFlow: () -> Unit = {}) {
     var destination: PremiumDestination by rememberSaveable(stateSaver = premiumDestinationSaver()) {
         mutableStateOf(PremiumDestination.Paywall)
+    }
+
+    // Ensure system/back gesture navigates within the flow (Payment -> Paywall)
+    BackHandler(enabled = destination is PremiumDestination.Payment) {
+        destination = PremiumDestination.Paywall
     }
 
     AnimatedContent(

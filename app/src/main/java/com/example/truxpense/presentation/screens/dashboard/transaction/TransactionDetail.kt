@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
+import com.example.truxpense.presentation.screens.dashboard.components.AppConfirmDialog
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.clearFocusOnTap
@@ -511,39 +512,12 @@ private fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-        containerColor = MaterialTheme.colorScheme.surface,
-        title = {
-            Text(
-                text = "Delete transaction?",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        },
-        text = {
-            Text(
-                text = "This action cannot be undone. The transaction will be permanently removed.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                elevation = ButtonDefaults.buttonElevation(0.dp),
-            ) {
-                Text("Delete", color = MaterialTheme.colorScheme.onError)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MaterialTheme.colorScheme.primary)
-            }
-        },
+    AppConfirmDialog(
+        title = "Delete transaction?",
+        message = "This action cannot be undone. The transaction will be permanently removed.",
+        confirmLabel = "Delete",
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
     )
 }
 

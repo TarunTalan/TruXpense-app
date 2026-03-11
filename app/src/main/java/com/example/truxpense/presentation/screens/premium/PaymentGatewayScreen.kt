@@ -9,9 +9,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -96,6 +97,9 @@ private fun PaymentGatewayContent(
     onPayTapped: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
+
+    // Handle system Back button to navigate within the premium flow back to Paywall
+    BackHandler { onNavigateBack() }
 
     val primary = MaterialTheme.colorScheme.primary
     val headerBrush = Brush.linearGradient(
@@ -778,36 +782,51 @@ private fun PaymentTextField(
             color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.padding(bottom = DashboardDimens.spaceXs),
         )
-        OutlinedTextField(
+
+        // Use BasicTextField + manual border to avoid animated error flash from OutlinedTextField
+        val shape = MaterialTheme.shapes.small
+        val borderColor = when {
+            !error.isNullOrEmpty() -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        }
+        val borderWidth = if (!error.isNullOrEmpty()) 2.dp else 1.dp
+
+        BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
-            placeholder = {
-                Text(
-                    text = placeholder,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                )
-            },
-            isError = error != null,
-            visualTransformation = visualTransformation,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(DashboardDimens.buttonHeight)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.background)
+                .border(borderWidth, borderColor, shape)
+                .padding(horizontal = 12.dp),
+            singleLine = true,
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
-            singleLine = true,
-            shape = MaterialTheme.shapes.small,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                errorBorderColor = MaterialTheme.colorScheme.error,
-                focusedContainerColor = MaterialTheme.colorScheme.background,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                cursorColor = MaterialTheme.colorScheme.primary,
-            ),
+            visualTransformation = visualTransformation,
             textStyle = MaterialTheme.typography.bodyMedium.copy(
                 color = MaterialTheme.colorScheme.onBackground,
             ),
+            decorationBox = { innerTextField ->
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    // place the inner text field centered
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        innerTextField()
+                    }
+                }
+            }
         )
+
         AnimatedVisibility(
             visible = error != null,
             enter = expandVertically() + fadeIn(),

@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -23,10 +22,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.data.sms.model.ParsedTransaction
 import com.example.truxpense.data.sms.model.TxnType
+import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,24 +38,10 @@ fun PendingTransactionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Pending Transactions", fontWeight = FontWeight.SemiBold)
-                        if (count > 0) {
-                            Text(
-                                "$count awaiting review",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            ScreenTopBar(
+                headerTitle = if (count > 0) "Pending Transactions, $count awaiting review" else "Pending Transactions",
+                showBack = true,
+                onBack = onBack,
                 actions = {
                     if (transactions.isNotEmpty()) {
                         TextButton(onClick = { vm.confirmAll() }) {
@@ -102,7 +87,7 @@ fun PendingTransactionsScreen(
                     PendingTransactionCard(
                         transaction = txn,
                         onConfirm = { vm.confirm(txn.id) },
-                        onReject  = { vm.reject(txn.id) }
+                        onReject = { vm.reject(txn.id) }
                     )
                 }
             }
@@ -118,8 +103,8 @@ private fun PendingTransactionCard(
 ) {
     val isDebit = transaction.type == TxnType.DEBIT
     val amountColor = if (isDebit) MaterialTheme.colorScheme.error
-                      else MaterialTheme.colorScheme.tertiary
-    val amountSign  = if (isDebit) "-" else "+"
+    else MaterialTheme.colorScheme.tertiary
+    val amountSign = if (isDebit) "-" else "+"
 
     val currencyFmt = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).apply {
         maximumFractionDigits = 2
@@ -128,7 +113,7 @@ private fun PendingTransactionCard(
 
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -151,8 +136,9 @@ private fun PendingTransactionCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = transaction.merchant ?: transaction.bank,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -165,8 +151,8 @@ private fun PendingTransactionCard(
 
                 Text(
                     text = "$amountSign${currencyFmt.format(transaction.amount)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = amountColor
                 )
             }
@@ -177,7 +163,7 @@ private fun PendingTransactionCard(
                 Text(
                     text = "🏦 ${transaction.bank}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.weight(1f)
                 )
                 val pct = (transaction.confidence * 100).toInt()
@@ -185,7 +171,7 @@ private fun PendingTransactionCard(
                     text = "Confidence: $pct%",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (pct >= 80) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.secondary
                 )
             }
 
@@ -216,11 +202,114 @@ private fun PendingTransactionCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PendingTransactionsContent(
+    transactions: List<ParsedTransaction>,
+    count: Int,
+    onBack: () -> Unit,
+    onConfirmAll: (() -> Unit)? = null,
+    onConfirm: (String) -> Unit,
+    onReject: (String) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            ScreenTopBar(
+                headerTitle = "Pending Transactions",
+                showBack = true,
+                onBack = onBack,
+                actions = {
+                    if (transactions.isNotEmpty() && onConfirmAll != null) {
+                        TextButton(onClick = { onConfirmAll() }) {
+                            Text("Confirm All", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (transactions.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🎉", fontSize = 48.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "All caught up!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "No pending transactions to review.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(transactions, key = { it.id }) { txn ->
+                    PendingTransactionCard(
+                        transaction = txn,
+                        onConfirm = { onConfirm(txn.id) },
+                        onReject = { onReject(txn.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Preview
 @Composable
 fun PendingTransactionsScreenPreview() {
-    PendingTransactionsScreen(
+    // Use the stateless content with fake data so preview doesn't try to create a ViewModel
+    val sample = listOf(
+        ParsedTransaction(
+            id = "1",
+            amount = 249.0,
+            type = TxnType.DEBIT,
+            merchant = "Coffee Shop",
+            category = com.example.truxpense.data.sms.model.Category.FOOD,
+            confidence = 0.95f,
+            balance = null,
+            accountLast4 = null,
+            bank = "HDFC",
+            rawSms = "TXN of INR 249 at Coffee Shop",
+            timestamp = System.currentTimeMillis()
+        ),
+        ParsedTransaction(
+            id = "2",
+            amount = 50000.0,
+            type = TxnType.CREDIT,
+            merchant = "Salary",
+            category = com.example.truxpense.data.sms.model.Category.SALARY,
+            confidence = 0.99f,
+            balance = null,
+            accountLast4 = null,
+            bank = "SBI",
+            rawSms = "Salary credited",
+            timestamp = System.currentTimeMillis() - 86_400_000L,
+        )
+    )
+
+    PendingTransactionsContent(
+        transactions = sample,
+        count = sample.size,
         onBack = {},
+        onConfirmAll = {},
+        onConfirm = {},
+        onReject = {}
     )
 }
-
