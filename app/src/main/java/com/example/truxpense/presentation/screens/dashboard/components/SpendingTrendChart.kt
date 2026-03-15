@@ -45,6 +45,8 @@ data class SpendPoint(
 // ─────────────────────────────────────────────────────────────────────────────
 
 fun formatChartAmount(v: Float): String = when {
+    // Prefer Crore (Cr) for very large INR values, then Lakh (L), then thousands (k).
+    v >= 10_000_000f -> "₹${"%.1f".format(v / 10_000_000f)}Cr"
     v >= 100_000f -> "₹${"%.1f".format(v / 100_000f)}L"
     v >= 1_000f -> "₹${"%.1f".format(v / 1_000f)}k"
     else -> "₹${v.toInt()}"
@@ -421,18 +423,23 @@ fun SpendingLineChart(
             textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
         }
-        // Show label for first, every-7th (monthly), every point (weekly/yearly), and last
-        val showEvery = if (n > 15) 7 else 1
+        // Show only specific day markers: 1,7,14,21,28 (if present) and Today
+        val markerDays = listOf(1, 7, 14, 21, 28)
+        val markerIndices = mutableSetOf<Int>()
+        for (d in markerDays) {
+            val idx = d - 1
+            if (idx in 0 until n) markerIndices.add(idx)
+        }
+        if (todayIndex in 0 until n) markerIndices.add(todayIndex)
+
         for (i in 0 until n) {
+            if (i !in markerIndices) continue
             val lbl = points[i].xLabel
             val isToday = points[i].isToday
-            val show = i == 0 || i == n - 1 || i % showEvery == 0 || isToday
-            if (show) {
-                xLblPaint.color = if (isToday) lineColor.copy(alpha = 0.9f).toArgb() else labelColor.toArgb()
-                xLblPaint.isFakeBoldText = isToday
-                val displayLbl = if (isToday) "Today" else lbl
-                drawContext.canvas.nativeCanvas.drawText(displayLbl, xOf(i), h - 4.dp.toPx(), xLblPaint)
-            }
+            xLblPaint.color = if (isToday) lineColor.copy(alpha = 0.9f).toArgb() else labelColor.toArgb()
+            xLblPaint.isFakeBoldText = isToday
+            val displayLbl = if (isToday) "Today" else lbl
+            drawContext.canvas.nativeCanvas.drawText(displayLbl, xOf(i), h - 4.dp.toPx(), xLblPaint)
         }
 
         // ── Long-press / drag tooltip ─────────────────────────────────────────

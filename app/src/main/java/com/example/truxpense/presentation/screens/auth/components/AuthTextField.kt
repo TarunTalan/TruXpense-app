@@ -33,7 +33,8 @@ fun AuthTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     onValueChange: (String) -> Unit,
     contentPadding: Int = 0,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
@@ -81,7 +82,11 @@ fun AuthTextField(
                         .fillMaxSize()
                         .padding(horizontal = contentPadding.dp)
                 ) {
-                    if (keyboardOptions.keyboardType == KeyboardType.Email) {
+                    // Leading slot (optional) — rendered before the text field content.
+                    if (leading != null) {
+                        Box(modifier = Modifier.padding(start = 12.dp, end = 4.dp)) { leading() }
+                    } else if (keyboardOptions.keyboardType == KeyboardType.Email) {
+                        // Backwards-compatible: if no leading slot provided, keep the old email icon behavior.
                         Icon(
                             painter = painterResource(id = R.drawable.email_icon),
                             contentDescription = "Email",

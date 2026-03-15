@@ -401,12 +401,19 @@ private fun BudgetOverviewCard(
                                 .align(Alignment.CenterVertically)
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
                         )
-                        OverviewStat(
-                            value = budgetLeft.toCurrency(fmt),
-                            label = "Remaining",
-                            modifier = Modifier.weight(1f),
-                            align = Alignment.End,
-                        )
+                            // Show meaningful Remaining text: exceeded / 100% used / remaining
+                            val exceededTotal = (totalSpent - totalBudget).coerceAtLeast(0.0)
+                            val remainingValueText = when {
+                                exceededTotal > 0.0 -> "Budget exceeded by ${exceededTotal.toCurrency(fmt)}"
+                                budgetLeft == 0.0 -> "100% used"
+                                else -> budgetLeft.toCurrency(fmt)
+                            }
+                            OverviewStat(
+                                value = remainingValueText,
+                                label = "Remaining",
+                                modifier = Modifier.weight(1f),
+                                align = Alignment.End,
+                            )
                     }
 
                     // horizontal divider
@@ -589,8 +596,14 @@ private fun BudgetCategoryCard(
 
             // Footer
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                val overshoot = (display.category.spent - display.category.total).coerceAtLeast(0)
+                val footerText = when {
+                    overshoot > 0 -> "Budget exceeded by ${overshoot.toDouble().toCurrency(fmt)} · $pctUsed% used"
+                    remaining == 0 -> "100% used · $pctUsed% used"
+                    else -> "${remaining.toDouble().toCurrency(fmt)} left this month · $pctUsed% used"
+                }
                 Text(
-                    text = "${remaining.toDouble().toCurrency(fmt)} left this month · $pctUsed% used",
+                    text = footerText,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = footerColor,

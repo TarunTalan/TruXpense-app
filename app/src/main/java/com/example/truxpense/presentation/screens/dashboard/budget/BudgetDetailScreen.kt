@@ -470,10 +470,16 @@ private fun BudgetSummaryCard(
             Spacer(Modifier.height(14.dp))
 
             // 3-column stats: Budget | Spent | Remaining
+            val exceeded = (spent - limit).coerceAtLeast(0.0)
+            val remainingText = when {
+                exceeded > 0.0 -> "Budget exceeded by ${fmtINR(exceeded)}"
+                left == 0.0 -> "100% used"
+                else -> "₹${formatAbbreviatedAmount(left)}"
+            }
             Row(modifier = Modifier.fillMaxWidth()) {
                 StatColumn("₹${formatAbbreviatedAmount(limit)}", "Budget", Modifier.weight(1f))
                 StatColumn("₹${formatAbbreviatedAmount(spent)}", "Spent", Modifier.weight(1f))
-                StatColumn("₹${formatAbbreviatedAmount(left)}", "Remaining", Modifier.weight(1f))
+                StatColumn(remainingText, "Remaining", Modifier.weight(1f))
             }
 
             Spacer(Modifier.height(12.dp))
@@ -503,11 +509,17 @@ private fun BudgetSummaryCard(
                     fontWeight = FontWeight.Medium,
                     color = barColor,
                 )
+                val over = (spent - limit).coerceAtLeast(0.0)
+                val dailyText = when {
+                    over > 0.0 -> "Budget exceeded by ${fmtINR(over)}"
+                    left == 0.0 -> "100% used"
+                    else -> "₹${formatAbbreviatedAmount(dailyBudget)}/day budget left"
+                }
                 Text(
-                    text = "₹${formatAbbreviatedAmount(dailyBudget)}/day budget left",
+                    text = dailyText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = if (over > 0.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
                 )
             }
         }

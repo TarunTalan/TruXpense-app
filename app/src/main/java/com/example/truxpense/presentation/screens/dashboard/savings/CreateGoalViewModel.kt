@@ -14,13 +14,8 @@ import javax.inject.Inject
 
 // Available goal icons (use label keys instead of emojis)
 val GOAL_ICONS = listOf(
-    "iphone", "camera", "women_bag", "gaming_controller", "laptop", "pager", "car", "cruise_ship", "toiletries",
-    "gift", "home_icon", "airplane", "music", "reading_books", "fitness", "diamond", "beach", "art", "trophy",
-)
-
-val GOAL_COLORS = listOf(
-    "#9B59F5", "#3498DB", "#E67E22", "#2ECC71", "#E74C3C",
-    "#1ABC9C", "#F39C12", "#8E44AD", "#2FA4A9", "#D35400",
+    "iphone", "camera", "women_bag", "gaming_controller", "laptop", "pager", "car", "cruise_ship",
+    "gift", "home_icon", "reading_books", "fitness",
 )
 
 @HiltViewModel

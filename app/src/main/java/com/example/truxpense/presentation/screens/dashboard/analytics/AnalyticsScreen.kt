@@ -698,11 +698,20 @@ private fun SummaryCard(
                         )
                     }
                     Spacer(Modifier.height(4.dp))
+                    val usedPctInt = (utilisation * 100).toInt().coerceAtLeast(0)
+                    val exceededAmt = (totalSpentShown - state.totalBudget).coerceAtLeast(0.0)
+                    val usageText: String
+                    val usageColor = if (exceededAmt > 0.0) MaterialTheme.colorScheme.error else accentColor
+                    when {
+                        exceededAmt > 0.0 -> usageText = "Budget exceeded by ${fmt(exceededAmt)}"
+                        usedPctInt >= 100 -> usageText = "100% used"
+                        else -> usageText = "${usedPctInt}% of budget used"
+                    }
                     Text(
-                        text = "${(utilisation * 100).toInt()}% of budget used",
+                        text = usageText,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = accentColor,
+                        color = usageColor,
                     )
                 }
 

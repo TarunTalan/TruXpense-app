@@ -5,13 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.tooling.preview.Preview
@@ -160,6 +154,10 @@ fun AddExpenseScreenContent(
     paymentMethodLabel: String = "Payment method",
     /** Icon resolver for the category/source picker grid. Defaults to expense category icons. */
     categoryIconResolver: (String) -> Int = ::iconForCategory,
+    /** When false, suppresses the TopBar — used by AddTransactionScreen which owns its own. */
+    showTopBar: Boolean = true,
+    /** When false, suppresses the bottom Save bar — used by AddTransactionScreen which owns its own. */
+    showBottomSaveBar: Boolean = true,
     extraBottomContent: (@Composable () -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
@@ -176,35 +174,34 @@ fun AddExpenseScreenContent(
         //    edge ourselves.  This prevents double-inset application.
         contentWindowInsets = WindowInsets(0),
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { ScreenTopBar(headerTitle = screenTitle, showBack = true, onBack = onBack) },
+        topBar = { if (showTopBar) ScreenTopBar(headerTitle = screenTitle, showBack = true, onBack = onBack) },
 
         // ── The bottomBar lifts above the keyboard via imePadding() and stays
         //    above the system gesture bar via navigationBarsPadding().
         //    Scaffold measures the resulting height and passes it back as
         //    innerPadding.bottom, so the scroll column shrinks correctly.
         bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.background,
-                shadowElevation = 8.dp,
-                tonalElevation = 0.dp,
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()   // respects gesture-nav bar
-                        .imePadding()              // rises above the keyboard
-                        .padding(
+            if (showBottomSaveBar) {
+                Surface(
+                    color = MaterialTheme.colorScheme.background,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 0.dp,
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(
                             horizontal = DashboardDimens.screenPaddingH,
                             vertical = 12.dp,
                         ),
-                ) {
-                    SaveButton(
-                        enabled = isFormValid,
-                        onClick = {
-                            // Dismiss keyboard before saving so the transition is clean
-                            focusManager.clearFocus()
-                            onSave()
-                        },
-                        label = saveLabel ?: "Save expense",
-                    )
+                    ) {
+                        SaveButton(
+                            enabled = isFormValid,
+                            onClick = {
+                                focusManager.clearFocus()
+                                onSave()
+                            },
+                            label = saveLabel ?: "Save expense",
+                        )
+                    }
                 }
             }
         },

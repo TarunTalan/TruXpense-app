@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * A lightweight reusable text field that follows the project's AuthTextField visual style
@@ -98,14 +99,14 @@ fun SimpleTextField(
                     singleLine = singleLine,
                     visualTransformation = VisualTransformation.None,
                     interactionSource = interactionSource,
-                    placeholder = { if (placeholder != null) Text(placeholder, color = MaterialTheme.colorScheme.onBackground.copy(0.5f)) },
-                    prefix = prefix,
+                    placeholder = { if (placeholder != null) Text(placeholder, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onBackground.copy(0.5f)) },
+                    prefix = prefix?.let { p -> { Box(modifier = Modifier.padding(end = 8.dp)) { p() } } },
                     trailingIcon = trailingIcon,
                     contentPadding = OutlinedTextFieldDefaults.contentPadding(
                         top = 0.dp,
                         bottom = 0.dp,
-                        start = 12.dp,
-                        end = 12.dp,
+                        start = 15.dp,
+                        end = 15.dp,
                     ),
                     colors = colors,
                     container = {},
