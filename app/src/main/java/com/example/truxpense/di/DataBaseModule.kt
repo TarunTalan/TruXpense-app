@@ -13,6 +13,7 @@ import com.example.truxpense.data.repository.savings.SavingsRepository
 import com.example.truxpense.data.repository.report.ReportDao
 import com.example.truxpense.data.repository.report.ReportRepository
 import com.example.truxpense.data.repository.report.ReportRepositoryImpl
+import com.example.truxpense.data.repository.vault.VaultEntryDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,6 +34,8 @@ object DatabaseModule {
                 AppDatabase.MIGRATION_5_6,
                 AppDatabase.MIGRATION_6_7,
                 AppDatabase.MIGRATION_7_8,
+                AppDatabase.MIGRATION_8_9,
+                AppDatabase.MIGRATION_9_10,
             )
             .build()
 
@@ -62,4 +65,7 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideReportRepository(dao: ReportDao): ReportRepository = ReportRepositoryImpl(dao)
+
+    @Provides @Singleton
+    fun provideVaultEntryDao(db: AppDatabase): VaultEntryDao = db.vaultEntryDao()
 }

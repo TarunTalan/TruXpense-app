@@ -172,6 +172,9 @@ dependencies {
 
     implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
     implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
 
     // Add Firebase Cloud Messaging (KTX) and AndroidX Startup
     implementation("com.google.firebase:firebase-messaging-ktx:23.2.0")

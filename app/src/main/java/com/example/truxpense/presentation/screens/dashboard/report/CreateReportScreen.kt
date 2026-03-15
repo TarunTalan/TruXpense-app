@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,8 +26,11 @@ import com.example.truxpense.presentation.utils.SimpleTextField
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
+// "Custom" is intentionally kept short so it fits in the pill.
+// The five quick-select pills sit on one row; "Custom" gets its own row-end slot
+// via the layout fix below.
 private val timePeriods = listOf("7D", "1M", "3M", "6M", "1y", "Custom")
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -35,23 +39,19 @@ private val timePeriods = listOf("7D", "1M", "3M", "6M", "1y", "Custom")
 @Composable
 fun CreateReportScreen(
     onBack: () -> Unit = {},
-    /** Called with the saved reportId so the caller can navigate to detail. */
     onPreview: (reportId: String) -> Unit = {},
     vm: CreateReportViewModel = hiltViewModel(),
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val uiState by vm.uiState.collectAsState()
 
-    // Navigate to detail when report is saved
     LaunchedEffect(uiState.savedReportId) {
         val id = uiState.savedReportId
         if (id != null) {
-            vm.onNavigatedToDetail()
-            onPreview(id)
+            vm.onNavigatedToDetail(); onPreview(id)
         }
     }
 
-    // Quick-period picker — maps pill → date range
     fun applyPeriod(period: String) {
         val now = Calendar.getInstance()
         val from = Calendar.getInstance()
@@ -61,41 +61,32 @@ fun CreateReportScreen(
             "3M" -> from.add(Calendar.MONTH, -3)
             "6M" -> from.add(Calendar.MONTH, -6)
             "1y" -> from.add(Calendar.YEAR, -1)
-            else -> return   // "Custom" → user picks manually
+            else -> return
         }
         vm.setFromDate(from.timeInMillis)
         vm.setToDate(now.timeInMillis)
     }
 
     var selectedPeriod by remember { mutableStateOf("1M") }
-
     var showFromPicker by remember { mutableStateOf(false) }
     var showToPicker by remember { mutableStateOf(false) }
     val fromPickerState = rememberDatePickerState(initialSelectedDateMillis = uiState.fromDate)
     val toPickerState = rememberDatePickerState(initialSelectedDateMillis = uiState.toDate)
 
-    fun epochToDisplay(ms: Long): String =
-        SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date(ms))
+    fun epochToDisplay(ms: Long): String = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date(ms))
 
-    // Date picker dialogs
     if (showFromPicker) {
         AppDatePickerDialog(
             state = fromPickerState,
             onDismiss = { showFromPicker = false },
-            onConfirm = { ms ->
-                ms?.let { vm.setFromDate(it) }
-                showFromPicker = false
-            },
+            onConfirm = { ms -> ms?.let { vm.setFromDate(it) }; showFromPicker = false },
         )
     }
     if (showToPicker) {
         AppDatePickerDialog(
             state = toPickerState,
             onDismiss = { showToPicker = false },
-            onConfirm = { ms ->
-                ms?.let { vm.setToDate(it) }
-                showToPicker = false
-            },
+            onConfirm = { ms -> ms?.let { vm.setToDate(it) }; showToPicker = false },
         )
     }
 
@@ -107,19 +98,13 @@ fun CreateReportScreen(
         },
         bottomBar = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .navigationBarsPadding()
-                    .padding(horizontal = DashboardDimens.screenPaddingH, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
+                    .navigationBarsPadding().padding(horizontal = DashboardDimens.screenPaddingH, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Button(
-                    onClick = {
-                        vm.suggestTitle()
-                        vm.saveReport()
-                    },
+                    onClick = { vm.suggestTitle(); vm.saveReport() },
                     enabled = uiState.isValid,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp),
@@ -139,21 +124,13 @@ fun CreateReportScreen(
                         )
                     }
                 }
-                // Error messages
-                uiState.titleError?.let {
-                    Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                }
-                uiState.dateError?.let {
-                    Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                }
+                uiState.titleError?.let { Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.error) }
+                uiState.dateError?.let { Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.error) }
             }
         },
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = DashboardDimens.screenPaddingH)
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = DashboardDimens.screenPaddingH)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -180,34 +157,23 @@ fun CreateReportScreen(
             // ── Report type ───────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Report type")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     listOf(
                         ReportType.EXPENSE to "Expense",
                         ReportType.INCOME to "Income",
-                        ReportType.ALL to "All"
+                        ReportType.ALL to "All",
                     ).forEach { (type, label) ->
                         val isSelected = uiState.reportType == type
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) primary else MaterialTheme.colorScheme.surfaceContainer)
-                                .border(
-                                    1.dp,
-                                    if (isSelected) primary else MaterialTheme.colorScheme.outline.copy(0.25f),
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .clickable { vm.setReportType(type) }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                label,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
+                        PillChip(
+                            label = label,
+                            isSelected = isSelected,
+                            primary = primary,
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.setReportType(type) },
+                        )
                     }
                 }
             }
@@ -215,39 +181,46 @@ fun CreateReportScreen(
             // ── Time period ───────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Time period")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    timePeriods.forEach { period ->
+
+                // FIX 1: Split into two rows so "Custom" is never squeezed next
+                // to five other pills. Row 1 → the five short quick-select pills,
+                // each with equal weight. Row 2 → "Custom" full-width pill with a
+                // fixed height so text never wraps.
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    timePeriods.dropLast(1).forEach { period ->
                         val isSelected = selectedPeriod == period
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) primary else MaterialTheme.colorScheme.surfaceContainer)
-                                .border(
-                                    1.dp,
-                                    if (isSelected) primary else MaterialTheme.colorScheme.outline.copy(0.25f),
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .clickable {
-                                    selectedPeriod = period
-                                    applyPeriod(period)
-                                }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                period,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
+                        PillChip(
+                            label = period,
+                            isSelected = isSelected,
+                            primary = primary,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                selectedPeriod = period
+                                applyPeriod(period)
+                            },
+                        )
                     }
                 }
 
+                // "Custom" pill — full width, single line guaranteed
+                val customSelected = selectedPeriod == "Custom"
+                PillChip(
+                    label = "Custom range",
+                    isSelected = customSelected,
+                    primary = primary,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { selectedPeriod = "Custom" },
+                )
+
                 // From / To date row — only visible when Custom is selected
                 if (selectedPeriod == "Custom") {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         DatePickerField(
                             label = "From",
                             date = epochToDisplay(uiState.fromDate),
@@ -268,53 +241,29 @@ fun CreateReportScreen(
             if (uiState.availableCategories.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionLabel("Categories")
+
+                    // FIX 2: Always render chip text at FontWeight.SemiBold so
+                    // the chip's intrinsic width never changes on selection.
+                    // Selection state is communicated through background / border
+                    // / text colour only — not weight — so FlowRow never re-flows.
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        // "All" chip
                         val allSelected = uiState.allCategoriesSelected
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (allSelected) primary else MaterialTheme.colorScheme.surfaceContainer)
-                                .border(
-                                    1.dp,
-                                    if (allSelected) primary else MaterialTheme.colorScheme.outline.copy(0.2f),
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .clickable { vm.selectAllCategories() }
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                "All",
-                                fontSize = 13.sp,
-                                fontWeight = if (allSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (allSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                            )
-                        }
-                        // Per-category chips
+                        CategoryChip(
+                            label = "All",
+                            isSelected = allSelected,
+                            primary = primary,
+                            onClick = { vm.selectAllCategories() },
+                        )
                         uiState.availableCategories.forEach { cat ->
-                            val isSelected = cat in uiState.selectedCategories
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) primary else MaterialTheme.colorScheme.surfaceContainer)
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) primary else MaterialTheme.colorScheme.outline.copy(0.2f),
-                                        RoundedCornerShape(20.dp)
-                                    )
-                                    .clickable { vm.toggleCategory(cat) }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                            ) {
-                                Text(
-                                    cat,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                                )
-                            }
+                            CategoryChip(
+                                label = cat,
+                                isSelected = cat in uiState.selectedCategories,
+                                primary = primary,
+                                onClick = { vm.toggleCategory(cat) },
+                            )
                         }
                     }
                 }
@@ -322,6 +271,82 @@ fun CreateReportScreen(
 
             Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+// ─── Shared pill composables ──────────────────────────────────────────────────
+
+/**
+ * Generic pill chip used for Report type and Time period rows.
+ *
+ * • [maxLines] = 1 + [softWrap] = false ensure the label never wraps,
+ *   regardless of how narrow the pill gets.
+ * • A minimum height of 36 dp gives every pill the same touch target even
+ *   when the pill is very narrow.
+ */
+@Composable
+private fun PillChip(
+    label: String,
+    isSelected: Boolean,
+    primary: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier.heightIn(min = 36.dp)               // ← uniform height, never collapses
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) primary else MaterialTheme.colorScheme.surfaceContainer).border(
+                1.dp,
+                if (isSelected) primary else MaterialTheme.colorScheme.outline.copy(0.25f),
+                RoundedCornerShape(20.dp),
+            ).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,        // ← always SemiBold; weight never changes
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,                           // ← never wraps
+            softWrap = false,                       // ← hard single-line guarantee
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * Category chip inside FlowRow.
+ *
+ * Key fix: text is ALWAYS FontWeight.SemiBold. The only things that change on
+ * selection are background colour, border colour, and text colour — none of
+ * which affect the chip's measured width, so FlowRow never re-flows other chips.
+ */
+@Composable
+private fun CategoryChip(
+    label: String,
+    isSelected: Boolean,
+    primary: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) primary else MaterialTheme.colorScheme.surfaceContainer).border(
+                1.dp,
+                if (isSelected) primary else MaterialTheme.colorScheme.outline.copy(0.2f),
+                RoundedCornerShape(20.dp),
+            ).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,        // ← always SemiBold — width is stable
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -344,13 +369,19 @@ private fun DatePickerField(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    GradientCard(modifier = modifier.clickable(onClick = onClick)) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     date,
@@ -361,7 +392,7 @@ private fun DatePickerField(
                     painter = painterResource(R.drawable.calender),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }

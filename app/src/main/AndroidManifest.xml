@@ -55,6 +55,16 @@
             </intent-filter>
         </activity>
 
+        <provider
+                android:name="androidx.core.content.FileProvider"
+                android:authorities="${applicationId}.provider"
+                android:exported="false"
+                android:grantUriPermissions="true">
+            <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- ── FCM Service ──────────────────────────────────────────── -->
         <service
                 android:name=".service.TruxpenseFirebaseMessagingService"
@@ -123,6 +133,21 @@
                 <action android:name="com.example.truxpense.ACTION_REJECT_TXN"/>
             </intent-filter>
         </receiver>
+
+        <!--
+            UpiNotificationListenerService: reads notifications from UPI apps
+            (PhonePe, GPay, Paytm, etc.) and feeds them into the same
+            PendingTransactionRepository pipeline used by the SMS parser.
+            Requires the user to grant "Notification access" in Settings.
+        -->
+        <service
+                android:name=".service.upi.UpiNotificationListenerService"
+                android:exported="true"
+                android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService"/>
+            </intent-filter>
+        </service>
 
     </application>
 
