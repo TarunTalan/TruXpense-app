@@ -15,7 +15,7 @@ fun goalIconToDrawable(icon: String): Int {
         "car" -> R.drawable.car
         "cruise_ship" -> R.drawable.trip_cruise_ship
         "gift" -> R.drawable.gift
-        "home_icon" -> R.drawable.home_icon
+        "home_icon" -> R.drawable.home_investment
         "reading_books" -> R.drawable.reading_books
         "fitness" -> R.drawable.fitness
         else -> R.drawable.diamond

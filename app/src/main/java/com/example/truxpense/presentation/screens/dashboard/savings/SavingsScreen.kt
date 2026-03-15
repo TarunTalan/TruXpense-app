@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,10 +46,24 @@ fun SavingsScreen(
     onAddSavings: () -> Unit,
     onGoalClick: (Long) -> Unit,
     onDistribute: () -> Unit,
+    onGoalCompleted: (goalName: String, savedAmount: Double) -> Unit,
     onBack: () -> Unit,
     vm: SavingsViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val snackbarHost = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        vm.snackbar.collect { message ->
+            snackbarHost.showSnackbar(message)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        vm.goalCompleted.collect { goal ->
+            onGoalCompleted(goal.name, goal.savedAmount)
+        }
+    }
 
     val cal = remember { Calendar.getInstance() }
     val curMonth = remember { cal.get(Calendar.MONTH) }
@@ -75,72 +90,99 @@ fun SavingsScreen(
         (state.totalSavings - allocatedToGoals).coerceAtLeast(0.0)
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-    ) {
-        // ── Top bar ───────────────────────────────────────────────────────────
-        ScreenTopBar(
-            headerTitle = "Savings",
-            showBack = true,
-            onBack = onBack,
-            actions = {
-                Box {
-                    IconButton(onClick = onAddSavings) {
-                        Box(
-                            modifier = Modifier.size(38.dp).border(
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-                                CircleShape,
-                            ),
-                            contentAlignment = Alignment.Center,
-                        ) {
+    Scaffold(
+        contentWindowInsets = WindowInsets(0),
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHost) },
+    ) { scaffoldPadding ->
+        Column(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(scaffoldPadding),
+        ) {
+            // ── Top bar ───────────────────────────────────────────────────────────
+            ScreenTopBar(
+                headerTitle = "Savings",
+                showBack = true,
+                onBack = onBack,
+                actions = {
+                    Box {
+                        IconButton(onClick = onAddSavings) {
                             Box(
-                                modifier = Modifier.matchParentSize().background(
-                                    MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.15f), CircleShape,
-                                ).blur(8.dp)
-                            )
-                            Icon(
-                                painter = painterResource(R.drawable.add),
-                                contentDescription = "Add savings",
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+                                modifier = Modifier.size(38.dp).border(
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                                    CircleShape,
+                                ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Box(
+                                    modifier = Modifier.matchParentSize().background(
+                                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.15f), CircleShape,
+                                    ).blur(8.dp)
+                                )
+                                Icon(
+                                    painter = painterResource(R.drawable.add),
+                                    contentDescription = "Add savings",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
                     }
-                }
-            },
-        )
-
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = screenPaddingH),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            SavingsTotalCard(
-                total = state.totalSavings,
-                thisMonthSaved = thisMonthSaved,
-                lastMonthSaved = lastMonthSaved,
-                unallocated = unallocated,
-                onDistribute = onDistribute,
+                },
             )
+
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(horizontal = screenPaddingH),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                SavingsTotalCard(
+                    total = state.totalSavings,
+                    thisMonthSaved = thisMonthSaved,
+                    lastMonthSaved = lastMonthSaved,
+                    unallocated = unallocated,
+                    onDistribute = onDistribute,
+                )
 
 //            if (state.recentEntries.isNotEmpty()) {
 //                SectionLabel("Recent Savings")
 //                RecentSavingsCard(entries = state.recentEntries)
 //            }
 
-            SectionLabel("Saving Goals")
-            if (state.goals.isEmpty()) {
-                CreateGoalRow(onClick = onCreateGoal)
-            } else {
-                state.goals.forEach { goal ->
-                    GoalCard(goal = goal, onClick = { onGoalClick(goal.id) })
-                }
-                CreateGoalRow(onClick = onCreateGoal)
-            }
+                SectionLabel("Saving Goals", onCreateGoal, true)
 
-            Spacer(Modifier.height(32.dp))
+                if (state.activeGoals.isEmpty() && state.completedGoals.isEmpty()) {
+                    Text(
+                        text = "No goals yet. Tap \"New Goal\" to get started.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+
+                state.activeGoals.forEach { goal ->
+                    GoalCard(
+                        goal = goal,
+                        onClick = { onGoalClick(goal.id) },
+                        onQuickAdd = { vm.quickAddToGoal(goal, unallocated) },
+                    )
+                }
+
+                if (state.completedGoals.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    SectionLabel(label = "Completed")
+                    state.completedGoals.forEach { goal ->
+                        CompletedGoalCard(
+                            goal = goal,
+                            onClick = { onGoalClick(goal.id) },
+                        )
+                    }
+                }
+
+
+                Spacer(Modifier.height(32.dp))
+            }
         }
-    }
+    } // Scaffold
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -289,75 +331,6 @@ private fun MiniStatSavings(
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Recent savings card
-// ══════════════════════════════════════════════════════════════════════════════
-
-//@Composable
-//private fun RecentSavingsCard(entries: List<SavingsEntryUi>) {
-//    Card(
-//        modifier = Modifier.fillMaxWidth(),
-//        shape = RoundedCornerShape(DashboardDimens.cornerCard),
-//        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-//        border = BorderStroke(DashboardDimens.borderStroke, MaterialTheme.colorScheme.outlineVariant),
-//        elevation = CardDefaults.cardElevation(0.dp),
-//    ) {
-//        entries.forEachIndexed { i, entry ->
-//            Row(
-//                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-//                horizontalArrangement = Arrangement.SpaceBetween,
-//                verticalAlignment = Alignment.CenterVertically,
-//            ) {
-//                Row(
-//                    modifier = Modifier.weight(1f),
-//                    verticalAlignment = Alignment.CenterVertically,
-//                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-//                ) {
-//                    Box(
-//                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
-//                            .background(MaterialTheme.colorScheme.surfaceContainer),
-//                        contentAlignment = Alignment.Center,
-//                    ) {
-//                        Icon(
-//                            painter = painterResource(savingsEntryIcon(entry.label)),
-//                            contentDescription = null,
-//                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-//                            modifier = Modifier.size(18.dp),
-//                        )
-//                    }
-//                    Column {
-//                        Text(
-//                            text = entry.label,
-//                            style = MaterialTheme.typography.bodyMedium,
-//                            fontWeight = FontWeight.SemiBold,
-//                            color = MaterialTheme.colorScheme.onBackground,
-//                            maxLines = 1,
-//                            overflow = TextOverflow.Ellipsis,
-//                        )
-//                        Text(
-//                            text = entry.dateDisplay(),
-//                            style = MaterialTheme.typography.bodySmall,
-//                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-//                            modifier = Modifier.padding(top = 2.dp),
-//                        )
-//                    }
-//                }
-//                Text(
-//                    text = "+${formatInr(entry.amount)}",
-//                    style = MaterialTheme.typography.titleSmall,
-//                    color = MaterialTheme.colorScheme.primary,
-//                    fontWeight = FontWeight.Bold,
-//                )
-//            }
-//            if (i < entries.size - 1) {
-//                HorizontalDivider(
-//                    thickness = DashboardDimens.dividerThin,
-//                    color = MaterialTheme.colorScheme.outlineVariant,
-//                )
-//            }
-//        }
-//    }
-//}
 
 private fun savingsEntryIcon(label: String): Int {
     val l = label.lowercase()
@@ -374,7 +347,7 @@ private fun savingsEntryIcon(label: String): Int {
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
+fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit, onQuickAdd: () -> Unit = {}) {
     val iconBg = MaterialTheme.colorScheme.primary.copy(0.15f)
     val primary = MaterialTheme.colorScheme.primary
     val daysLeft = goal.daysLeft()
@@ -416,7 +389,7 @@ fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
                     )
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f).widthIn(max = 160.dp)) {
                     Text(
                         text = goal.name,
                         style = MaterialTheme.typography.bodyLarge,
@@ -430,6 +403,8 @@ fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(top = 2.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
 
@@ -526,8 +501,9 @@ fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
                 }
                 if (goal.autoContribute && goal.autoContributeAmount > 0) {
                     Spacer(Modifier.width(8.dp))
+                    val quickAddAmt = minOf(goal.autoContributeAmount, goal.remaining)
                     Button(
-                        onClick = { /* navigate to detail for quick-add */ },
+                        onClick = onQuickAdd,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = primary,
@@ -537,7 +513,7 @@ fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
                         modifier = Modifier.height(30.dp),
                     ) {
                         Text(
-                            text = "Add ${formatInr(goal.autoContributeAmount)}",
+                            text = "Add ${formatInr(quickAddAmt)}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -549,69 +525,111 @@ fun GoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// "Create a new goal" row
+// Completed goal card — muted, no progress bar, no Add button
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun CreateGoalRow(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(DashboardDimens.cornerCard))
-            .background(MaterialTheme.colorScheme.surfaceContainer).border(
-                border = BorderStroke(DashboardDimens.borderStroke, MaterialTheme.colorScheme.outlineVariant),
-                shape = RoundedCornerShape(DashboardDimens.cornerCard),
-            ).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+fun CompletedGoalCard(goal: SavingsGoalUi, onClick: () -> Unit) {
+    val secondary = MaterialTheme.colorScheme.secondary
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(DashboardDimens.cornerCard),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp,
     ) {
-        IconButton(onClick = {}) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Icon with muted background
             Box(
-                modifier = Modifier.size(38.dp).border(
-                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-                    CircleShape,
-                ),
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier.matchParentSize().background(
-                        MaterialTheme.colorScheme.background.copy(alpha = 0.85f), CircleShape,
-                    ).blur(8.dp)
-                )
                 Icon(
-                    painter = painterResource(R.drawable.add),
-                    contentDescription = "Add savings",
+                    painter = painterResource(id = goalIconToDrawable(goal.icon)),
+                    contentDescription = goal.name,
+                    tint = Color.Unspecified,
                     modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            // Name + date
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = goal.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "Completed · ${formatInr(goal.savedAmount)} saved",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // Checkmark badge
+            Box(
+                modifier = Modifier.size(28.dp).clip(CircleShape).background(secondary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.tick),
+                    contentDescription = "Completed",
+                    tint = secondary,
+                    modifier = Modifier.size(14.dp),
                 )
             }
         }
-        Column {
-            Text(
-                text = "Create a new goal",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                text = "Set a target amount and time",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Shared helpers (exported for other screens)
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-fun SectionLabel(label: String) {
-    Text(
-        text = label,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
+fun SectionLabel(label: String, onClick: () -> Unit = {}, showAdd: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        if (showAdd) {
+            TextButton(
+                onClick = onClick,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.add),
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "New Goal",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -734,11 +752,11 @@ private fun SavingsScreenPreview() {
                 )
 //                SectionLabel("Recent Savings")
 //                RecentSavingsCard(entries = entries)
-                SectionLabel("Saving Goals")
-                goals.forEach { GoalCard(goal = it, onClick = {}) }
-                CreateGoalRow(onClick = {})
+                SectionLabel("Saving Goals", onClick = { }, true)
+                goals.forEach { GoalCard(goal = it, onClick = {}, onQuickAdd = {}) }
                 Spacer(Modifier.height(32.dp))
             }
         }
     }
 }
+

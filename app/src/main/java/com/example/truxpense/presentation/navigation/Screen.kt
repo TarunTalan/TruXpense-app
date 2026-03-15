@@ -23,9 +23,26 @@ object Screen {
         // ── Home tab ─────────────────────────────────────────────────────────
         object Home {
             const val Root = "home"
-            const val AddExpense = "home/add_expense"
-            const val AddExpenseResult = "home/add_expense/result"
-            const val AddIncome = "home/add_income"
+
+            /**
+             * Unified add-transaction screen (Expense / Income tabs).
+             * Optional query param: ?tab=0 (expense) or ?tab=1 (income).
+             * Replaces the old separate AddExpense / AddIncome routes.
+             */
+            const val AddTransaction = "home/add_transaction?tab={tab}"
+
+            fun addTransactionRoute(tab: Int = 0) = "home/add_transaction?tab=$tab"
+
+            /**
+             * Backwards-compatible aliases for older code that referenced the
+             * legacy AddExpense/AddIncome constants. These point to the unified
+             * add-transaction routes with the appropriate tab query.
+             */
+            @Deprecated("Use addTransactionRoute(tab) instead")
+            const val AddExpense = "home/add_transaction?tab=0"
+
+            @Deprecated("Use addTransactionRoute(tab) instead")
+            const val AddIncome = "home/add_transaction?tab=1"
 
             // ── Savings flow ─────────────────────────────────────────────────
             const val Savings = "home/savings"
@@ -34,6 +51,12 @@ object Screen {
             const val SavingsGoalDetail = "home/savings/detail/{goalId}"
             const val SavingsDistribute = "home/savings/distribute"
             const val AddSavings = "home/savings/add"
+            const val SavingsGoalCompleted = "home/savings/goal_completed?goalName={goalName}&savedAmount={savedAmount}"
+
+            fun goalCompletedRoute(goalName: String, savedAmount: Double): String {
+                val encoded = java.net.URLEncoder.encode(goalName, "UTF-8")
+                return "home/savings/goal_completed?goalName=$encoded&savedAmount=$savedAmount"
+            }
 
             fun savingsEditRoute(goalId: Long) = "home/savings/edit/$goalId"
             fun savingsDetailRoute(goalId: Long) = "home/savings/detail/$goalId"
@@ -42,22 +65,24 @@ object Screen {
         // ── Transactions tab ──────────────────────────────────────────────────
         object Transactions {
             const val Root = "transactions"
-            const val AddExpense = "transactions/add_expense"
+
+            /** Unified add-transaction screen reached from the Transactions tab. */
+            const val AddTransaction = "transactions/add_transaction?tab={tab}"
+
+            fun addTransactionRoute(tab: Int = 0) = "transactions/add_transaction?tab=$tab"
+
+            @Deprecated("Use addTransactionRoute(tab) instead")
+            const val AddExpense = "transactions/add_transaction?tab=0"
 
             const val Detail = "transactions/detail/{transactionId}"
-
             fun detailRoute(transactionId: String): String =
                 "transactions/detail/${java.net.URLEncoder.encode(transactionId, "UTF-8")}"
 
-            // Edit route for editing an existing expense transaction
             const val Edit = "transactions/edit/{transactionId}"
-
             fun editRoute(transactionId: String): String =
                 "transactions/edit/${java.net.URLEncoder.encode(transactionId, "UTF-8")}"
 
-            // Edit route for editing an existing income entry
             const val EditIncome = "transactions/edit_income/{incomeId}"
-
             fun editIncomeRoute(incomeId: String): String =
                 "transactions/edit_income/${java.net.URLEncoder.encode(incomeId, "UTF-8")}"
         }
@@ -68,21 +93,18 @@ object Screen {
             const val Add = "budget/add"
 
             const val Detail = "budget/detail/{budgetName}/{monthlyLimit}/{spent}"
-
             fun detailRoute(
                 budgetName: String,
                 monthlyLimit: Double,
                 spent: Double,
             ): String = "budget/detail/${budgetName.encodeForRoute()}/$monthlyLimit/$spent"
 
-            /** Percent-encode chars that would break URL segment parsing. */
             private fun String.encodeForRoute(): String = java.net.URLEncoder.encode(this, "UTF-8")
         }
 
         // ── Analytics tab ─────────────────────────────────────────────────────
         object Analytics {
             const val Root = "analytics"
-            const val AddExpense = "analytics/add_expense"
         }
 
         // ── Settings tab ──────────────────────────────────────────────────────
@@ -98,14 +120,11 @@ object Screen {
             const val About = "settings/about"
             const val DeleteAccount = "settings/delete_account"
 
-            /** type = EMAIL | PHONE */
             const val ChangeContactOtp = "settings/change_contact_otp/{type}"
-
-            fun changeContactOtpRoute(type: String): String =
-                "settings/change_contact_otp/$type"
+            fun changeContactOtpRoute(type: String): String = "settings/change_contact_otp/$type"
         }
 
-        // ── Notifications (not a bottom-nav tab; shown as a full screen) ──────
+        // ── Notifications ─────────────────────────────────────────────────────
         object Notifications {
             const val Root = "notifications"
         }
@@ -117,13 +136,19 @@ object Screen {
 
         // ── Report ────────────────────────────────────────────────────────────
         object Report {
+            const val Hub = "report/hub"
             const val Create = "report/create"
             const val Detail = "report/detail/{reportId}"
             fun detailRoute(reportId: String) = "report/detail/$reportId"
         }
+
+        // ── Vault ─────────────────────────────────────────────────────────────
+        object Vault {
+            const val Root = "vault"
+        }
     }
 
-    // ── Premium flow (Paywall / Payment / Success)
+    // ── Premium flow ──────────────────────────────────────────────────────────
     object Premium {
         const val Root = "premium"
     }

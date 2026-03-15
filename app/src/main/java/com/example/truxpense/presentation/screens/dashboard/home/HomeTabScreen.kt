@@ -36,8 +36,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.truxpense.R
 import com.example.truxpense.data.repository.savings.SavingsGoalUi
+import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsViewModel
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategory
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetCategoryDisplay
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetViewModel
@@ -52,6 +56,7 @@ import com.example.truxpense.presentation.utils.currencyFormat
 import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
 import com.example.truxpense.presentation.utils.progressColor
 import com.example.truxpense.presentation.utils.toCurrency
+import com.example.truxpense.service.upi.UpiPermissionBanner
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.*
@@ -78,17 +83,21 @@ fun HomeTabScreen(
     onAddExpense: (() -> Unit)? = null,
     onAddIncome: (() -> Unit)? = null,
     onNavigateToBudget: (() -> Unit)? = null,
+    onSetBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
     onNavigateToAnalytics: (() -> Unit)? = null,
     onSavings: (() -> Unit)? = null,
+    onReports: (() -> Unit)? = null,
     onNavigateToTransaction: ((String) -> Unit)? = null,
     onNavigateToBudgetDetail: ((String, Double, Double) -> Unit)? = null,
 ) {
     val hasSmsPermission by vm.hasSmsPermission.collectAsState()
+    val hasNotificationAccess by vm.hasNotificationAccess.collectAsState()
     LaunchedEffect(Unit) { vm.refreshSmsPermission() }
+    UpiPermissionHandler(vm = vm)
 
     val expenseCount by vm.expenseCount.collectAsState()
     val isLoaded by vm.isLoaded.collectAsState()
@@ -123,6 +132,7 @@ fun HomeTabScreen(
             HomeTabContent(
                 monthlySpend = monthlySpend,
                 hasSmsPermission = hasSmsPermission,
+                hasNotificationAccess = hasNotificationAccess,
                 pendingCount = pendingCount,
                 unreadCount = unreadCount,
                 username = username ?: "",
@@ -132,12 +142,14 @@ fun HomeTabScreen(
                 currencyCode = currencyCode,
                 vm = vm,
                 onNavigateToBudget = onNavigateToBudget,
+                onSetBudget = onSetBudget,
                 onViewAll = onViewAll,
                 onNotificationsClick = onNotificationsClick,
                 onProfileClick = onProfileClick,
                 onPendingReviewClick = onPendingReviewClick,
                 onNavigateToAnalytics = onNavigateToAnalytics,
                 onSavings = onSavings,
+                onReports = onReports,
                 onNavigateToTransaction = onNavigateToTransaction,
                 onNavigateToBudgetDetail = onNavigateToBudgetDetail,
             )
@@ -149,6 +161,7 @@ fun HomeTabScreen(
 fun HomeTabContent(
     monthlySpend: Double,
     hasSmsPermission: Boolean,
+    hasNotificationAccess: Boolean = true,
     pendingCount: Int = 0,
     unreadCount: Int = 0,
     username: String = "",
@@ -158,12 +171,14 @@ fun HomeTabContent(
     currencyCode: String = "INR",
     vm: HomeViewModel = hiltViewModel(),
     onNavigateToBudget: (() -> Unit)? = null,
+    onSetBudget: (() -> Unit)? = null,
     onViewAll: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
     onPendingReviewClick: (() -> Unit)? = null,
     onNavigateToAnalytics: (() -> Unit)? = null,
     onSavings: (() -> Unit)? = null,
+    onReports: (() -> Unit)? = null,
     onNavigateToTransaction: ((String) -> Unit)? = null,
     onNavigateToBudgetDetail: ((String, Double, Double) -> Unit)? = null,
 ) {
@@ -246,6 +261,17 @@ fun HomeTabContent(
                 }
             }
 
+            // ── UPI notification-access banner ────────────────────────────────
+
+            if (!hasNotificationAccess) {
+                item {
+                    UpiPermissionBanner(
+                        onEnable = { vm.openNotificationAccessSettings() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+
             // ── Spend this month ──────────────────────────────────────────────
 
             item {
@@ -256,6 +282,7 @@ fun HomeTabContent(
                     budgetLeft = budgetLeft,
                     monthlyChange = monthlyChange,
                     fmt = fmt,
+                    currencyCode = currencyCode,
                 )
             }
 
@@ -265,8 +292,9 @@ fun HomeTabContent(
                 QuickActionsRow(
                     onAddExpense = { onAddExpense?.invoke() },
                     onAddIncome = { onAddIncome?.invoke() },
-                    onSetBudget = { onNavigateToBudget?.invoke() },
+                    onSetBudget = { onSetBudget?.invoke() },
                     onSavings = { onSavings?.invoke() },
+                    onReports = { onReports?.invoke() },
                 )
             }
 
@@ -280,6 +308,8 @@ fun HomeTabContent(
                         progMul = progMul,
                         fmt = fmt,
                         onDetails = { onNavigateToBudget?.invoke() },
+                        totalBudget = totalBudget,
+                        totalSpent = totalSpent,
                     )
                 }
             }
@@ -307,38 +337,54 @@ fun HomeTabContent(
 
             item {
                 val coroutineScope = rememberCoroutineScope()
+                // Prefer an analytics insight if available
+                val analyticsVm: AnalyticsViewModel = hiltViewModel()
+                val aState by analyticsVm.uiState.collectAsState()
+                val analyticsInsight = remember(aState) {
+                    // Priority: topCategory -> topMerchant -> peak period -> comparison
+                    aState.topCategory?.let { (cat, amt) -> Pair("Top category: $cat", amt.toCurrency(fmt)) }
+                        ?: aState.topMerchant?.let { (m, amt) -> Pair("Top merchant: $m", amt.toCurrency(fmt)) }
+                        ?: aState.trendPoints.maxByOrNull { it.amount }
+                            ?.let { p -> Pair("Peak period: ${p.label}", p.amount.toCurrency(fmt)) }
+                        ?: if (aState.hasComparison) Pair("Change vs last period", "${aState.changePercent}%") else null
+                }
+
+                val messageToShow = analyticsInsight?.let { "${it.first} · ${it.second}" } ?: insight.message
+                val actionTextToShow = analyticsInsight?.let { "View analytics" } ?: insight.actionText
+
                 InsightCard(
-                    message = insight.message,
-                    actionText = insight.actionText,
+                    message = messageToShow,
+                    actionText = actionTextToShow,
                     onAction = {
-                        when (val t = insight.target) {
-                            is InsightTarget.AnalyticsRoot -> onNavigateToAnalytics?.invoke()
-                            is InsightTarget.AnalyticsCategory -> {
-                                // Navigate to analytics; host can decide how to apply category filter
-                                onNavigateToAnalytics?.invoke()
-                            }
+                        if (analyticsInsight != null) {
+                            onNavigateToAnalytics?.invoke()
+                        } else {
+                            when (val t = insight.target) {
+                                is InsightTarget.AnalyticsRoot -> onNavigateToAnalytics?.invoke()
+                                is InsightTarget.AnalyticsCategory -> {
+                                    onNavigateToAnalytics?.invoke()
+                                }
 
-                            is InsightTarget.AnalyticsMerchant -> {
-                                onNavigateToAnalytics?.invoke()
-                            }
+                                is InsightTarget.AnalyticsMerchant -> {
+                                    onNavigateToAnalytics?.invoke()
+                                }
 
-                            is InsightTarget.TransactionDetail -> {
-                                onNavigateToTransaction?.invoke(t.txId)
-                            }
+                                is InsightTarget.TransactionDetail -> {
+                                    onNavigateToTransaction?.invoke(t.txId)
+                                }
 
-                            is InsightTarget.BudgetDetailByCategory -> {
-                                // Need to resolve budget name, limit and spent via ViewModel (suspend)
-                                coroutineScope.launch {
-                                    val args = try {
-                                        vm.getBudgetDetailArgs(t.category)
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                    if (args != null) {
-                                        onNavigateToBudgetDetail?.invoke(args.first, args.second, args.third)
-                                    } else {
-                                        // Fallback to budget list
-                                        onNavigateToBudget?.invoke()
+                                is InsightTarget.BudgetDetailByCategory -> {
+                                    coroutineScope.launch {
+                                        val args = try {
+                                            vm.getBudgetDetailArgs(t.category)
+                                        } catch (e: Exception) {
+                                            null
+                                        }
+                                        if (args != null) {
+                                            onNavigateToBudgetDetail?.invoke(args.first, args.second, args.third)
+                                        } else {
+                                            onNavigateToBudget?.invoke()
+                                        }
                                     }
                                 }
                             }
@@ -436,6 +482,7 @@ private fun SpendThisMonthCard(
     budgetLeft: Double,
     monthlyChange: MonthlyChangeData,
     fmt: NumberFormat,
+    currencyCode: String = "INR",
 ) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -482,7 +529,7 @@ private fun SpendThisMonthCard(
                     )
                 }
             }
-            // Divider + mini stats
+            // Divider + mini stats (abbreviated values like Cr/L)
             HorizontalDivider(
                 modifier = Modifier.padding(top = 16.dp),
                 color = MaterialTheme.colorScheme.outline.copy(0.3f),
@@ -490,21 +537,24 @@ private fun SpendThisMonthCard(
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
             ) {
-                MiniStat(
-                    label = "Income", value = income.toCurrency(fmt), modifier = Modifier.weight(1f)
-                )
+                // Abbreviated display: prefer Crore/Lakh when large
+                val symbol = remember(currencyCode) {
+                    runCatching {
+                        Currency.getInstance(currencyCode).getSymbol(Locale.getDefault())
+                    }.getOrDefault("")
+                }
+                val incomeAbbrev = remember(income, currencyCode) { formatAbbreviatedAmount(income, currencyCode) }
+                val savingsAbbrev = remember(savings, currencyCode) { formatAbbreviatedAmount(savings, currencyCode) }
+                val totalLeft = remember(income, monthlySpend) { (income - monthlySpend).coerceAtLeast(0.0) }
+                val leftAbbrev = remember(totalLeft, currencyCode) { formatAbbreviatedAmount(totalLeft, currencyCode) }
+
+                MiniStat(label = "Income", value = "$symbol$incomeAbbrev", modifier = Modifier.weight(1f))
                 VerticalDivider(
                     modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f)
                 )
-                MiniStat(
-                    label = "Savings", value = savings.toCurrency(fmt), modifier = Modifier.weight(1f)
-                )
+                MiniStat(label = "Savings", value = "$symbol$savingsAbbrev", modifier = Modifier.weight(1f))
                 VerticalDivider(modifier = Modifier.height(45.dp), color = MaterialTheme.colorScheme.outline.copy(0.3f))
-                MiniStat(
-                    label = "Left",
-                    value = budgetLeft.toCurrency(fmt),
-                    modifier = Modifier.weight(1f),
-                )
+                MiniStat(label = "Left", value = "$symbol$leftAbbrev", modifier = Modifier.weight(1f))
             }
         }
     }
@@ -543,6 +593,7 @@ private fun QuickActionsRow(
     onAddIncome: () -> Unit,
     onSetBudget: () -> Unit,
     onSavings: () -> Unit,
+    onReports: () -> Unit,
 ) {
     Column {
         Text(
@@ -557,19 +608,19 @@ private fun QuickActionsRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             QuickActionItem(
-                label = "Add expense",
+                label = "Add transactions",
                 bgColor = IconBlue,
                 iconRes = R.drawable.add,
                 onClick = onAddExpense,
                 modifier = Modifier.weight(1f),
             )
-            QuickActionItem(
-                label = "Add income",
-                bgColor = IconOrange,
-                iconRes = R.drawable.add_inocme,
-                onClick = onAddIncome,
-                modifier = Modifier.weight(1f),
-            )
+//            QuickActionItem(
+//                label = "Add income",
+//                bgColor = IconOrange,
+//                iconRes = R.drawable.add_inocme,
+//                onClick = onAddIncome,
+//                modifier = Modifier.weight(1f),
+//            )
             QuickActionItem(
                 label = "Set budget",
                 bgColor = IconGreen,
@@ -578,10 +629,17 @@ private fun QuickActionsRow(
                 modifier = Modifier.weight(1f),
             )
             QuickActionItem(
-                label = "Savings goal",
+                label = "Savings",
                 bgColor = IconPurple,
                 iconRes = R.drawable.savings,
                 onClick = onSavings,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionItem(
+                label = "Reports",
+                bgColor = Color(0xFFEDE9FF),
+                iconRes = R.drawable.report,
+                onClick = onReports,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -658,6 +716,8 @@ private fun BudgetOverviewCard(
     progMul: Float,
     fmt: NumberFormat,
     onDetails: () -> Unit,
+    totalBudget: Double,
+    totalSpent: Double,
 ) {
     // Map BudgetCategoryDisplay → BudgetDisplayItem for the UI
     val displayItems = remember(budgetDisplayItems) {
@@ -721,10 +781,26 @@ private fun BudgetOverviewCard(
                     }
                 }
                 Text(
+                    // If total budget is exceeded or exactly used, show meaningful label
                     text = buildAnnotatedString {
-                        append("$daysLeft more day${if (daysLeft == 1) "" else "s"} · ")
-                        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
-                            append("${safePerDay.toCurrency(fmt)}/day safe to spend")
+                        val exceededTotal = (totalSpent - totalBudget).coerceAtLeast(0.0)
+                        when {
+                            exceededTotal > 0.0 -> {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
+                                    append("Budget exceeded by ${exceededTotal.toCurrency(fmt)}")
+                                }
+                            }
+
+                            budgetLeft == 0.0 -> {
+                                append("100% used")
+                            }
+
+                            else -> {
+                                append("$daysLeft more day${if (daysLeft == 1) "" else "s"} · ")
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
+                                    append("${safePerDay.toCurrency(fmt)}/day safe to spend")
+                                }
+                            }
                         }
                     },
                     fontSize = 11.sp,
@@ -789,11 +865,17 @@ private fun BudgetCategoryItem(
             height = 6.dp,
         )
         Spacer(Modifier.height(4.dp))
+        val exceeded = (item.spent - item.limit).coerceAtLeast(0.0)
+        val remainingText = when {
+            exceeded > 0.0 -> "Budget exceeded by ${exceeded.toCurrency(fmt)}"
+            item.remaining == 0.0 -> "100% used"
+            else -> "${item.remaining.toCurrency(fmt)} left this month"
+        }
         Text(
-            text = "${item.remaining.toCurrency(fmt)} left this month",
+            text = remainingText,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = barColor,
+            color = if (exceeded > 0.0) MaterialTheme.colorScheme.error else barColor,
         )
     }
 }
@@ -1017,17 +1099,24 @@ fun PendingSmsBanner(
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(
                 modifier = Modifier.size(40.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(1.5f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(0.15f)),
                 contentAlignment = Alignment.Center,
-            ) { Text("💳", fontSize = 18.sp) }
+            ) {
+                Icon(
+                    painterResource(R.drawable.card),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier= Modifier.size(20.dp),
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "$count new transaction${if (count > 1) "s" else ""} detected",
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -1145,13 +1234,13 @@ private fun SavingsGoalRow(
     ) {
         // Coloured icon bubble (emoji)
         Box(
-            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(iconBg),
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary.copy(0.15f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painter = painterResource(id = goalIconToDrawable(goal.icon)),
                 contentDescription = goal.name,
-                tint = MaterialTheme.colorScheme.onBackground,
+                tint = Color.Unspecified,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -1224,6 +1313,7 @@ private fun HomeTabContentPreview() {
                         budgetLeft = 26000.0,
                         monthlyChange = MonthlyChangeData(percentChange = 12.0, prevMonthLabel = "Feb"),
                         fmt = fmt,
+                        currencyCode = "INR",
                     )
                 }
                 item {
@@ -1232,6 +1322,7 @@ private fun HomeTabContentPreview() {
                         onAddIncome = {},
                         onSetBudget = {},
                         onSavings = {},
+                        onReports = {},
                     )
                 }
                 item { SpendingTrendsCard() }
@@ -1290,6 +1381,8 @@ private fun BudgetOverviewPreview() {
             progMul = 1f,
             fmt = fmt,
             onDetails = {},
+            totalBudget = 7000.0,
+            totalSpent = 3500.0,
         )
     }
 }
@@ -1321,6 +1414,24 @@ private fun InsightCardPreview() {
                 actionText = "Review food spending",
                 onAction = {})
         }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UPI PERMISSION HANDLER
+// Re-checks hasNotificationAccess on every Activity resume so the banner
+// disappears the moment the user enables access in Settings and returns.
+// ══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun UpiPermissionHandler(vm: HomeViewModel) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refreshNotificationAccess()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 

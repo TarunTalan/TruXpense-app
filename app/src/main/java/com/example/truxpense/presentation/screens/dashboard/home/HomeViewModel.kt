@@ -15,6 +15,7 @@ import com.example.truxpense.data.repository.income.IncomeRepository
 import com.example.truxpense.data.repository.savings.SavingsGoalUi
 import com.example.truxpense.data.repository.savings.SavingsRepository
 import com.example.truxpense.data.repository.sms.PendingTransactionRepository
+import com.example.truxpense.service.upi.UpiPermissionHelper
 import com.google.android.gms.auth.api.identity.Identity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -43,6 +44,10 @@ class HomeViewModel @Inject constructor(
     private val _hasSmsPermission = MutableStateFlow(
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
     )
+    private val _hasNotificationAccess = MutableStateFlow(
+        UpiPermissionHelper.hasAccess(context)
+    )
+    val hasNotificationAccess: StateFlow<Boolean> = _hasNotificationAccess.asStateFlow()
     val hasSmsPermission: StateFlow<Boolean> = _hasSmsPermission.asStateFlow()
 
     private val _requestSmsPermission = MutableSharedFlow<Unit>(replay = 0)
@@ -60,6 +65,25 @@ class HomeViewModel @Inject constructor(
 
     fun emitRequestSmsPermission() {
         viewModelScope.launch { _requestSmsPermission.emit(Unit) }
+    }
+
+    // ── UPI notification-listener access ─────────────────────────────────────
+
+    /**
+     * Re-checks whether the user has granted notification-listener access.
+     * Call this on every Activity resume (via [DisposableEffect]) so the
+     * banner disappears the moment they enable it in Settings and return.
+     */
+    fun refreshNotificationAccess() {
+        _hasNotificationAccess.value = UpiPermissionHelper.hasAccess(context)
+    }
+
+    /**
+     * Deep-links the user to the system "Notification access" settings screen
+     * so they can enable [UpiNotificationListenerService].
+     */
+    fun openNotificationAccessSettings() {
+        UpiPermissionHelper.openSettings(context)
     }
 
     // ── Pending SMS transactions ──────────────────────────────────────────────

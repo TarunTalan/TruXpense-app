@@ -16,7 +16,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.AndroidUiModes
 import androidx.compose.ui.tooling.preview.Preview
@@ -362,13 +361,12 @@ private fun GoalAllocationCard(
     val needAmt = (goal.targetAmount - alloc).coerceAtLeast(0.0)
     val isComplete = alloc >= goal.targetAmount
 
-    // Slider bounds — lower end is the already-saved amount; upper is the target
-    val sliderMin = goal.savedAmount.toFloat()
-    val sliderMax = goal.targetAmount.toFloat()
-    val sliderRange = (sliderMax - sliderMin).coerceAtLeast(0f)
+    // Slider bounds — handle cases where savedAmount may be greater than targetAmount
+    val sliderLower = minOf(goal.savedAmount.toFloat(), goal.targetAmount.toFloat())
+    val sliderUpper = maxOf(goal.savedAmount.toFloat(), goal.targetAmount.toFloat())
+    val sliderRange = (sliderUpper - sliderLower).coerceAtLeast(0f)
     // ₹100 per step; coerce into [0, 999] as required by Slider API
-    val steps = if (sliderRange > 0) ((sliderRange / 100f).toInt() - 1).coerceIn(0, 999)
-    else 0
+    val steps = if (sliderRange > 0f) ((sliderRange / 100f).toInt() - 1).coerceIn(0, 999) else 0
 
     var inputText by remember(alloc) { mutableStateOf(alloc.toLong().toString()) }
 
@@ -462,14 +460,16 @@ private fun GoalAllocationCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SimpleTextField(
+                        SimpleTextField(
                     value = inputText,
                     onValueChange = { raw ->
                         val digits = raw.filter { it.isDigit() }
                         inputText = digits
-                        digits.toDoubleOrNull()?.let {
-                            onSliderChange(it.coerceIn(sliderMin.toDouble(), sliderMax.toDouble()))
-                        }
+                                digits.toDoubleOrNull()?.let {
+                                    // coerce into safe slider bounds
+                                    val clamped = it.coerceIn(sliderLower.toDouble(), sliderUpper.toDouble())
+                                    onSliderChange(clamped)
+                                }
                     },
                     prefix = {
                         Text(
@@ -526,9 +526,10 @@ private fun GoalAllocationCard(
                 }
 
                 Slider(
-                    value = alloc.toFloat().coerceIn(sliderMin, sliderMax),
+                    // ensure value and range use lower/upper to avoid empty range exceptions
+                    value = alloc.toFloat().coerceIn(sliderLower, sliderUpper),
                     onValueChange = { onSliderChange(it.toDouble()) },
-                    valueRange = sliderMin..sliderMax,
+                    valueRange = sliderLower..sliderUpper,
                     steps = steps,
                     modifier = Modifier.weight(1f),
                     // Custom thumb: 14dp circle — visually smaller than the 20dp default
@@ -541,11 +542,9 @@ private fun GoalAllocationCard(
                     // Custom track: solid teal active portion, no interval-color override
                     track = { sliderState ->
                         val filled =
-                            if (sliderMax > sliderMin) ((sliderState.value - sliderMin) / (sliderMax - sliderMin)).coerceIn(
-                                0f,
-                                1f
-                            )
-                            else 0f
+                            if (sliderUpper > sliderLower) {
+                                ((sliderState.value - sliderLower) / (sliderUpper - sliderLower)).coerceIn(0f, 1f)
+                            } else 0f
                         Box(
                             modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(999.dp))
                                 .background(primary.copy(alpha = 0.14f)),

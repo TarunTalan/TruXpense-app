@@ -62,7 +62,8 @@ fun GoalDetailScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val monthlyData by vm.monthlyData.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) { vm.completedEvent.collect { onGoalCompleted() } }
+    LaunchedEffect("completedEvent") { vm.completedEvent.collect { onGoalCompleted() } }
+    LaunchedEffect("deleteEvent") { vm.deleteEvent.collect { onBack() } }
 
     val goal = state.goal ?: return
     GoalDetailScreenContent(
@@ -71,7 +72,7 @@ fun GoalDetailScreen(
         monthlyData = monthlyData,
         onBack = onBack,
         onEdit = { onEdit(goal.id) },
-        onDelete = { vm.deleteGoal { onBack() } },
+        onDelete = { vm.deleteGoal() },
         onAddContribution = { amt -> vm.addContribution(amt) },
     )
 }
@@ -215,40 +216,52 @@ fun GoalDetailScreenContent(
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // ── TopBar ────────────────────────────────────────────────────────────
         ScreenTopBar(
-            headerTitle = "Active Goals",
+            headerTitle = if (goal.isCompleted) "Completed Goal" else "Active Goals",
             showBack = true,
             onBack = onBack,
             actions = {
-                Box {
-                    IconButton(onClick = { menuOpen = !menuOpen }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                if (goal.isCompleted) {
+                    // Completed goal: show a direct delete icon to make deletion primary and quicker
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            painterResource(R.drawable.delete),
+                            contentDescription = "Delete goal",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
                     }
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit goal") },
-                            leadingIcon = {
-                                Icon(
-                                    painterResource(R.drawable.edit),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            },
-                            onClick = { menuOpen = false; onEdit() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete Goal", color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = {
-                                Icon(
-                                    painterResource(R.drawable.delete),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            },
-                            onClick = { menuOpen = false; showDeleteDialog = true },
-                        )
+                } else {
+                    Box {
+                        IconButton(onClick = { menuOpen = !menuOpen }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit goal") },
+                                leadingIcon = {
+                                    Icon(
+                                        painterResource(R.drawable.edit),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = { menuOpen = false; onEdit() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete Goal", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = {
+                                    Icon(
+                                        painterResource(R.drawable.delete),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = { menuOpen = false; showDeleteDialog = true },
+                            )
+                        }
                     }
                 }
             },
@@ -501,18 +514,20 @@ fun GoalDetailScreenContent(
                 }
             }
 
-            // ── Add savings button ────────────────────────────────────────────
-            Button(
-                onClick = { showAddSheet = true },
-                modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
-                shape = RoundedCornerShape(DashboardDimens.cornerCard),
-                colors = ButtonDefaults.buttonColors(containerColor = primary),
-            ) {
-                Text(
-                    "Add savings",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
+            // ── Add savings button (hidden for completed goals) ──────────────
+            if (!goal.isCompleted) {
+                Button(
+                    onClick = { showAddSheet = true },
+                    modifier = Modifier.fillMaxWidth().height(DashboardDimens.buttonHeight),
+                    shape = RoundedCornerShape(DashboardDimens.cornerCard),
+                    colors = ButtonDefaults.buttonColors(containerColor = primary),
+                ) {
+                    Text(
+                        "Add savings",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -684,4 +699,3 @@ private fun PreviewGoalDetailEmpty() {
         )
     }
 }
-

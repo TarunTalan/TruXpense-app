@@ -30,9 +30,12 @@ class DistributeViewModel @Inject constructor(
         repository.goals,
         _allocations,
     ) { total, goals, allocs ->
-        // seed allocations for new goals
+        // seed allocations for new goals and ensure values are clamped between savedAmount and targetAmount
         val seeded = goals.associate { g ->
-            g.id to (allocs[g.id] ?: g.savedAmount)
+            val raw = allocs[g.id] ?: g.savedAmount
+            val lower = minOf(g.savedAmount, g.targetAmount)
+            val upper = maxOf(g.savedAmount, g.targetAmount)
+            g.id to raw.coerceIn(lower, upper)
         }
         if (allocs.isEmpty() && goals.isNotEmpty()) {
             _allocations.value = seeded
@@ -49,7 +52,13 @@ class DistributeViewModel @Inject constructor(
         repository.goals,
         _allocations,
     ) { goals, allocs ->
-        goals.sumOf { (allocs[it.id] ?: it.savedAmount) - it.savedAmount }
+        goals.sumOf { g ->
+            val raw = allocs[g.id] ?: g.savedAmount
+            val lower = minOf(g.savedAmount, g.targetAmount)
+            val upper = maxOf(g.savedAmount, g.targetAmount)
+            val clamped = raw.coerceIn(lower, upper)
+            (clamped - g.savedAmount)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
     fun adjust(goalId: Long, delta: Double) {

@@ -21,19 +21,15 @@ data class SavingsGoal(
     val autoContributeFrequency: ContributeFrequency = ContributeFrequency.DAILY,
     val createdAt: Long = System.currentTimeMillis(),
     val isCompleted: Boolean = false,
+    val celebrationShown: Boolean = false,
 )
 
 enum class ContributeFrequency { DAILY, WEEKLY, MONTHLY }
 
 @Entity(
-    tableName = "savings_contributions",
-    foreignKeys = [ForeignKey(
-        entity = SavingsGoal::class,
-        parentColumns = ["id"],
-        childColumns = ["goalId"],
-        onDelete = ForeignKey.CASCADE
-    )],
-    indices = [Index("goalId")]
+    tableName = "savings_contributions", foreignKeys = [ForeignKey(
+        entity = SavingsGoal::class, parentColumns = ["id"], childColumns = ["goalId"], onDelete = ForeignKey.CASCADE
+    )], indices = [Index("goalId")]
 )
 data class SavingsContribution(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -79,6 +75,9 @@ interface SavingsDao {
 
     @Query("UPDATE savings_goals SET isCompleted = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long)
+
+    @Query("UPDATE savings_goals SET celebrationShown = 1 WHERE id = :id")
+    suspend fun markCelebrationShown(id: Long)
 
     // Contributions
     @Query("SELECT * FROM savings_contributions WHERE goalId = :goalId ORDER BY timestampMs DESC LIMIT 20")

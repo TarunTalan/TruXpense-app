@@ -21,10 +21,10 @@ data class SavingsGoalUi(
     val autoContributeAmount: Double,
     val autoContributeFrequency: ContributeFrequency,
     val isCompleted: Boolean,
+    val celebrationShown: Boolean = false,
 ) {
     val progressFraction: Float
-        get() =
-            if (targetAmount <= 0) 0f else (savedAmount / targetAmount).toFloat().coerceIn(0f, 1f)
+        get() = if (targetAmount <= 0) 0f else (savedAmount / targetAmount).toFloat().coerceIn(0f, 1f)
 
     val progressPercent: Int get() = (progressFraction * 100).toInt()
 
@@ -40,8 +40,9 @@ data class SavingsGoalUi(
         return try {
             val millis = targetDateEpoch * 86_400_000L
             val cal = java.util.Calendar.getInstance().also { it.timeInMillis = millis }
-            val month = cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, java.util.Locale.getDefault())
-                ?: ""
+            val month =
+                cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, java.util.Locale.getDefault())
+                    ?: ""
             "$month ${cal.get(java.util.Calendar.YEAR)}"
         } catch (e: Exception) {
             ""
@@ -63,11 +64,9 @@ data class SavingsContributionUi(
             diff < 86_400_000 -> "Today · ${formatTime(timestampMs)}"
             diff < 172_800_000 -> "Yesterday · ${formatTime(timestampMs)}"
             else -> {
-                val cal = java.util.Calendar.getInstance()
-                    .also { it.timeInMillis = timestampMs }
+                val cal = java.util.Calendar.getInstance().also { it.timeInMillis = timestampMs }
                 val month = cal.getDisplayName(
-                    java.util.Calendar.MONTH,
-                    java.util.Calendar.SHORT, java.util.Locale.getDefault()
+                    java.util.Calendar.MONTH, java.util.Calendar.SHORT, java.util.Locale.getDefault()
                 ) ?: ""
                 "$month ${cal.get(java.util.Calendar.DAY_OF_MONTH)} · ${formatTime(timestampMs)}"
             }
@@ -93,8 +92,7 @@ data class SavingsEntryUi(
     fun dateDisplay(): String {
         val cal = java.util.Calendar.getInstance().also { it.timeInMillis = timestampMs }
         val month = cal.getDisplayName(
-            java.util.Calendar.MONTH,
-            java.util.Calendar.SHORT, java.util.Locale.getDefault()
+            java.util.Calendar.MONTH, java.util.Calendar.SHORT, java.util.Locale.getDefault()
         ) ?: ""
         return "$month ${cal.get(java.util.Calendar.DAY_OF_MONTH)}"
     }
@@ -116,8 +114,7 @@ class SavingsRepository @Inject constructor(private val dao: SavingsDao) {
     fun contributions(goalId: Long): Flow<List<SavingsContributionUi>> =
         dao.observeContributions(goalId).map { list -> list.map { it.toUi() } }
 
-    val recentSavingsEntries: Flow<List<SavingsEntryUi>> =
-        dao.observeEntries().map { list -> list.map { it.toUi() } }
+    val recentSavingsEntries: Flow<List<SavingsEntryUi>> = dao.observeEntries().map { list -> list.map { it.toUi() } }
 
     val totalSavings: Flow<Double> = dao.observeTotalSavings()
 
@@ -142,6 +139,8 @@ class SavingsRepository @Inject constructor(private val dao: SavingsDao) {
         }
     }
 
+    suspend fun markCelebrationShown(id: Long) = dao.markCelebrationShown(id)
+
     /** Bulk-set savedAmount for distribution confirm */
     suspend fun distributeGoals(allocations: Map<Long, Double>) {
         allocations.forEach { (id, amount) -> dao.setSaved(id, amount) }
@@ -162,17 +161,18 @@ class SavingsRepository @Inject constructor(private val dao: SavingsDao) {
     private fun SavingsGoal.toUi() = SavingsGoalUi(
         id, name, icon, colorHex,
         targetAmount, savedAmount, targetDateEpoch,
-        autoContribute, autoContributeAmount, autoContributeFrequency, isCompleted
+        autoContribute, autoContributeAmount, autoContributeFrequency,
+        isCompleted, celebrationShown,
     )
 
     private fun SavingsGoalUi.toEntity() = SavingsGoal(
         id, name, icon, colorHex,
         targetAmount, savedAmount, targetDateEpoch,
-        autoContribute, autoContributeAmount, autoContributeFrequency, isCompleted = isCompleted
+        autoContribute, autoContributeAmount, autoContributeFrequency,
+        isCompleted = isCompleted, celebrationShown = celebrationShown,
     )
 
-    private fun SavingsContribution.toUi() =
-        SavingsContributionUi(id, goalId, amount, label, timestampMs)
+    private fun SavingsContribution.toUi() = SavingsContributionUi(id, goalId, amount, label, timestampMs)
 
     private fun SavingsEntry.toUi() = SavingsEntryUi(id, label, amount, timestampMs)
 }

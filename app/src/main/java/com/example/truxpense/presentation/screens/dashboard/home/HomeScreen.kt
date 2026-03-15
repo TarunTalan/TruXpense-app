@@ -13,7 +13,9 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,31 +35,28 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.truxpense.notification.deeplink.NotificationDeepLink
 import com.example.truxpense.presentation.navigation.*
+import com.example.truxpense.presentation.screens.dashboard.add.AddTransactionScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsEmptyScreen
 import com.example.truxpense.presentation.screens.dashboard.analytics.AnalyticsScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.AddBudgetScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.budget.BudgetTab
+import com.example.truxpense.presentation.screens.dashboard.components.AddFab
 import com.example.truxpense.presentation.screens.dashboard.components.AppConfirmDialog
 import com.example.truxpense.presentation.screens.dashboard.components.DashboardBottomBar
 import com.example.truxpense.presentation.screens.dashboard.components.SmsPermissionBanner
-import com.example.truxpense.presentation.screens.dashboard.expense.AddExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.expense.EditExpenseScreen
 import com.example.truxpense.presentation.screens.dashboard.income.EditIncomeScreen
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationDeepLinkViewModel
 import com.example.truxpense.presentation.screens.dashboard.notifications.NotificationScreen
 import com.example.truxpense.presentation.screens.dashboard.report.CreateReportScreen
-import com.example.truxpense.presentation.screens.dashboard.savings.AddSavingsScreen
-import com.example.truxpense.presentation.screens.dashboard.savings.CreateGoalScreen
-import com.example.truxpense.presentation.screens.dashboard.savings.DistributiveScreen
-import com.example.truxpense.presentation.screens.dashboard.savings.GoalDetailScreen
-import com.example.truxpense.presentation.screens.dashboard.savings.SavingsScreen
+import com.example.truxpense.presentation.screens.dashboard.savings.*
 import com.example.truxpense.presentation.screens.dashboard.settings.*
 import com.example.truxpense.presentation.screens.dashboard.sms.PendingTransactionsScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionDetailScreen
 import com.example.truxpense.presentation.screens.dashboard.transaction.TransactionsScreen
+import com.example.truxpense.presentation.screens.dashboard.vault.VaultScreen
 import com.example.truxpense.presentation.screens.premium.PremiumNavHost
-import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 
 // Dashboard shell: owns the NavController and tab routing
@@ -79,8 +78,12 @@ fun DashboardScreen(
         deepLinkVm.pendingDeepLink.collect { link ->
             when (link) {
 
-                // Daily expense reminder → Add Expense screen
-                is NotificationDeepLink.AddExpense -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
+                // Daily expense reminder → unified Add Transaction (Expense tab)
+                is NotificationDeepLink.AddExpense -> dashboardNavController.safeNavigate(
+                    Screen.Dashboard.Home.addTransactionRoute(
+                        tab = 0
+                    )
+                )
 
                 // Budget reset / budget tab notification → Budget list screen
                 is NotificationDeepLink.BudgetTab -> dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
@@ -166,6 +169,11 @@ fun DashboardScreen(
         derivedStateOf { currentDestination?.route in topLevelRoutes }
     }
 
+    // Hide certain top-level UI like the FAB on specific tabs (Settings)
+    val isSettingsDestination by remember(currentDestination) {
+        derivedStateOf { currentDestination?.route == Screen.Dashboard.Settings.Root }
+    }
+
     fun isTabSelected(tab: BottomNavBarMenu): Boolean =
         currentDestination?.hierarchy?.any { it.route == tab.route } == true
 
@@ -189,6 +197,20 @@ fun DashboardScreen(
                 }
             }
         },
+        floatingActionButton = {
+            AnimatedVisibility(
+                // show FAB only on top-level destinations except the Settings tab
+                visible = isTopLevelDestination && !isSettingsDestination,
+                enter = fadeIn(),
+                exit = ExitTransition.None,
+            ) {
+                AddFab(
+                    onClick = { dashboardNavController.safeNavigate(Screen.Dashboard.Home.addTransactionRoute(tab = 0)) },
+                    contentDescription = "Add transaction",
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End,
     ) { innerPadding ->
 
         val bottomBarPadding = innerPadding.calculateBottomPadding()
@@ -232,13 +254,20 @@ fun DashboardScreen(
                     HomeTabScreen(
                         vm = vm,
                         onAddExpense = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.addTransactionRoute(tab = 0))
                         },
                         onAddIncome = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddIncome)
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.addTransactionRoute(tab = 1))
                         },
                         onNavigateToBudget = {
-                            // Open Add Budget screen directly from Quick Actions "Set budget"
+                            // Navigate to Budget tab (used by BudgetOverview Details)
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Root) {
+                                popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true; restoreState = true
+                            }
+                        },
+                        onSetBudget = {
+                            // Quick Action 'Set budget' should open Add Budget screen
                             dashboardNavController.safeNavigate(Screen.Dashboard.Budget.Add)
                         },
                         onViewAll = {
@@ -257,8 +286,10 @@ fun DashboardScreen(
                             dashboardNavController.safeNavigate(Screen.Dashboard.Sms.PendingReview)
                         },
                         onSavings = {
-                            // Navigate to Savings screen instead of premium paywall
                             dashboardNavController.safeNavigate(Screen.Dashboard.Home.Savings)
+                        },
+                        onReports = {
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Report.Hub)
                         },
                         onNavigateToAnalytics = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.Root) {
@@ -270,21 +301,14 @@ fun DashboardScreen(
                 }
             }
 
+            // Unified AddTransaction screen (Home tab)
             composable(
-                route = Screen.Dashboard.Home.AddExpense,
-                enterTransition = { slideInFromRight() },
-            ) {
-                AddExpenseScreen(
-                    onBack = { dashboardNavController.popBackStack() },
-                    onSave = { _ -> dashboardNavController.popBackStack() },
-                )
-            }
-
-            composable(
-                route = Screen.Dashboard.Home.AddIncome,
-                enterTransition = { slideInFromRight() },
-            ) {
-                com.example.truxpense.presentation.screens.dashboard.income.AddIncomeScreen(
+                route = Screen.Dashboard.Home.AddTransaction,
+                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+            ) { backStackEntry ->
+                val initialTab = backStackEntry.arguments?.getInt("tab") ?: 0
+                AddTransactionScreen(
+                    initialTab = initialTab,
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
@@ -308,6 +332,11 @@ fun DashboardScreen(
                         )
                     },
                     onDistribute = { dashboardNavController.safeNavigate(Screen.Dashboard.Home.SavingsDistribute) },
+                    onGoalCompleted = { goalName, savedAmount ->
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Home.goalCompletedRoute(goalName, savedAmount)
+                        )
+                    },
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
@@ -364,9 +393,10 @@ fun DashboardScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onEdit = { id -> dashboardNavController.safeNavigate(Screen.Dashboard.Home.savingsEditRoute(id)) },
                     onGoalCompleted = {
-                        // Pop detail, then navigate to completed screen
                         dashboardNavController.popBackStack()
-                        dashboardNavController.safeNavigate("home/savings/completed")
+                        dashboardNavController.safeNavigate(
+                            Screen.Dashboard.Home.goalCompletedRoute("Goal", 0.0)
+                        )
                     },
                 )
             }
@@ -381,6 +411,33 @@ fun DashboardScreen(
                 DistributiveScreen(
                     onBack = { dashboardNavController.popBackStack() },
                     onConfirmed = { dashboardNavController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = Screen.Dashboard.Home.SavingsGoalCompleted,
+                arguments = listOf(
+                    navArgument("goalName") { type = NavType.StringType },
+                    navArgument("savedAmount") { type = NavType.FloatType },
+                ),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() },
+            ) { back ->
+                GoalCompletedScreen(
+                    goalName = back.arguments?.getString("goalName") ?: "",
+                    savedAmount = back.arguments?.getFloat("savedAmount")?.toDouble() ?: 0.0,
+                    onSetNewGoal = {
+                        dashboardNavController.navigate(Screen.Dashboard.Home.SavingsCreateGoal) {
+                            popUpTo(Screen.Dashboard.Home.SavingsGoalCompleted) { inclusive = true }
+                        }
+                    },
+                    onGoHome = {
+                        dashboardNavController.popBackStack(
+                            Screen.Dashboard.Home.Savings, inclusive = false
+                        )
+                    },
                 )
             }
 
@@ -419,10 +476,24 @@ fun DashboardScreen(
                             )
                         },
                         onAddTransaction = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense)
+                            // Navigate to the unified AddTransaction screen for Transactions tab
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.addTransactionRoute(tab = 0))
                         },
                     )
                 }
+            }
+
+            // Unified Add Transaction screen (Transactions tab)
+            composable(
+                route = Screen.Dashboard.Transactions.AddTransaction,
+                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+                enterTransition = { slideInFromRight() },
+            ) { backStackEntry ->
+                val initialTab = backStackEntry.arguments?.getInt("tab") ?: 0
+                AddTransactionScreen(
+                    initialTab = initialTab,
+                    onBack = { dashboardNavController.popBackStack() },
+                )
             }
 
             composable(
@@ -593,7 +664,8 @@ fun DashboardScreen(
                 Box(Modifier.fillMaxSize().padding(bottom = bottomBarPadding)) {
                     AnalyticsTab(
                         onAddExpense = {
-                            dashboardNavController.safeNavigate(Screen.Dashboard.Analytics.AddExpense)
+                            // Open unified AddTransaction (expense tab)
+                            dashboardNavController.safeNavigate(Screen.Dashboard.Home.addTransactionRoute(tab = 0))
                         },
                         onGenerateReport = {
                             dashboardNavController.safeNavigate(Screen.Dashboard.Report.Create)
@@ -602,15 +674,7 @@ fun DashboardScreen(
                 }
             }
 
-            composable(
-                route = Screen.Dashboard.Analytics.AddExpense,
-                enterTransition = { slideInFromRight() },
-            ) {
-                AddExpenseScreen(
-                    onBack = { dashboardNavController.popBackStack() },
-                    onSave = { _ -> dashboardNavController.popBackStack() },
-                )
-            }
+            // Analytics uses unified AddTransaction route for adding an expense
 
             // ══════════════════════════════════════════════════════════════════
             // SETTINGS TAB  — no animation on tab switch
@@ -860,8 +924,8 @@ fun DashboardScreen(
                         )
                     },
                     onNavigateToAddExpense = {
-                        // Push AddExpense on top — back returns to Notification
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.AddExpense) {
+                        // Push unified AddTransaction (expense tab) on top — back returns to Notification
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Home.addTransactionRoute(tab = 0)) {
                             launchSingleTop = true
                         }
                     },
@@ -879,6 +943,22 @@ fun DashboardScreen(
             composable(Screen.Dashboard.Sms.PendingReview, enterTransition = { slideInFromRight() }) {
                 PendingTransactionsScreen(
                     onBack = { dashboardNavController.popBackStack() })
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // REPORTS HUB (full-screen, no bottom bar)
+            // Entry point from the "Reports" quick action on Home.
+            // Shows recent reports list + Generate + Vault entry point.
+            // ══════════════════════════════════════════════════════════════════
+            composable(Screen.Dashboard.Report.Hub, enterTransition = { slideInFromRight() }) {
+                com.example.truxpense.presentation.screens.dashboard.report.ReportsScreen(
+                    onBack = { dashboardNavController.popBackStack() },
+                    onGenerateReport = { dashboardNavController.safeNavigate(Screen.Dashboard.Report.Create) },
+                    onReportClick = { reportId ->
+                        dashboardNavController.safeNavigate(Screen.Dashboard.Report.detailRoute(reportId))
+                    },
+                    onOpenVault = { dashboardNavController.safeNavigate(Screen.Dashboard.Vault.Root) },
+                )
             }
 
             // ══════════════════════════════════════════════════════════════════
@@ -904,6 +984,16 @@ fun DashboardScreen(
                 val reportId = backStackEntry.arguments?.getString("reportId") ?: ""
                 com.example.truxpense.presentation.screens.dashboard.report.ReportDetailScreen(
                     reportId = reportId,
+                    onBack = { dashboardNavController.popBackStack() },
+                    onNavigateToVault = { dashboardNavController.safeNavigate(Screen.Dashboard.Vault.Root) },
+                )
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // VAULT (full-screen, no bottom bar)
+            // ══════════════════════════════════════════════════════════════════
+            composable(Screen.Dashboard.Vault.Root, enterTransition = { slideInFromRight() }) {
+                VaultScreen(
                     onBack = { dashboardNavController.popBackStack() },
                 )
             }
