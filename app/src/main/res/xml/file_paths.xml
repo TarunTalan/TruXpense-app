@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+        Covers getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+        which is where ReportExporter writes all PDF / CSV / Excel files.
+        The path value must match the sub-folder used in ReportExporter.outputFile():
+            File(context.getExternalFilesDir(DIRECTORY_DOCUMENTS), "TruXpense")
+    -->
+    <external-files-path
+            name="truxpense_exports"
+            path="Documents/TruXpense/" />
+
+    <!--
+        Fallback: covers any file written directly to getExternalFilesDir()
+        without a sub-folder, just in case the path changes in the future.
+    -->
+    <external-files-path
+            name="truxpense_exports_root"
+            path="Documents/" />
+</paths>
