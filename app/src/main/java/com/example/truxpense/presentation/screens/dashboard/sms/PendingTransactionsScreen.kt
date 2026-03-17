@@ -150,7 +150,7 @@ private fun PendingTransactionCard(
                 }
 
                 Text(
-                    text = "$amountSign${currencyFmt.format(transaction.amount)}",
+                    text = "$amountSign${currencyFmt.format(kotlin.math.abs(transaction.amount))}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = amountColor

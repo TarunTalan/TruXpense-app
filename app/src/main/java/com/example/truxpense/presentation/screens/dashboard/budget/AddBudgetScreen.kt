@@ -152,9 +152,8 @@ fun AddBudgetScreenContent(
             modifier = Modifier.fillMaxSize().padding(innerPadding)             // tracks bottomBar height automatically
                 .padding(horizontal = DashboardDimens.screenPaddingH).verticalScroll(rememberScrollState())
                 .clearFocusOnTap(),                // tap outside a field → dismiss keyboard
-            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceXl),
         ) {
-            Spacer(Modifier.height(DashboardDimens.spaceMd))
 
             // ── Amount input card ─────────────────────────────────────────
             // Wrapped in bringIntoViewRequester so the keyboard doesn't
@@ -170,28 +169,47 @@ fun AddBudgetScreenContent(
                 },
             )
 
-            // ── Category picker card ──────────────────────────────────────
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(DashboardDimens.cornerCard),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                elevation = CardDefaults.cardElevation(DashboardDimens.cardElevation),
-            ) {
-                CategoryPickerGrid(
-                    categories = categories,
-                    selected = selected,
-                    onSelect = onSelectCategory,
-                    disabledCategories = existingBudgetedCategories,
-                    label = "Category",
-                    modifier = Modifier.fillMaxWidth().padding(
-                        horizontal = DashboardDimens.screenPaddingH,
-                        vertical = DashboardDimens.spaceMd,
-                    ),
-                )
+            // Custom category state and merged list — mirrors AddExpenseScreen
+            var customIconMap by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+            var extraCategories by remember { mutableStateOf<List<String>>(emptyList()) }
+
+            val mergedCategories = remember(categories, extraCategories) {
+                val customIdx = categories.indexOfFirst { it == AppCategories.CUSTOM }
+                if (customIdx >= 0 && extraCategories.isNotEmpty()) {
+                    categories.toMutableList().also { list ->
+                        list.addAll(customIdx, extraCategories)
+                    }
+                } else {
+                    categories + extraCategories
+                }
             }
 
+            // Resolver: check customIconMap first, fall back to built-in resolver
+            val resolveIcon: (String) -> Int = { cat ->
+                customIconMap.getOrElse(cat) {
+                    com.example.truxpense.presentation.screens.dashboard.components.iconForCategory(
+                        cat
+                    )
+                }
+            }
+
+            CategoryPickerGrid(
+                categories = mergedCategories,
+                selected = selected,
+                onSelect = onSelectCategory,
+                disabledCategories = existingBudgetedCategories,
+                label = "Category",
+                modifier = Modifier,
+                iconResolver = resolveIcon,
+                onCustomCategoryAdded = { name, iconRes ->
+                    if (name !in mergedCategories) {
+                        extraCategories = extraCategories + name
+                    }
+                    customIconMap = customIconMap + (name to iconRes)
+                    // Auto-select the newly created category
+                    onSelectCategory(name)
+                },
+            )
             // ── Budget period info card ───────────────────────────────────
             GradientCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -218,7 +236,7 @@ fun AddBudgetScreenContent(
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
-                modifier = Modifier.padding(horizontal = DashboardDimens.screenPaddingH),
+                modifier = Modifier,
             )
 
             // Bottom guard — ensures last card never sits flush against the

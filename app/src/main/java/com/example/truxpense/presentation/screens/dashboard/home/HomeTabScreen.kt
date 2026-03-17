@@ -787,7 +787,7 @@ private fun BudgetOverviewCard(
                         when {
                             exceededTotal > 0.0 -> {
                                 withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
-                                    append("Budget exceeded by ${exceededTotal.toCurrency(fmt)}")
+                                    append("Over budget by ₹${formatAbbreviatedAmount(exceededTotal)}")
                                 }
                             }
 
@@ -798,13 +798,15 @@ private fun BudgetOverviewCard(
                             else -> {
                                 append("$daysLeft more day${if (daysLeft == 1) "" else "s"} · ")
                                 withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.error)) {
-                                    append("${safePerDay.toCurrency(fmt)}/day safe to spend")
+                                    append("₹${formatAbbreviatedAmount(safePerDay)}/day safe to spend")
                                 }
                             }
                         }
                     },
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
                 )
 
@@ -867,14 +869,16 @@ private fun BudgetCategoryItem(
         Spacer(Modifier.height(4.dp))
         val exceeded = (item.spent - item.limit).coerceAtLeast(0.0)
         val remainingText = when {
-            exceeded > 0.0 -> "Budget exceeded by ${exceeded.toCurrency(fmt)}"
+            exceeded > 0.0 -> "Over by ₹${formatAbbreviatedAmount(exceeded)}"
             item.remaining == 0.0 -> "100% used"
-            else -> "${item.remaining.toCurrency(fmt)} left this month"
+            else -> "₹${formatAbbreviatedAmount(item.remaining)} left"
         }
         Text(
             text = remainingText,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = if (exceeded > 0.0) MaterialTheme.colorScheme.error else barColor,
         )
     }
@@ -1110,7 +1114,7 @@ fun PendingSmsBanner(
                     painterResource(R.drawable.card),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onBackground,
-                    modifier= Modifier.size(20.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -1208,10 +1212,13 @@ private fun SavingsHomeCard(
             if (activeGoals.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.2f))
-                activeGoals.take(3).forEach { goal ->
-                    SavingsGoalRow(goal = goal, fmt = fmt)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.12f))
-                }
+                        val goalsToShow = activeGoals.take(3)
+                        goalsToShow.forEachIndexed { idx, goal ->
+                            SavingsGoalRow(goal = goal, fmt = fmt)
+                            if (idx < goalsToShow.lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(0.12f))
+                            }
+                        }
             }
         }
     }
@@ -1234,7 +1241,8 @@ private fun SavingsGoalRow(
     ) {
         // Coloured icon bubble (emoji)
         Box(
-            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary.copy(0.15f)),
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(0.15f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1267,7 +1275,7 @@ private fun SavingsGoalRow(
             text = "Need ${needed.toCurrency(fmt)}",
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.error,
+            color = MaterialTheme.colorScheme.secondary,
             maxLines = 1,
         )
     }

@@ -21,27 +21,27 @@ class PendingTransactionsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val pendingTransactions: StateFlow<List<ParsedTransaction>> =
-        repository.pendingTransactions
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        repository.pendingTransactions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pendingCount: StateFlow<Int> =
-        repository.pendingCount
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+        repository.pendingCount.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     fun confirm(id: String, category: Category? = null) {
         viewModelScope.launch {
             repository.confirm(id, category)
-            // Also persist to local expense DB so it appears in the Transactions screen
             val tx = pendingTransactions.value.firstOrNull { it.id == id } ?: return@launch
+            val isCredit = tx.type == com.example.truxpense.data.sms.model.TxnType.CREDIT
+            // Credits saved as positive, debits as negative
+            val signedAmount = if (isCredit) kotlin.math.abs(tx.amount) else -kotlin.math.abs(tx.amount)
             expenseRepository.addExpense(
                 Transaction(
                     id = tx.id,
-                    amount = -kotlin.math.abs(tx.amount),   // expenses are negative
+                    amount = signedAmount,
                     category = category?.name?.lowercase()?.replaceFirstChar { it.uppercaseChar() }
                         ?: tx.category.name.lowercase().replaceFirstChar { it.uppercaseChar() },
                     paymentMethod = tx.bank.ifBlank { "UPI" },
                     merchant = tx.merchant ?: "Unknown",
-                    notes = "",
+                    notes = if (isCredit) "UPI Credit" else "",
                     timestamp = tx.timestamp,
                     source = "sms",
                 )
@@ -57,14 +57,16 @@ class PendingTransactionsViewModel @Inject constructor(
         viewModelScope.launch {
             pendingTransactions.value.forEach { tx ->
                 repository.confirm(tx.id)
+                val isCredit = tx.type == com.example.truxpense.data.sms.model.TxnType.CREDIT
+                val signedAmount = if (isCredit) kotlin.math.abs(tx.amount) else -kotlin.math.abs(tx.amount)
                 expenseRepository.addExpense(
                     Transaction(
                         id = tx.id,
-                        amount = -kotlin.math.abs(tx.amount),
+                        amount = signedAmount,
                         category = tx.category.name.lowercase().replaceFirstChar { it.uppercaseChar() },
                         paymentMethod = tx.bank.ifBlank { "UPI" },
                         merchant = tx.merchant ?: "Unknown",
-                        notes = "",
+                        notes = if (isCredit) "UPI Credit" else "",
                         timestamp = tx.timestamp,
                         source = "sms",
                     )
@@ -79,4 +81,3 @@ class PendingTransactionsViewModel @Inject constructor(
         }
     }
 }
-

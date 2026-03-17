@@ -94,8 +94,9 @@ class TransactionNotifier @Inject constructor(
     }
 
     private fun buildTitle(tx: ParsedTransaction): String {
-        val sign   = if (tx.type == TxnType.CREDIT) "+" else "-"
-        val amount = "₹%.2f".format(tx.amount)
+        val sign = if (tx.type == TxnType.CREDIT) "+" else "-"
+        // Ensure we format the absolute amount (avoid double negative when amount stored negative)
+        val amount = "₹%.2f".format(kotlin.math.abs(tx.amount))
         return "${tx.type.label}: $sign$amount${if (tx.merchant != null) " · ${tx.merchant}" else ""}"
     }
 

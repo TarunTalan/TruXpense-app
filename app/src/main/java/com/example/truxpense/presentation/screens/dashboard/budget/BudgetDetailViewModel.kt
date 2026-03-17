@@ -58,6 +58,10 @@ class BudgetDetailViewModel @Inject constructor(
     val canGoForward: StateFlow<Boolean> =
         _periodOffset.map { it < 0 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** True when the user can navigate back (up to 24 periods of history). */
+    val canGoBack: StateFlow<Boolean> =
+        _periodOffset.map { it > -24 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     /**
      * Human-readable label for the currently displayed period.
      * WEEK  → "1–7 Feb 2026"
@@ -109,10 +113,13 @@ class BudgetDetailViewModel @Inject constructor(
         budgets.firstOrNull { it.category == cat }?.amount ?: 0.0
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
-    // ── Live spent amount from Room ───────────────────────────────────────────
+    // ── Live spent amount — filtered to the selected period window ───────────
 
-    val spent: StateFlow<Double> = combine(_categoryName, expenseRepository.transactions) { cat, txs ->
-        txs.filter { it.category == cat }.sumOf { it.amount }
+    val spent: StateFlow<Double> = combine(
+        _categoryName, expenseRepository.transactions, _selectedPeriod, _periodOffset
+    ) { cat, txs, period, offset ->
+        val (winStart, winEnd) = periodWindowMs(period, offset)
+        txs.filter { it.category == cat && it.timestamp in winStart..winEnd }.sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
     // ── Derived ───────────────────────────────────────────────────────────────
@@ -125,11 +132,15 @@ class BudgetDetailViewModel @Inject constructor(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0
     )
 
-    // ── Transactions for this category ────────────────────────────────────────
+    // ── Transactions for this category — filtered to the selected period ──────
 
-    val transactions: StateFlow<List<BudgetTransaction>> =
-        combine(_categoryName, expenseRepository.transactions) { cat, txs ->
-            txs.filter { it.category == cat }.sortedByDescending { it.timestamp }.map { t ->
+    val transactions: StateFlow<List<BudgetTransaction>> = combine(
+        _categoryName, expenseRepository.transactions, _selectedPeriod, _periodOffset
+    ) { cat, txs, period, offset ->
+        val (winStart, winEnd) = periodWindowMs(period, offset)
+        txs.filter { it.category == cat && it.timestamp in winStart..winEnd }
+            .sortedByDescending { it.timestamp }
+            .map { t ->
                 BudgetTransaction(
                     id = t.id,
                     amount = t.amount,
@@ -142,7 +153,7 @@ class BudgetDetailViewModel @Inject constructor(
                     time = formatTime(t.timestamp),
                 )
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // ── Spend chart points (period-aware + offset-aware) ──────────────────────
 
@@ -211,6 +222,37 @@ class BudgetDetailViewModel @Inject constructor(
     }
 
     // ── Chart computation helpers ─────────────────────────────────────────────
+
+    /**
+     * Returns the inclusive [start, end] millisecond range for the period
+     * identified by [period] and [offset].
+     * Used by [spent] and [transactions] to filter to the correct time window.
+     */
+    private fun periodWindowMs(period: PeriodTab, offset: Int): Pair<Long, Long> {
+        val cal = java.util.Calendar.getInstance()
+        return when (period) {
+            PeriodTab.WEEK -> {
+                val dow = cal.get(java.util.Calendar.DAY_OF_WEEK)
+                val daysToMon = (dow - java.util.Calendar.MONDAY + 7) % 7
+                cal.add(java.util.Calendar.DAY_OF_YEAR, -daysToMon)
+                cal.add(java.util.Calendar.WEEK_OF_YEAR, offset)
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0); cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0); cal.set(java.util.Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                start to (start + 7 * 24 * 60 * 60 * 1_000L - 1L)
+            }
+
+            PeriodTab.MONTH -> {
+                cal.add(java.util.Calendar.MONTH, offset)
+                cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0); cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0); cal.set(java.util.Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                cal.add(java.util.Calendar.MONTH, 1)
+                start to (cal.timeInMillis - 1L)
+            }
+        }
+    }
 
     /**
      * Builds 7 [SpendPoint] values (Mon→Sun) for the week identified by [weekOffset].

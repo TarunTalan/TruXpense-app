@@ -158,7 +158,9 @@ fun DashboardScreen(
     val topLevelRoutes = remember {
         setOf(
             Screen.Dashboard.Home.Root,
-            Screen.Dashboard.Transactions.Root,
+            // Registered route includes the optional query param — must match exactly
+            // what the composable declares, otherwise isTopLevelDestination is always false.
+            Screen.Dashboard.Transactions.RootWithOptionalFilter,
             Screen.Dashboard.Budget.Root,
             Screen.Dashboard.Analytics.Root,
             Screen.Dashboard.Settings.Root,
@@ -175,7 +177,13 @@ fun DashboardScreen(
     }
 
     fun isTabSelected(tab: BottomNavBarMenu): Boolean =
-        currentDestination?.hierarchy?.any { it.route == tab.route } == true
+        currentDestination?.hierarchy?.any { dest ->
+            // Exact match covers all tabs. The prefix check covers the Transactions
+            // tab whose composable is registered as "transactions?preselectCategory=…"
+            // but whose BottomNavBarMenu route is the bare "transactions" string.
+            dest.route == tab.route ||
+                    dest.route?.startsWith("${tab.route}?") == true
+        } == true
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -452,7 +460,14 @@ fun DashboardScreen(
             // TRANSACTIONS TAB  — no animation on tab switch
             // ══════════════════════════════════════════════════════════════════
             composable(
-                route = Screen.Dashboard.Transactions.Root,
+                route = Screen.Dashboard.Transactions.RootWithOptionalFilter,
+                arguments = listOf(
+                    navArgument(Screen.Dashboard.Transactions.PRESELECT_CATEGORY_KEY) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                ),
                 enterTransition = { EnterTransition.None },
                 exitTransition = {
                     val to = targetState?.destination?.route
@@ -619,19 +634,21 @@ fun DashboardScreen(
                     onDeleted = { dashboardNavController.popBackStack() },
                     onSeeAll = { category ->
                         val cat = category.trim()
-                        dashboardNavController.safeNavigate(Screen.Dashboard.Transactions.Root) {
-                            popUpTo(dashboardNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
-                        }
-                        if (cat.isNotBlank()) {
-                            try {
-                                dashboardNavController.getBackStackEntry(Screen.Dashboard.Transactions.Root).savedStateHandle["preselectCategory"] =
-                                    cat
-                            } catch (_: Exception) {
-                                dashboardNavController.currentBackStackEntry?.savedStateHandle?.set(
-                                    "preselectCategory", cat
-                                )
+                        // Navigate with the category baked into the route URL.
+                        // Hilt reads nav-args into SavedStateHandle before the
+                        // ViewModel is created, so the filter is always available
+                        // — no write-after-navigate timing issues.
+                        dashboardNavController.safeNavigate(
+                            if (cat.isNotBlank()) Screen.Dashboard.Transactions.filteredRoute(cat)
+                            else Screen.Dashboard.Transactions.Root
+                        ) {
+                            popUpTo(dashboardNavController.graph.findStartDestination().id) {
+                                saveState = true
                             }
+                            // launchSingleTop = false: the URL differs each time a new
+                            // category is selected, so we always want a fresh entry.
+                            launchSingleTop = false
+                            restoreState = false
                         }
                     },
                     onTransactionClick = { txId ->

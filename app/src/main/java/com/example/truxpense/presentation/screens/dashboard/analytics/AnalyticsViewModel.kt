@@ -1,5 +1,6 @@
 package com.example.truxpense.presentation.screens.dashboard.analytics
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.truxpense.data.repository.budget.BudgetRepository
@@ -10,7 +11,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.util.*
 import javax.inject.Inject
-import androidx.compose.ui.graphics.Color
 import android.graphics.Color as AndroidColor
 
 // ── UI models ─────────────────────────────────────────────────────────────────
@@ -47,6 +47,13 @@ data class AnalyticsUiState(
     val canGoForward: Boolean = false,
     val totalSpent: Double = 0.0,
     val totalBudget: Double = 0.0,
+    /**
+     * Spend summed only for categories that have an active budget — this is what
+     * BudgetTab and HomeTab compare against totalBudget to compute exceeded/remaining.
+     * [totalSpent] includes ALL expenses and is used for the headline; this field
+     * is used exclusively for the budget-progress bar and exceeded/remaining stats.
+     */
+    val budgetTrackedSpent: Double = 0.0,
     /** +N → spent more than previous period, -N → spent less, 0 → no previous data */
     val changePercent: Int = 0,
     val hasComparison: Boolean = false,
@@ -84,12 +91,30 @@ class AnalyticsViewModel @Inject constructor(
     val filterDateTo: StateFlow<Long?> = _filterDateTo.asStateFlow()
     val filterType: StateFlow<EntryType?> = _filterType.asStateFlow()
 
-    fun setFilterCategory(v: String?) { _filterCategory.value = v }
-    fun setFilterMonth(v: Int?) { _filterMonth.value = v }
-    fun setFilterYear(v: Int?) { _filterYear.value = v }
-    fun setFilterDateFrom(v: Long?) { _filterDateFrom.value = v }
-    fun setFilterDateTo(v: Long?) { _filterDateTo.value = v }
-    fun setFilterType(v: EntryType?) { _filterType.value = v }
+    fun setFilterCategory(v: String?) {
+        _filterCategory.value = v
+    }
+
+    fun setFilterMonth(v: Int?) {
+        _filterMonth.value = v
+    }
+
+    fun setFilterYear(v: Int?) {
+        _filterYear.value = v
+    }
+
+    fun setFilterDateFrom(v: Long?) {
+        _filterDateFrom.value = v
+    }
+
+    fun setFilterDateTo(v: Long?) {
+        _filterDateTo.value = v
+    }
+
+    fun setFilterType(v: EntryType?) {
+        _filterType.value = v
+    }
+
     fun clearFilters() {
         _filterCategory.value = null
         _filterMonth.value = null
@@ -206,7 +231,8 @@ class AnalyticsViewModel @Inject constructor(
             }
             // Apply entry type filter: only include matching entry types
             if (filters.type != null) {
-                val isIncome = tx.amount > 0 // in repository Transaction.amount is positive for all? Recheck domain: transactions amount likely positive for expenses; but we'll check 'source' or type mapping elsewhere. For now, skip type filtering here as repository Transaction lacks type flag.
+                val isIncome =
+                    tx.amount > 0 // in repository Transaction.amount is positive for all? Recheck domain: transactions amount likely positive for expenses; but we'll check 'source' or type mapping elsewhere. For now, skip type filtering here as repository Transaction lacks type flag.
             }
             if (filters.dateFrom != null && tx.timestamp < filters.dateFrom) return false
             if (filters.dateTo != null && tx.timestamp > filters.dateTo) return false
@@ -219,7 +245,15 @@ class AnalyticsViewModel @Inject constructor(
 
         val totalSpent = current.sumOf { it.amount }
         val prevSpent = previous.sumOf { it.amount }
-        val totalBudget = budgets.sumOf { it.amount }
+        // totalBudget = ALL active budgets summed — matches BudgetViewModel.totalBudget exactly.
+        // Only meaningful for the current period (offset == 0); hidden for past/future.
+        val budgetCategoryNames = budgets.map { it.category }.toHashSet()
+        val totalBudget = if (offset == 0) budgets.sumOf { it.amount } else 0.0
+        // budgetTrackedSpent = spend only in budgeted categories — matches BudgetViewModel.totalSpent.
+        // This is what we compare against totalBudget for exceeded/remaining.
+        val budgetTrackedSpent = if (offset == 0)
+            current.filter { it.category in budgetCategoryNames }.sumOf { it.amount }
+        else 0.0
         val changePercent = if (prevSpent > 0) (((totalSpent - prevSpent) / prevSpent) * 100).toInt() else 0
 
         val categories = run {
@@ -285,6 +319,7 @@ class AnalyticsViewModel @Inject constructor(
             canGoForward = offset < 0,
             totalSpent = totalSpent,
             totalBudget = totalBudget,
+            budgetTrackedSpent = budgetTrackedSpent,
             changePercent = changePercent,
             hasComparison = prevSpent > 0,
             categories = categories,

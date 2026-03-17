@@ -1,5 +1,8 @@
 package com.example.truxpense.presentation.navigation
 
+import com.example.truxpense.presentation.navigation.Screen.Dashboard.Transactions.PRESELECT_CATEGORY_KEY
+
+
 object Screen {
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -65,6 +68,29 @@ object Screen {
         // ── Transactions tab ──────────────────────────────────────────────────
         object Transactions {
             const val Root = "transactions"
+
+            /**
+             * Key used to pass a pre-selected category filter as a nav-argument
+             * query param when navigating from BudgetDetailScreen ("See all").
+             *
+             * The composable is registered on [RootWithOptionalFilter] so Hilt
+             * pre-populates SavedStateHandle from the URL before the ViewModel
+             * is created — no savedStateHandle write-after-navigate timing issues.
+             */
+            const val PRESELECT_CATEGORY_KEY = "preselectCategory"
+
+            /**
+             * Route pattern registered in the NavHost. Matches both bare
+             * "transactions" (no filter) and "transactions?preselectCategory=Food".
+             */
+            const val RootWithOptionalFilter =
+                "transactions?$PRESELECT_CATEGORY_KEY={$PRESELECT_CATEGORY_KEY}"
+
+            /** Navigate to Transactions pre-filtered to [category]. */
+            fun filteredRoute(category: String): String =
+                "transactions?$PRESELECT_CATEGORY_KEY=${
+                    java.net.URLEncoder.encode(category, "UTF-8")
+                }"
 
             /** Unified add-transaction screen reached from the Transactions tab. */
             const val AddTransaction = "transactions/add_transaction?tab={tab}"

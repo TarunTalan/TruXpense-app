@@ -92,10 +92,10 @@ class HomeViewModel @Inject constructor(
         pendingTransactionRepository.pendingCount.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     val pendingTransactions = pendingTransactionRepository.pendingTransactions.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            emptyList()
-        )
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList()
+    )
 
     fun confirmPending(id: String) {
         viewModelScope.launch { pendingTransactionRepository.confirm(id) }
@@ -132,19 +132,16 @@ class HomeViewModel @Inject constructor(
             )
         }
         (expenseItems + incomeItems).sortedByDescending { item ->
-                // Use original timestamp for sorting; look it up from each repo list
-                expenses.firstOrNull { it.id == item.id }?.timestamp
-                    ?: incomes.firstOrNull { it.id == item.id }?.timestamp ?: 0L
-            }.take(5)
+            // Use original timestamp for sorting; look it up from each repo list
+            expenses.firstOrNull { it.id == item.id }?.timestamp
+                ?: incomes.firstOrNull { it.id == item.id }?.timestamp ?: 0L
+        }.take(5)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Aggregated totals ─────────────────────────────────────────────────────
 
-    val monthlySpend: StateFlow<Double> = expenseRepository.transactions.map { it.sumOf { t -> t.amount } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
-
     /** Sum of expenses for the current calendar month only. */
-    val currentMonthExpenses: StateFlow<Double> = expenseRepository.transactions.map { list ->
+    val monthlySpend: StateFlow<Double> = expenseRepository.transactions.map { list ->
         val start = monthStartMs()
         list.filter { it.timestamp >= start }.sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
@@ -255,19 +252,6 @@ class HomeViewModel @Inject constructor(
             _isLoaded.value = true
         }
     }
-
-    val budgetLimit: StateFlow<Double> =
-        budgetRepository.budgets.map { it.sumOf { b -> b.amount } }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
-
-    val budgetLeft: StateFlow<Double> = combine(budgetLimit, monthlySpend) { limit, spent -> limit - spent }.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            0.0
-        )
-
-    val budgetProgress: StateFlow<Float> = combine(budgetLimit, monthlySpend) { limit, spent ->
-        if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     // ── Dynamic home-screen insight ───────────────────────────────────────────
 
@@ -459,14 +443,17 @@ class HomeViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingInsight("Loading insights…"))
 
-    // ── Top spending categories ───────────────────────────────────────────────
+    // ── Top spending categories (current month only) ──────────────────────────
 
     val topCategories: StateFlow<List<HomeSpendingCategory>> =
-        combine(expenseRepository.transactions, monthlySpend) { list, total ->
-            list.groupBy { it.category }.entries.map { (cat, items) ->
-                    val amt = items.sumOf { it.amount }
-                    HomeSpendingCategory(cat, amt, if (total > 0) (amt / total).toFloat() else 0f)
-                }.sortedByDescending { it.amount }
+        expenseRepository.transactions.map { list ->
+            val start = monthStartMs()
+            val thisMonth = list.filter { it.timestamp >= start }
+            val total = thisMonth.sumOf { it.amount }
+            thisMonth.groupBy { it.category }.entries.map { (cat, items) ->
+                val amt = items.sumOf { it.amount }
+                HomeSpendingCategory(cat, amt, if (total > 0) (amt / total).toFloat() else 0f)
+            }.sortedByDescending { it.amount }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── Deep-link helpers ─────────────────────────────────────────────────────

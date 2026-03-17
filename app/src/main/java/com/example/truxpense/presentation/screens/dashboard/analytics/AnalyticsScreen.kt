@@ -14,15 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -31,6 +27,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,13 +38,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.truxpense.R
 import com.example.truxpense.presentation.screens.dashboard.components.*
 import com.example.truxpense.presentation.theme.DashboardDimens
+import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-private fun fmt(amount: Double) = "₹${"%,.0f".format(abs(amount))}"
+// Delegates to the shared formatAbbreviatedAmount util so all screens
+// (Home, Budget, Analytics) produce identical amount strings — e.g. "₹1.2k", "₹3.4L".
+private fun fmt(amount: Double) = "₹${formatAbbreviatedAmount(abs(amount))}"
 
 private val MONTH_LABELS = listOf(
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -114,9 +114,10 @@ fun AnalyticsScreen(
         label = "donut_entry",
     )
 
-    // Budget progress animation
+    // Budget progress animation — uses budgetTrackedSpent (budgeted-category spend only)
+    // so the bar matches exactly what BudgetTab and HomeTab show.
     val utilisation =
-        if (state.totalBudget > 0) (state.totalSpent / state.totalBudget).toFloat().coerceIn(0f, 1f) else 0f
+        if (state.totalBudget > 0) (state.budgetTrackedSpent / state.totalBudget).toFloat().coerceIn(0f, 1f) else 0f
     var progTriggered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { progTriggered = true }
     val progressAnim by animateFloatAsState(
@@ -141,7 +142,11 @@ fun AnalyticsScreen(
         val fm = filterMonth
         if (fm != null) {
             val mlabel = MONTH_LABELS.getOrNull(fm - 1) ?: ""
-            if (!tp.tooltipDate.contains(mlabel, ignoreCase = true) && !tp.label.contains(mlabel, ignoreCase = true)) return false
+            if (!tp.tooltipDate.contains(mlabel, ignoreCase = true) && !tp.label.contains(
+                    mlabel,
+                    ignoreCase = true
+                )
+            ) return false
         }
         val fy = filterYear
         if (fy != null) {
@@ -190,63 +195,55 @@ fun AnalyticsScreen(
                 headerTitle = "Analytics",
                 showBack = false,
                 actions = {
-                    // Filter badge indicator
-                    if (activeFilterCount > 0) {
-                        Badge(
-                            modifier = Modifier.offset((-4).dp, 4.dp),
-                            containerColor = MaterialTheme.colorScheme.primary,
+                    // MoreVert overflow menu with filter-count badge overlay
+                    Box(modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.align(Alignment.Center)
                         ) {
-                            Text(
-                                activeFilterCount.toString(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
-                    }
-                    // MoreVert overflow menu
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
                                 contentDescription = "More options",
                                 tint = MaterialTheme.colorScheme.onBackground,
                             )
                         }
+
+                        if (activeFilterCount > 0) {
+                            Badge(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 6.dp, y = (-4).dp),
+                                containerColor = MaterialTheme.colorScheme.primary,
+                            ) {
+                                Text(
+                                    activeFilterCount.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                        }
+
                         DropdownMenu(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false },
                         ) {
                             DropdownMenuItem(
                                 leadingIcon = {
-                                    Box {
-                                        Icon(
-                                            painter = painterResource(R.drawable.filter),
-                                            contentDescription = null,
-                                            tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
-                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(DashboardDimens.iconMd),
-                                        )
-                                        if (activeFilterCount > 0) {
-                                            Badge(
-                                                modifier = Modifier.align(Alignment.TopEnd),
-                                                containerColor = MaterialTheme.colorScheme.primary,
-                                            ) {
-                                                Text(
-                                                    activeFilterCount.toString(),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onPrimary,
-                                                )
-                                            }
-                                        }
-                                    }
+                                    Icon(
+                                        painter = painterResource(R.drawable.filter),
+                                        contentDescription = null,
+                                        tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(DashboardDimens.iconMd),
+                                    )
                                 },
                                 text = {
                                     Text(
-                                        "Filter",
+                                        if (activeFilterCount > 0) "Filter (${activeFilterCount})" else "Filter",
                                         color = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onBackground,
+                                        else MaterialTheme.colorScheme.onBackground,
                                         fontWeight = if (activeFilterCount > 0) FontWeight.SemiBold
-                                                     else FontWeight.Normal,
+                                        else FontWeight.Normal,
                                     )
                                 },
                                 onClick = {
@@ -330,7 +327,7 @@ fun AnalyticsScreen(
                 SummaryCard(
                     state = state,
                     progressAnim = progressAnim,
-                    utilisation = if (state.totalBudget > 0) (filteredTotalSpent / state.totalBudget).toFloat() else 0f,
+                    utilisation = utilisation,
                     modifier = Modifier.fillMaxWidth(),
                     displayTotalSpent = filteredTotalSpent,
                     displayCategories = filteredCategories,
@@ -356,16 +353,16 @@ fun AnalyticsScreen(
                     val period = state.period
                     val offset = state.offset
                     val trendTitle = when (period) {
-                        AnalyticsPeriod.WEEK  -> "Daily spending"
+                        AnalyticsPeriod.WEEK -> "Daily spending"
                         AnalyticsPeriod.MONTH -> "Weekly spending"
-                        AnalyticsPeriod.YEAR  -> "Monthly spending"
+                        AnalyticsPeriod.YEAR -> "Monthly spending"
                     }
 
                     val spendPoints = remember(filteredTrendPoints, period, offset) {
                         val now = java.util.Calendar.getInstance()
                         val todayDow = now.get(java.util.Calendar.DAY_OF_WEEK)
                         // DAY_OF_WEEK: Sun=1..Sat=7 → Mon=2→"Mon", etc.
-                        val dowLabels = listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")
+                        val dowLabels = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
                         val todayDowLabel = dowLabels.getOrNull(todayDow - 1) ?: ""
                         val todayMonthIdx = now.get(java.util.Calendar.MONTH) // 0-based
                         val todayMonthShort = MONTH_LABELS.getOrNull(todayMonthIdx) ?: ""
@@ -383,6 +380,7 @@ fun AnalyticsScreen(
                                         ?: emptyList()
                                     nums.size >= 2 && todayDom in nums[0]..nums[1]
                                 }
+
                                 AnalyticsPeriod.YEAR -> tp.label == todayMonthShort
                             }
                             SpendPoint(
@@ -588,6 +586,10 @@ private fun SummaryCard(
     val categoriesShown = displayCategories ?: state.categories
     val trendPointsShown = displayTrendPoints ?: state.trendPoints
 
+    // For budget bar / exceeded / remaining: use budgetTrackedSpent (only spend in budgeted
+    // categories) so the value matches BudgetTab and HomeTab exactly.
+    val budgetSpentShown = state.budgetTrackedSpent
+
     val accentColor = when {
         utilisation >= 1f -> MaterialTheme.colorScheme.error
         utilisation >= 0.80f -> Color(0xFFF2A93B)
@@ -596,9 +598,9 @@ private fun SummaryCard(
 
     // Avg label adapts to period
     val avgLabel = when (state.period) {
-        AnalyticsPeriod.WEEK  -> "Avg / day"
+        AnalyticsPeriod.WEEK -> "Avg / day"
         AnalyticsPeriod.MONTH -> "Avg / week"
-        AnalyticsPeriod.YEAR  -> "Avg / month"
+        AnalyticsPeriod.YEAR -> "Avg / month"
     }
 
     GradientCard(modifier = modifier) {
@@ -677,7 +679,7 @@ private fun SummaryCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = "${fmt(totalSpentShown)} / ${fmt(state.totalBudget)}",
+                            text = "${fmt(budgetSpentShown)} / ${fmt(state.totalBudget)}",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = accentColor,
@@ -699,11 +701,11 @@ private fun SummaryCard(
                     }
                     Spacer(Modifier.height(4.dp))
                     val usedPctInt = (utilisation * 100).toInt().coerceAtLeast(0)
-                    val exceededAmt = (totalSpentShown - state.totalBudget).coerceAtLeast(0.0)
+                    val exceededAmt = (budgetSpentShown - state.totalBudget).coerceAtLeast(0.0)
                     val usageText: String
                     val usageColor = if (exceededAmt > 0.0) MaterialTheme.colorScheme.error else accentColor
                     when {
-                        exceededAmt > 0.0 -> usageText = "Budget exceeded by ${fmt(exceededAmt)}"
+                        exceededAmt > 0.0 -> usageText = "Over budget by ${fmt(exceededAmt)}"
                         usedPctInt >= 100 -> usageText = "100% used"
                         else -> usageText = "${usedPctInt}% of budget used"
                     }
@@ -721,7 +723,10 @@ private fun SummaryCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f))
                     Spacer(Modifier.height(14.dp))
 
-                    val remaining = (state.totalBudget - totalSpentShown).coerceAtLeast(0.0)
+                    // Remaining / Over budget quick-stat — mirrors BudgetTab and HomeTab:
+                    // positive value when under budget, exceeded amount when over (never negative).
+                    val remainingRaw = state.totalBudget - budgetSpentShown
+                    val isOverBudget = remainingRaw < 0.0
                     // Use non-empty buckets so future zero-spend slots don't deflate the average
                     val nonEmptyBuckets = trendPointsShown.count { it.amount > 0 }.coerceAtLeast(1)
                     val avgPerBucket = if (totalSpentShown > 0) totalSpentShown / nonEmptyBuckets else 0.0
@@ -741,10 +746,21 @@ private fun SummaryCard(
                         )
                         if (state.totalBudget > 0) {
                             StatDivider()
+                            val remainingValue = when {
+                                isOverBudget -> fmt(-remainingRaw)   // positive exceeded amount
+                                remainingRaw == 0.0 -> "₹0"
+                                else -> fmt(remainingRaw)
+                            }
+                            val remainingLabel = if (isOverBudget) "Over budget" else "Remaining"
+                            val remainingColor = when {
+                                isOverBudget -> MaterialTheme.colorScheme.error
+                                remainingRaw == 0.0 -> MaterialTheme.colorScheme.onSurfaceVariant
+                                else -> accentColor
+                            }
                             QuickStat(
-                                value = fmt(remaining),
-                                label = "Remaining",
-                                valueColor = accentColor,
+                                value = remainingValue,
+                                label = remainingLabel,
+                                valueColor = remainingColor,
                             )
                         }
                     }
@@ -1069,7 +1085,15 @@ private fun InsightsCard(
             add(InsightTile(R.drawable.profile_icon, "Top merchant", merchant, fmt(amt), primary))
         }
         if (peakPt != null) {
-            add(InsightTile(R.drawable.ic_trending_up, "Peak period", peakPt.label, fmt(peakPt.amount), Color(0xFFF59E0B)))
+            add(
+                InsightTile(
+                    R.drawable.ic_trending_up,
+                    "Peak period",
+                    peakPt.label,
+                    fmt(peakPt.amount),
+                    Color(0xFFF59E0B)
+                )
+            )
         }
         if (state.hasComparison) {
             val up = state.changePercent >= 0
@@ -1313,4 +1337,3 @@ fun AnalyticsScreenFullPreview() {
         }
     }
 }
-

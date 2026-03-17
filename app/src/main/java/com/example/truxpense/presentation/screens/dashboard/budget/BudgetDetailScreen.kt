@@ -1,13 +1,11 @@
 package com.example.truxpense.presentation.screens.dashboard.budget
 
 import android.annotation.SuppressLint
+import android.graphics.Paint
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,6 +44,7 @@ import com.example.truxpense.presentation.theme.AppDialogTheme
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.*
 import java.util.*
+import kotlin.math.abs
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 private val BarTeal = Color(0xFF1BAF9D)
@@ -57,7 +56,7 @@ private fun fmtINR(amount: Double): String = runCatching {
     currencyFormat("INR").format(amount)
 }.getOrDefault("₹${"%,.0f".format(amount)}")
 
-private fun fmtINRAbs(amount: Double): String = "₹${"%,.0f".format(kotlin.math.abs(amount))}"
+private fun fmtINRAbs(amount: Double): String = "₹${"%,.0f".format(abs(amount))}"
 
 /**
  * Derives a stable, visually distinct colour from a merchant name.
@@ -77,7 +76,7 @@ private val avatarPalette = listOf(
 )
 
 private fun merchantAvatarColor(name: String): Color {
-    val index = kotlin.math.abs(name.hashCode()) % avatarPalette.size
+    val index = abs(name.hashCode()) % avatarPalette.size
     return avatarPalette[index]
 }
 
@@ -108,6 +107,15 @@ fun BudgetDetailScreen(
     val spendPoints by vm.spendPoints.collectAsState()
     val deleteComplete by vm.deleteComplete.collectAsState()
     val updateComplete by vm.updateComplete.collectAsState()
+    val selectedPeriod by vm.selectedPeriod.collectAsState()
+    val periodLabel by vm.periodLabel.collectAsState()
+    val periodOffset by vm.periodOffset.collectAsState()
+    val canGoBackPeriod by vm.canGoBack.collectAsState()
+    val canGoForwardPeriod by vm.canGoForward.collectAsState()
+
+    // True only when the user is viewing the current month/week — used to hide
+    // time-remaining stats (days left, /day budget) that are meaningless for past periods.
+    val isCurrentPeriod = periodOffset == 0
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -124,9 +132,6 @@ fun BudgetDetailScreen(
             vm.setPeriod(PeriodTab.MONTH)
         }
     }
-
-    val left = (limitFinal - spentFinal).coerceAtLeast(0.0)
-    val progress = if (limitFinal > 0) (spentFinal / limitFinal).toFloat().coerceIn(0f, 1f) else 0f
 
     var progTriggered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { progTriggered = true }
@@ -271,13 +276,22 @@ fun BudgetDetailScreen(
         val daysLeft = remember {
             (cal.getActualMaximum(Calendar.DAY_OF_MONTH) - cal.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
         }
+
+        // For past periods where no budget was ever set (limit == 0), show ₹0 for
+        // all monetary stats — displaying real spending without a budget reference
+        // is misleading (Budget:₹0 / Spent:₹5k / Remaining:₹0).
+        val displaySpent = if (!isCurrentPeriod && limitFinal == 0.0) 0.0 else spentFinal
+        val left = (limitFinal - displaySpent).coerceAtLeast(0.0)
         val dailyBudget = if (daysLeft > 0) left / daysLeft else 0.0
 
-        // Avg spend/day from spendPoints
-        val avgPerDay = remember(spendPoints) {
+        // Avg spend per bucket — daily when in Week view, weekly when in Month view
+        val avgPerDay = remember(spendPoints, selectedPeriod) {
             val nonZero = spendPoints.filter { it.amount > 0 }
             if (nonZero.isEmpty()) 0.0
-            else nonZero.sumOf { it.amount } / (nonZero.size * 7).coerceAtLeast(1)
+            else when (selectedPeriod) {
+                PeriodTab.WEEK -> nonZero.sumOf { it.amount } / 7.0          // avg per day
+                PeriodTab.MONTH -> nonZero.sumOf { it.amount } / nonZero.size  // avg per week
+            }
         }
 
         LazyColumn(
@@ -294,21 +308,30 @@ fun BudgetDetailScreen(
                 BudgetSummaryCard(
                     categoryName = budgetNameFinal,
                     limit = limitFinal,
-                    spent = spentFinal,
+                    spent = displaySpent,
                     left = left,
-                    progress = progress,
+                    progress = if (limitFinal > 0) (displaySpent / limitFinal).toFloat().coerceIn(0f, 1f) else 0f,
                     progressMultiplier = progMul,
                     daysLeft = daysLeft,
                     dailyBudget = dailyBudget,
+                    isCurrentPeriod = isCurrentPeriod,
+                    periodLabel = periodLabel,
                 )
             }
 
-            // ── ② Weekly breakdown bar chart ──────────────────────────────────
+            // ── ② Breakdown chart with period tab + navigator ─────────────────
             item {
-                WeeklyBreakdownCard(
+                SpendBreakdownCard(
                     points = spendPoints,
                     avgPerDay = avgPerDay,
                     animProgress = chartAnimProg,
+                    selectedPeriod = selectedPeriod,
+                    periodLabel = periodLabel,
+                    canGoBack = canGoBackPeriod,
+                    canGoForward = canGoForwardPeriod,
+                    onPeriodSelected = { vm.setPeriod(it) },
+                    onGoBack = { vm.goBack() },
+                    onGoForward = { vm.goForward() },
                 )
             }
 
@@ -420,26 +443,10 @@ private fun BudgetSummaryCard(
     progressMultiplier: Float,
     daysLeft: Int,
     dailyBudget: Double,
+    isCurrentPeriod: Boolean,
+    periodLabel: String,
 ) {
     val barColor = progressColor(progress, MaterialTheme.colorScheme.error)
-    val cal = remember { Calendar.getInstance() }
-    val monthYear = remember {
-        val months = listOf(
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December"
-        )
-        "${months[cal.get(Calendar.MONTH)]} ${cal.get(Calendar.YEAR)}. monthly"
-    }
 
     GradientCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -460,7 +467,7 @@ private fun BudgetSummaryCard(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = monthYear,
+                        text = "$periodLabel · monthly",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.secondary,
                     )
@@ -469,17 +476,25 @@ private fun BudgetSummaryCard(
 
             Spacer(Modifier.height(14.dp))
 
-            // 3-column stats: Budget | Spent | Remaining
-            val exceeded = (spent - limit).coerceAtLeast(0.0)
-            val remainingText = when {
-                exceeded > 0.0 -> "Budget exceeded by ${fmtINR(exceeded)}"
-                left == 0.0 -> "100% used"
+            // 3-column stats: Budget | Spent | Remaining / Over budget
+            // When no budget is set (limit == 0), show all zeros cleanly.
+            val exceeded = if (limit > 0) (spent - limit).coerceAtLeast(0.0) else 0.0
+            val remainingValue = when {
+                limit == 0.0 -> "₹0"
+                exceeded > 0.0 -> "+₹${formatAbbreviatedAmount(exceeded)}"
+                left == 0.0 -> "₹0"
                 else -> "₹${formatAbbreviatedAmount(left)}"
+            }
+            val remainingLabel = if (exceeded > 0.0) "Over budget" else "Remaining"
+            val remainingColor = when {
+                exceeded > 0.0 -> MaterialTheme.colorScheme.error
+                left == 0.0 -> BarAmber
+                else -> MaterialTheme.colorScheme.onBackground
             }
             Row(modifier = Modifier.fillMaxWidth()) {
                 StatColumn("₹${formatAbbreviatedAmount(limit)}", "Budget", Modifier.weight(1f))
                 StatColumn("₹${formatAbbreviatedAmount(spent)}", "Spent", Modifier.weight(1f))
-                StatColumn(remainingText, "Remaining", Modifier.weight(1f))
+                StatColumn(remainingValue, remainingLabel, Modifier.weight(1f), valueColor = remainingColor)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -498,43 +513,77 @@ private fun BudgetSummaryCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // Footer: usage% + days left | daily budget remaining
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = "${(progress * 100).toInt()}% used . $daysLeft days left",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = barColor,
-                )
-                val over = (spent - limit).coerceAtLeast(0.0)
-                val dailyText = when {
-                    over > 0.0 -> "Budget exceeded by ${fmtINR(over)}"
-                    left == 0.0 -> "100% used"
-                    else -> "₹${formatAbbreviatedAmount(dailyBudget)}/day budget left"
+            // Footer — for past periods only show % used (days left is meaningless)
+            val over = if (limit > 0) (spent - limit).coerceAtLeast(0.0) else 0.0
+            if (over > 0.0) {
+                // ── Exceeded: single full-width pill banner ─────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.10f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "${(progress * 100).toInt()}% used",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Text(
+                        text = "₹${formatAbbreviatedAmount(over)} over limit",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
-                Text(
-                    text = dailyText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (over > 0.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
-                )
+            } else {
+                // ── Normal / fully used ─────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Left side: always show % used
+                    // Right side: show days-left info only for the current period
+                    val pctText = "${(progress * 100).toInt()}% used"
+                    Text(
+                        text = if (isCurrentPeriod) "$pctText · $daysLeft days left" else pctText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = barColor,
+                    )
+                    if (isCurrentPeriod) {
+                        val dailyText = if (left == 0.0) "Budget fully used"
+                        else "₹${formatAbbreviatedAmount(dailyBudget)}/day left"
+                        Text(
+                            text = dailyText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun StatColumn(value: String, label: String, modifier: Modifier = Modifier) {
+private fun StatColumn(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = Color.Unspecified,
+) {
     Column(modifier = modifier) {
         Text(
             text = value,
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (valueColor == Color.Unspecified) MaterialTheme.colorScheme.onBackground else valueColor,
             letterSpacing = (-0.3).sp,
+            maxLines = 1,
         )
         Text(
             text = label,
@@ -545,22 +594,30 @@ private fun StatColumn(value: String, label: String, modifier: Modifier = Modifi
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ② WEEKLY BREAKDOWN BAR CHART  (GradientCard)
+// ② SPEND BREAKDOWN CARD — period tab (Week / Month) + navigator + bar chart
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun WeeklyBreakdownCard(
+private fun SpendBreakdownCard(
     points: List<SpendPoint>,
     avgPerDay: Double,
     animProgress: Float,
+    selectedPeriod: PeriodTab,
+    periodLabel: String,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPeriodSelected: (PeriodTab) -> Unit,
+    onGoBack: () -> Unit,
+    onGoForward: () -> Unit,
 ) {
     val displayPoints = points.ifEmpty {
-        listOf(SpendPoint("W1", 0.0), SpendPoint("W2", 0.0), SpendPoint("W3", 0.0), SpendPoint("W4", 0.0))
+        if (selectedPeriod == PeriodTab.WEEK)
+            listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").map { SpendPoint(it, 0.0) }
+        else
+            listOf(SpendPoint("W1", 0.0), SpendPoint("W2", 0.0), SpendPoint("W3", 0.0), SpendPoint("W4", 0.0))
     }
 
     val maxVal = displayPoints.maxOf { it.amount }.coerceAtLeast(1.0)
-
-    // Color each bar based on rank: highest = red, 2nd = amber, rest = teal, zero = empty
     val sortedAmounts = displayPoints.map { it.amount }.sortedDescending()
     fun barColor(amount: Double): Color = when {
         amount <= 0 -> BarEmpty
@@ -572,31 +629,97 @@ private fun WeeklyBreakdownCard(
     GradientCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
 
-            // Header
+            // ── Period tab row (Week | Month) ─────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.10f)),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                PeriodTab.entries.forEach { tab ->
+                    val selected = tab == selectedPeriod
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else Color.Transparent
+                            )
+                            .clickable { onPeriodSelected(tab) }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = tab.name.lowercase().replaceFirstChar { it.uppercase() },
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── Period navigator (← label →) ──────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Weekly breakdown",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                if (avgPerDay > 0) {
+                IconButton(
+                    onClick = onGoBack,
+                    enabled = canGoBack,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.left_arrow),
+                        contentDescription = "Previous period",
+                        tint = MaterialTheme.colorScheme.onBackground.copy(
+                            alpha = if (canGoBack) 1f else 0.3f
+                        ),
+                        modifier = Modifier.size(DashboardDimens.iconMd),
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Avg ${fmtINRAbs(avgPerDay)}/day",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = periodLabel,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    if (avgPerDay > 0) {
+                        val avgLabel = if (selectedPeriod == PeriodTab.WEEK) "/day" else "/week"
+                        Text(
+                            text = "Avg ${fmtINRAbs(avgPerDay)}$avgLabel",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = onGoForward,
+                    enabled = canGoForward,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.right_arrow),
+                        contentDescription = "Next period",
+                        tint = MaterialTheme.colorScheme.onBackground.copy(
+                            alpha = if (canGoForward) 1f else 0.3f
+                        ),
+                        modifier = Modifier.size(DashboardDimens.iconMd),
                     )
                 }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Bar chart
+            // ── Bar chart ─────────────────────────────────────────────────────
             VerticalBarChart(
                 points = displayPoints,
                 maxVal = maxVal,
@@ -650,9 +773,9 @@ private fun VerticalBarChart(
                 // Amount label above bar
                 if (animProgress > 0.5f) {
                     drawIntoCanvas { canvas ->
-                        val paint = android.graphics.Paint().apply {
+                        val paint = Paint().apply {
                             textSize = amtSzPx
-                            textAlign = android.graphics.Paint.Align.CENTER
+                            textAlign = Paint.Align.CENTER
                             isFakeBoldText = true
                             this.color = topTextColorInt
                         }
@@ -674,9 +797,9 @@ private fun VerticalBarChart(
 
             // Day / week label below
             drawIntoCanvas { canvas ->
-                val paint = android.graphics.Paint().apply {
+                val paint = Paint().apply {
                     textSize = textSzPx
-                    textAlign = android.graphics.Paint.Align.CENTER
+                    textAlign = Paint.Align.CENTER
                     this.color = topTextColorInt
                 }
                 canvas.nativeCanvas.drawText(pt.dayLabel, x + barW / 2, h - with(density) { 4.dp.toPx() }, paint)
@@ -1035,7 +1158,7 @@ private fun EditBudgetBottomSheet(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f).height(DashboardDimens.buttonHeight),
                         shape = MaterialTheme.shapes.medium,
-                        border = androidx.compose.foundation.BorderStroke(
+                        border = BorderStroke(
                             DashboardDimens.borderStroke,
                             MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                         ),
@@ -1162,8 +1285,27 @@ fun BudgetDetailScreenPreview() {
                 ),
                 verticalArrangement = Arrangement.spacedBy(DashboardDimens.spaceLg),
             ) {
-                item { BudgetSummaryCard("Food", limit, spent, left, progress, 1f, 15, left / 15) }
-                item { WeeklyBreakdownCard(weekPoints, 280.0, 1f) }
+                item {
+                    BudgetSummaryCard(
+                        "Food", limit, spent, left, progress, 1f, 15, left / 15,
+                        isCurrentPeriod = true,
+                        periodLabel = "",
+                    )
+                }
+                item {
+                    SpendBreakdownCard(
+                        points = weekPoints,
+                        avgPerDay = 280.0,
+                        animProgress = 1f,
+                        selectedPeriod = PeriodTab.MONTH,
+                        periodLabel = "March 2026",
+                        canGoBack = true,
+                        canGoForward = false,
+                        onPeriodSelected = {},
+                        onGoBack = {},
+                        onGoForward = {},
+                    )
+                }
                 item { TopMerchantsCard(topMerchants, spent) }
                 item {
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
@@ -1313,4 +1455,3 @@ private fun RecentTransactionsEmptyPreview() {
         }
     }
 }
-

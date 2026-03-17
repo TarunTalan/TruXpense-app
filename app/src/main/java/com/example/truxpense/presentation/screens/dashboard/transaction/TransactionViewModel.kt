@@ -18,22 +18,11 @@ class TransactionsViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    init {
-        viewModelScope.launch {
-            savedStateHandle.getStateFlow<String?>("preselectCategory", null).filterNotNull().collect { category ->
-                setCategory(category)
-                // remove to avoid reapplying on process death/restore
-                savedStateHandle.remove<String>("preselectCategory")
-            }
-        }
-        viewModelScope.launch {
-            combine(
-                repository.transactions,
-                incomeRepository.allIncome,
-            ) { _, _ -> }.first()
-            _isLoaded.value = true
-        }
-    }
+    // ── All MutableStateFlow properties MUST be declared before init{} ─────────
+    // The init block launches a coroutine that immediately collects the
+    // preselectCategory nav-arg from SavedStateHandle. If any _xxx flow is
+    // declared after init, it will still be null when setCategory() is called,
+    // causing a NullPointerException. Kotlin initialises class members top-to-bottom.
 
     // ── Type filter (All / Expense / Income) ──────────────────────────────────
 
@@ -121,6 +110,35 @@ class TransactionsViewModel @Inject constructor(
     private val _isLoaded = MutableStateFlow(false)
     val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
 
+    // ── Bottom-sheet toggle ───────────────────────────────────────────────────
+
+    private val _totalExpanded = MutableStateFlow(false)
+    val totalExpanded: StateFlow<Boolean> = _totalExpanded.asStateFlow()
+    fun toggleTotalExpanded() {
+        _totalExpanded.update { !it }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // init — runs AFTER all properties above are initialized
+    // ─────────────────────────────────────────────────────────────────────────
+
+    init {
+        viewModelScope.launch {
+            savedStateHandle.getStateFlow<String?>("preselectCategory", null).filterNotNull().collect { category ->
+                setCategory(category)
+                // remove to avoid reapplying on process death/restore
+                savedStateHandle.remove<String>("preselectCategory")
+            }
+        }
+        viewModelScope.launch {
+            combine(
+                repository.transactions,
+                incomeRepository.allIncome,
+            ) { _, _ -> }.first()
+            _isLoaded.value = true
+        }
+    }
+
     // ── Active filter count ───────────────────────────────────────────────────
 
     val activeFilterCount: StateFlow<Int> = combine(_selectedCategory, _paymentMethod) { cat: String?, pay: String? ->
@@ -144,7 +162,8 @@ class TransactionsViewModel @Inject constructor(
                 merchant = t.merchant,
                 category = t.category,
                 timeLabel = formatRelativeTime(t.timestamp),
-                amount = t.amount,
+                // repository may store expenses as negative amounts; UI expects positive values
+                amount = kotlin.math.abs(t.amount),
                 paymentMethod = t.paymentMethod,
                 entryType = EntryType.EXPENSE,
                 timestamp = t.timestamp,
@@ -156,7 +175,7 @@ class TransactionsViewModel @Inject constructor(
                 merchant = inc.source,
                 category = inc.source,
                 timeLabel = formatRelativeTime(inc.timestamp),
-                amount = inc.amount,
+                amount = kotlin.math.abs(inc.amount),
                 paymentMethod = inc.paymentMethod,
                 entryType = EntryType.INCOME,
                 timestamp = inc.timestamp,
@@ -237,14 +256,6 @@ class TransactionsViewModel @Inject constructor(
     val totalIncome: StateFlow<Double> =
         transactions.map { it.filter { tx -> tx.entryType == EntryType.INCOME }.sumOf { tx -> tx.amount } }
             .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
-
-    // ── Bottom-sheet toggle ───────────────────────────────────────────────────
-
-    private val _totalExpanded = MutableStateFlow(false)
-    val totalExpanded: StateFlow<Boolean> = _totalExpanded.asStateFlow()
-    fun toggleTotalExpanded() {
-        _totalExpanded.update { !it }
-    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

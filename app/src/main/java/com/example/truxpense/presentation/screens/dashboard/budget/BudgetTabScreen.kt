@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +36,7 @@ import com.example.truxpense.presentation.screens.dashboard.components.GradientC
 import com.example.truxpense.presentation.screens.dashboard.components.ScreenTopBar
 import com.example.truxpense.presentation.theme.DashboardDimens
 import com.example.truxpense.presentation.utils.currencyFormat
+import com.example.truxpense.presentation.utils.formatAbbreviatedAmount
 import com.example.truxpense.presentation.utils.progressColor
 import com.example.truxpense.presentation.utils.toCurrency
 import java.util.*
@@ -97,9 +100,15 @@ fun BudgetTab(
         visible = isLoaded,
         enter = fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)),
     ) {
-        if (budgetsToShow.isEmpty() || totalBudget <= 0) {
+        val noBudget = budgetsToShow.isEmpty() || totalBudget <= 0
+        val isPastMonth = canGoForward  // canGoForward == true means offset < 0, i.e. viewing history
+
+        if (noBudget && !isPastMonth) {
+            // Current month with no budgets → full empty/onboarding screen
             BudgetsEmptyScreen(onAddBudget = onNavigateToAddBudget)
         } else {
+            // Past months: always show the tab content so the navigator stays accessible,
+            // and BudgetTabContent handles the no-budget state with zeros + placeholder text.
             BudgetTabContent(
                 budgetsToShow = budgetsToShow,
                 totalBudget = totalBudget,
@@ -144,13 +153,23 @@ fun BudgetTabContent(
         label = "budget_progress",
     )
 
-    // Derived values for overview card
+    // Derived values for overview card.
+    // NOTE: for past months the ViewModel's `categories` flow already filters out
+    // categories with zero spend, so totalBudget / totalSpent naturally come back as
+    // 0 for months that had no activity — no manual clamping needed here.
+    val isCurrentMonth = !canGoForward
+    val noBudgetPastMonth = !isCurrentMonth && totalBudget <= 0
+
     val budgetLeft = (totalBudget - totalSpent).coerceAtLeast(0)
     val usedPct = if (totalBudget > 0) (totalSpent.toFloat() / totalBudget).coerceIn(0f, 1f) else 0f
     val cal = remember { Calendar.getInstance() }
     val daysInMonth = remember { cal.getActualMaximum(Calendar.DAY_OF_MONTH) }
     val daysLeft = remember { (daysInMonth - cal.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1) }
-    val dailyAvg = if (daysLeft > 0) budgetLeft.toDouble() / daysLeft else 0.0
+    // Daily avg = actual average spend per day so far this month.
+    // For past months the full month has elapsed, so use daysInMonth as the divisor.
+    val daysElapsed = remember { cal.get(Calendar.DAY_OF_MONTH).coerceAtLeast(1) }
+    val effectiveDaysElapsed = if (isCurrentMonth) daysElapsed else daysInMonth
+    val dailyAvg = totalSpent.toDouble() / effectiveDaysElapsed
 
     // Alert: first category that is >80% used
     val alertCategory = budgetsToShow.firstOrNull { it.progress > 0.80f }
@@ -159,9 +178,7 @@ fun BudgetTabContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             ScreenTopBar(
-                headerTitle = "Budgets",
-                showBack = false,
-                actions = {
+                headerTitle = "Budgets", showBack = false, actions = {
                     Box {
                         IconButton(onClick = onNavigateToAddBudget) {
                             Box(
@@ -187,8 +204,7 @@ fun BudgetTabContent(
                             }
                         }
                     }
-                }
-            )
+                })
         },
     ) { innerPadding ->
         LazyColumn(
@@ -202,38 +218,73 @@ fun BudgetTabContent(
             item { MonthNavigatorRow(currentMonth, canGoBack, canGoForward, onPrevious, onNext) }
 
             // ── Overview card (GradientCard / glass) ─────────────────────────
-            item {
-                BudgetOverviewCard(
-                    totalBudget = totalBudget.toDouble(),
-                    totalSpent = totalSpent.toDouble(),
-                    budgetLeft = budgetLeft.toDouble(),
-                    usedPct = usedPct,
-                    daysLeft = daysLeft,
-                    dailyAvg = dailyAvg,
-                    alertCategory = alertCategory,
-                    fmt = fmt,
-                )
+            // Not rendered when no budget was set for a past month.
+            if (!noBudgetPastMonth) {
+                item {
+                    BudgetOverviewCard(
+                        totalBudget = totalBudget.toDouble(),
+                        totalSpent = totalSpent.toDouble(),
+                        budgetLeft = budgetLeft.toDouble(),
+                        usedPct = usedPct,
+                        daysLeft = daysLeft,
+                        dailyAvg = dailyAvg,
+                        alertCategory = alertCategory,
+                        fmt = fmt,
+                        isCurrentMonth = isCurrentMonth,
+                    )
+                }
             }
 
             // ── Section label ────────────────────────────────────────────────
-            item {
-                Text(
-                    text = "${budgetsToShow.size} budgets. ${currentMonth.take(3)} ${currentMonth.takeLast(4)}",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(vertical = 2.dp),
-                )
+            if (!noBudgetPastMonth) {
+                item {
+                    Text(
+                        text = "${budgetsToShow.size} budgets. ${currentMonth.take(3)} ${currentMonth.takeLast(4)}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
+                }
             }
 
-            // ── Per-category cards ───────────────────────────────────────────
-            items(budgetsToShow, key = { it.category.id }) { display ->
-                BudgetCategoryCard(
-                    display = display,
-                    progMul = progMul,
-                    fmt = fmt,
-                    onClick = { onNavigateToBudgetDetail(display.category) },
-                )
+            // ── Per-category cards or no-budget placeholder ──────────────────
+            if (noBudgetPastMonth) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = "No budget set",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "No budgets were tracked for ${currentMonth}.",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(budgetsToShow, key = { it.category.id }) { display ->
+                    BudgetCategoryCard(
+                        display = display,
+                        progMul = progMul,
+                        fmt = fmt,
+                        onClick = { onNavigateToBudgetDetail(display.category) },
+                    )
+                }
             }
         }
     }
@@ -298,6 +349,7 @@ private fun BudgetOverviewCard(
     dailyAvg: Double,
     alertCategory: BudgetCategoryDisplay?,
     fmt: java.text.NumberFormat,
+    isCurrentMonth: Boolean = true,
 ) {
     var arcTriggered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { arcTriggered = true }
@@ -395,25 +447,28 @@ private fun BudgetOverviewCard(
                         )
                         // vertical divider
                         Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(36.dp)
-                                .align(Alignment.CenterVertically)
+                            modifier = Modifier.width(1.dp).height(36.dp).align(Alignment.CenterVertically)
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
                         )
-                            // Show meaningful Remaining text: exceeded / 100% used / remaining
-                            val exceededTotal = (totalSpent - totalBudget).coerceAtLeast(0.0)
-                            val remainingValueText = when {
-                                exceededTotal > 0.0 -> "Budget exceeded by ${exceededTotal.toCurrency(fmt)}"
-                                budgetLeft == 0.0 -> "100% used"
-                                else -> budgetLeft.toCurrency(fmt)
-                            }
-                            OverviewStat(
-                                value = remainingValueText,
-                                label = "Remaining",
-                                modifier = Modifier.weight(1f),
-                                align = Alignment.End,
-                            )
+                        // Remaining: abbreviated so it never overflows maxLines=1
+                        val exceededTotal = (totalSpent - totalBudget).coerceAtLeast(0.0)
+                        val remainingValueText = when {
+                            exceededTotal > 0.0 -> "−₹${formatAbbreviatedAmount(exceededTotal)}"
+                            budgetLeft == 0.0 -> "100% used"
+                            else -> "₹${formatAbbreviatedAmount(budgetLeft.toDouble())}"
+                        }
+                        val remainingColor = when {
+                            exceededTotal > 0.0 -> MaterialTheme.colorScheme.error
+                            budgetLeft == 0.0 -> AmberColor
+                            else -> Color.Unspecified
+                        }
+                        OverviewStat(
+                            value = remainingValueText,
+                            label = "Remaining",
+                            valueColor = remainingColor,
+                            modifier = Modifier.weight(1f),
+                            align = Alignment.End,
+                        )
                     }
 
                     // horizontal divider
@@ -422,32 +477,39 @@ private fun BudgetOverviewCard(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                     )
 
-                    // Row 2: Days left | Daily avg
+                    // Row 2: Days left (current month only) | Daily avg
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
-                        OverviewStat(
-                            value = "$daysLeft days",
-                            label = "Days left",
-                            valueColor = AmberColor,
-                            modifier = Modifier.weight(1f),
-                        )
-                        // vertical divider
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(36.dp)
-                                .align(Alignment.CenterVertically)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-                        )
-                        OverviewStat(
-                            value = dailyAvg.toCurrency(fmt),
-                            label = "Daily avg",
-                            valueColor = arcColor,
-                            modifier = Modifier.weight(1f),
-                            align = Alignment.End,
-                        )
+                        if (isCurrentMonth) {
+                            OverviewStat(
+                                value = "$daysLeft days",
+                                label = "Days left",
+                                valueColor = AmberColor,
+                                modifier = Modifier.weight(1f),
+                            )
+                            // vertical divider
+                            Box(
+                                modifier = Modifier.width(1.dp).height(36.dp).align(Alignment.CenterVertically)
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                            )
+                            OverviewStat(
+                                value = dailyAvg.toCurrency(fmt),
+                                label = "Daily avg",
+                                valueColor = arcColor,
+                                modifier = Modifier.weight(1f),
+                                align = Alignment.End,
+                            )
+                        } else {
+                            // Past month: days left is meaningless — show daily avg full-width
+                            OverviewStat(
+                                value = dailyAvg.toCurrency(fmt),
+                                label = "Daily avg",
+                                valueColor = arcColor,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }
@@ -459,10 +521,7 @@ private fun BudgetOverviewCard(
                 else MaterialTheme.colorScheme.onErrorContainer
                 Spacer(Modifier.height(14.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.Transparent)
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.Transparent)
                         .border(1.dp, color = colorVar, shape = RoundedCornerShape(10.dp))
                         .padding(horizontal = 10.dp, vertical = 9.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -475,12 +534,10 @@ private fun BudgetOverviewCard(
                         modifier = Modifier.size(16.dp).padding(top = 1.dp),
                     )
                     Text(
-                        text = if (overshoot > 0)
-                            "Heads up! At this pace you'll exceed ${alertCategory.category.name} budget by ${
-                                overshoot.toDouble().toCurrency(fmt)
-                            } by month-end."
-                        else
-                            "You're close to exceeding your ${alertCategory.category.name} budget.",
+                        text = if (overshoot > 0) "Heads up! At this pace you'll exceed ${alertCategory.category.name} budget by ${
+                            overshoot.toDouble().toCurrency(fmt)
+                        } by month-end."
+                        else "You're close to exceeding your ${alertCategory.category.name} budget.",
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium,
                         color = colorVar,
@@ -553,7 +610,8 @@ private fun BudgetCategoryCard(
     val pctUsed = (p * 100).toInt()
 
     Box(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = onClick),
     ) {
         // Colored left accent
         Box(
@@ -595,24 +653,33 @@ private fun BudgetCategoryCard(
             Spacer(Modifier.height(7.dp))
 
             // Footer
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 val overshoot = (display.category.spent - display.category.total).coerceAtLeast(0)
                 val footerText = when {
-                    overshoot > 0 -> "Budget exceeded by ${overshoot.toDouble().toCurrency(fmt)} · $pctUsed% used"
-                    remaining == 0 -> "100% used · $pctUsed% used"
-                    else -> "${remaining.toDouble().toCurrency(fmt)} left this month · $pctUsed% used"
+                    overshoot > 0 -> "Over by ₹${formatAbbreviatedAmount(overshoot.toDouble())} · $pctUsed% used"
+
+                    remaining == 0 -> "100% used"
+
+                    else -> "₹${formatAbbreviatedAmount(remaining.toDouble())} left · $pctUsed% used"
                 }
                 Text(
                     text = footerText,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = footerColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 6.dp),
                 )
                 Icon(
                     painterResource(R.drawable.right_arrow),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
