@@ -1,0 +1,13 @@
+# Local gradle properties example — KEEP THIS FILE IN REPO.
+# Copy this file to `gradle-local.properties` at the project root and fill in your local values.
+# IMPORTANT: Do NOT commit your real `gradle-local.properties` — keep it out of version control.
+
+# Example backend URL (replace with your local/dev backend). Include scheme (http:// or https://).
+# You can include a trailing slash or omit it; the build will normalize it.
+# backendBaseUrl=http://192.168.29.104:8082/
+
+# Replace the placeholder below in your local gradle-local.properties
+backendBaseUrl=REPLACE_WITH_BACKEND_BASE_URL
+
+# Example Google web client id (optional):
+# googleWebClientId=REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com
