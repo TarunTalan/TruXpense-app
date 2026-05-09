@@ -9,6 +9,29 @@
 
 ---
 
+## 📸 Premium Showcase (Curated Feature Clusters)
+
+A streamlined 6-step journey through the TruXpense ecosystem, highlighting the synergy between automated tracking and professional analysis.
+
+| 1. Core Experience | 2. Manual Data Entry | 3. Visual Analytics |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/dashboard/dark/dashboard_speding_chart_dark.jpg" width="49%"/> <img src="assets/screenshots/transactions/dark/transaction_dark.jpg" width="49%"/> | <img src="assets/screenshots/add_transactions/dark/add_transaction_dark.jpg" width="100%"> | <img src="assets/screenshots/analytics/dark/anlytics_dark.jpg" width="49%"/> <img src="assets/screenshots/analytics/dark/analytics_bottom_dark.jpg" width="49%"/> |
+| *Dashboard & History* | *Manual Transaction Entry* | *Spending Trends & Charts* |
+
+| 4. Financial Planning | 5. Professional Reporting | 6. App Customization |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/budgets/dark/budgets_dark.jpg" width="49%"/> <img src="assets/screenshots/savings_and_goals/dark/savings_dark.jpg" width="49%"/> | <img src="assets/screenshots/reports/dark/report_detail_dark.jpg" width="49%"/> <img src="assets/screenshots/reports/dark/report_vault_dark.jpg" width="49%"/> | <img src="assets/screenshots/settings/dark/settings_dark.jpg" width="49%"/> <img src="assets/screenshots/notifications/dark/notification_dark.jpg" width="49%"/> |
+| *Budgets & Savings Goals* | *Analysis & Vault* | *Preferences & Notifications* |
+
+### 🌗 Dynamic Theme Support
+*Seamlessly transition between Light and Dark modes with Material You dynamic color scaling.*
+
+| Light Mode | Dark Mode |
+| :---: | :---: |
+| <img src="assets/screenshots/dashboard/light/dashboard.jpg" width="100%"> | <img src="assets/screenshots/dashboard/dark/dashboard_speding_chart_dark.jpg" width="100%"> |
+
+---
+
 ## 🌟 Key Features
 
 - **🤖 AI-Powered Automation**: Automatically detects and parses bank SMS notifications to record transactions in real-time.
@@ -19,74 +42,6 @@
 - **🔒 Report Vault**: A secure space to manage and view all your historical financial reports.
 - **🌗 Full Theme Support**: Beautifully crafted Light and Dark modes that adapt to your system preferences.
 - **🔔 Smart Reminders**: Customizable notifications to keep you on track with your financial goals.
-
----
-
-## 📸 App Showcase
-
-### 🏠 Core Experience & Dashboard
-| Dashboard (Light) | Dashboard (Dark) | Scrolled Overview |
-| :---: | :---: | :---: |
-| ![Dashboard](assets/screenshots/dashboard.jpg) | ![Dashboard Dark](assets/screenshots/dashboard_dark.jpg) | ![Dashboard Scrolled](assets/screenshots/dashboard_scrolled.jpg) |
-
-| Smart SMS Parsing | Budget Overview Card | Recent Transactions |
-| :---: | :---: | :---: |
-| ![SMS Parsing](assets/screenshots/notification_popup_dark.jpg) | ![Budget Card](assets/screenshots/dashboard_budgets_card.jpg) | ![Transactions](assets/screenshots/recent_transactions.jpg) |
-
-### 📊 Analytics & Deep Insights
-| Spending Trends | Category Analytics | Daily Spending Chart |
-| :---: | :---: | :---: |
-| ![Analytics](assets/screenshots/analytics.jpg) | ![Analytics Dark](assets/screenshots/anlytics_dark.jpg) | ![Daily Chart](assets/screenshots/daily_spending_chart.jpg) |
-
-| Spending Charts (Light) | Spending Charts (Dark) | Analytics Bottom Sheet |
-| :---: | :---: | :---: |
-| ![Charts](assets/screenshots/analytics_spending_chart.jpg) | ![Charts Dark](assets/screenshots/analytics_spending_chart_dark.jpg) | ![Analytics Bottom](assets/screenshots/analytics_bottom_dark.jpg) |
-
-### 💸 Budgeting & Financial Planning
-| All Budgets | Budget Detail | Budget Actions |
-| :---: | :---: | :---: |
-| ![Budgets](assets/screenshots/budgets.jpg) | ![Budget Detail](assets/screenshots/budget_detail.jpg) | ![Budget Actions](assets/screenshots/budget_detail_actions.jpg) |
-
-| Add New Budget | Add Budget (Dark) | Filter Transactions |
-| :---: | :---: | :---: |
-| ![Add Budget](assets/screenshots/add_budget.jpg) | ![Add Budget Dark](assets/screenshots/add_budget_dark.jpg) | ![Filter](assets/screenshots/filter_transactions.jpg) |
-
-### 🎯 Savings & Goals
-| Savings Overview | Goal Distribution | Savings Distribution |
-| :---: | :---: | :---: |
-| ![Savings](assets/screenshots/savings.jpg) | ![Goal Distribution](assets/screenshots/distribute_goal.jpg) | ![Savings Distribution](assets/screenshots/distribute_savings_dark.jpg) |
-
-| Goal Details | Goal Progress | Create New Goal |
-| :---: | :---: | :---: |
-| ![Goal Detail](assets/screenshots/goal_detail.jpg) | ![Goal Bottom](assets/screenshots/goal_detail_bottom.jpg) | ![Create Goal](assets/screenshots/create_goal.jpg) |
-
-### 📄 Professional Reporting
-| Report Generation | Generated Report | Expense Summary |
-| :---: | :---: | :---: |
-| ![Create Report](assets/screenshots/create_report.jpg) | ![Generated Report](assets/screenshots/generated_report.jpg) | ![Expense Report](assets/screenshots/expense_report.jpg) |
-
-| Report Detail | Report Actions | Report Vault |
-| :---: | :---: | :---: |
-| ![Report Detail](assets/screenshots/report_detail_bottom.jpg) | ![Report Actions](assets/screenshots/report_actions.jpg) | ![Vault](assets/screenshots/Report_Vault.jpg) |
-
-### ➕ Transactions & Data Entry
-| Add Expense | Add Income | Add Transaction (Dark) |
-| :---: | :---: | :---: |
-| ![Add Expense](assets/screenshots/add-expense.jpg) | ![Add Income](assets/screenshots/add_income_dark.jpg) | ![Add Trans Dark](assets/screenshots/add_transaction_dark.jpg) |
-
-### ⚙️ Settings & Customization
-| User Settings | Notifications | Preferences |
-| :---: | :---: | :---: |
-| ![Settings](assets/screenshots/settings.jpg) | ![Notifications](assets/screenshots/notifiaction_and_reminder_settings.jpg) | ![Preferences](assets/screenshots/settings_preferences.jpg) |
-
-### 👋 Onboarding & Authentication
-| Onboarding 1 | Onboarding 2 | Onboarding 3 |
-| :---: | :---: | :---: |
-| ![Onboarding 1](assets/screenshots/onboarding_1.jpg) | ![Onboarding 2](assets/screenshots/onboarding_2.jpg) | ![Onboarding 3](assets/screenshots/onboarding_3.jpg) |
-
-| Login Screen | Signup Screen | Auth Dark Mode |
-| :---: | :---: | :---: |
-| ![Login](assets/screenshots/login.jpg) | ![Signup](assets/screenshots/signup.jpg) | ![Notification Dark](assets/screenshots/notification_dark.jpg) |
 
 ---
 
@@ -136,7 +91,7 @@ Contributions are what make the open-source community such an amazing place to l
 
 ## 📧 Contact
 
-**Tarun Talan** - [Your LinkedIn/Email]
+**Tarun Talan** - [LinkedIn](https://www.linkedin.com/in/tarun-talan-77360a37a/) - [Portfolio](https://www.tarundev.me/project)
 
 Project Link: [https://github.com/TarunTalan/TruXpense-app](https://github.com/TarunTalan/TruXpense-app)
 
