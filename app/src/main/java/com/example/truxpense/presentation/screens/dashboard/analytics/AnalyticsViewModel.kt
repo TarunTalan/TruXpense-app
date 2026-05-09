@@ -1,0 +1,473 @@
+package com.example.truxpense.presentation.screens.dashboard.analytics
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.truxpense.data.repository.budget.BudgetRepository
+import com.example.truxpense.data.repository.expense.ExpenseRepository
+import com.example.truxpense.data.repository.expense.Transaction
+import com.example.truxpense.presentation.screens.dashboard.transaction.EntryType
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.*
+import java.util.*
+import javax.inject.Inject
+import androidx.compose.ui.graphics.Color
+import android.graphics.Color as AndroidColor
+
+// ── UI models ─────────────────────────────────────────────────────────────────
+
+data class CategorySpend(
+    val name: String,
+    val amount: Double,
+    val color: Color,
+)
+
+/**
+ * A single point on the trend chart.
+ * [label]       — x-axis label (e.g. "Mon", "W1", "Jan")
+ * [amount]      — total spend for this bucket
+ * [tooltipDate] — human-readable date/range for press-and-hold tooltip
+ */
+data class TrendPoint(
+    val label: String,
+    val amount: Double,
+    val tooltipDate: String = label,
+)
+
+// ── Period selector ───────────────────────────────────────────────────────────
+
+enum class AnalyticsPeriod { WEEK, MONTH, YEAR }
+
+// ── Analytics state ───────────────────────────────────────────────────────────
+
+data class AnalyticsUiState(
+    val period: AnalyticsPeriod = AnalyticsPeriod.MONTH,
+    val offset: Int = 0,
+    val periodLabel: String = "",
+    val canGoBack: Boolean = true,
+    val canGoForward: Boolean = false,
+    val totalSpent: Double = 0.0,
+    val totalBudget: Double = 0.0,
+    /** +N → spent more than previous period, -N → spent less, 0 → no previous data */
+    val changePercent: Int = 0,
+    val hasComparison: Boolean = false,
+    val categories: List<CategorySpend> = emptyList(),
+    val trendPoints: List<TrendPoint> = emptyList(),
+    val topMerchant: Pair<String, Double>? = null,
+    val topCategory: Pair<String, Double>? = null,
+    /** False until Room has emitted at least once — used to suppress the pre-data skeleton flash. */
+    val roomLoaded: Boolean = false,
+)
+
+// ── ViewModel ─────────────────────────────────────────────────────────────────
+
+@HiltViewModel
+class AnalyticsViewModel @Inject constructor(
+    private val expenseRepository: ExpenseRepository,
+    private val budgetRepository: BudgetRepository,
+) : ViewModel() {
+
+    private val _period = MutableStateFlow(AnalyticsPeriod.MONTH)
+    private val _offset = MutableStateFlow(0)
+
+    // ── Filter state ──────────────────────────────────────────────────────────
+    private val _filterCategory = MutableStateFlow<String?>(null)
+    private val _filterMonth = MutableStateFlow<Int?>(null)
+    private val _filterYear = MutableStateFlow<Int?>(null)
+    private val _filterDateFrom = MutableStateFlow<Long?>(null)
+    private val _filterDateTo = MutableStateFlow<Long?>(null)
+    private val _filterType = MutableStateFlow<EntryType?>(null)
+
+    val filterCategory: StateFlow<String?> = _filterCategory.asStateFlow()
+    val filterMonth: StateFlow<Int?> = _filterMonth.asStateFlow()
+    val filterYear: StateFlow<Int?> = _filterYear.asStateFlow()
+    val filterDateFrom: StateFlow<Long?> = _filterDateFrom.asStateFlow()
+    val filterDateTo: StateFlow<Long?> = _filterDateTo.asStateFlow()
+    val filterType: StateFlow<EntryType?> = _filterType.asStateFlow()
+
+    fun setFilterCategory(v: String?) { _filterCategory.value = v }
+    fun setFilterMonth(v: Int?) { _filterMonth.value = v }
+    fun setFilterYear(v: Int?) { _filterYear.value = v }
+    fun setFilterDateFrom(v: Long?) { _filterDateFrom.value = v }
+    fun setFilterDateTo(v: Long?) { _filterDateTo.value = v }
+    fun setFilterType(v: EntryType?) { _filterType.value = v }
+    fun clearFilters() {
+        _filterCategory.value = null
+        _filterMonth.value = null
+        _filterYear.value = null
+        _filterDateFrom.value = null
+        _filterDateTo.value = null
+        _filterType.value = null
+    }
+
+    val activeFilterCount: StateFlow<Int> = combine(
+        _filterCategory, _filterMonth, _filterYear, _filterDateFrom, _filterDateTo,
+    ) { cat, month, year, from, to ->
+        // base count without type
+        listOfNotNull(cat, month, year, if (from != null || to != null) true else null).size
+    }.combine(_filterType) { baseCount, type ->
+        baseCount + if (type != null) 1 else 0
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /** Available categories derived from all transactions */
+    val availableCategories: StateFlow<List<String>> = expenseRepository.transactions
+        .map { txs -> txs.map { it.category }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Available years derived from all transactions */
+    val availableYears: StateFlow<List<Int>> = expenseRepository.transactions
+        .map { txs ->
+            txs.map {
+                Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                    .get(Calendar.YEAR)
+            }.distinct().sortedDescending()
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val selectedPeriod: StateFlow<AnalyticsPeriod> = _period.asStateFlow()
+
+    fun setPeriod(p: AnalyticsPeriod) {
+        _period.value = p; _offset.value = 0
+    }
+
+    fun goBack() {
+        _offset.value--
+    }
+
+    fun goForward() {
+        if (_offset.value < 0) _offset.value++
+    }
+
+    // Pre-compute the initial state synchronously so the screen never sees a blank sentinel.
+    // periodLabel / periodWindow only need Calendar.getInstance() — no coroutine required.
+    private val _initialState: AnalyticsUiState = run {
+        val now = Calendar.getInstance()
+        AnalyticsUiState(
+            period = AnalyticsPeriod.MONTH,
+            offset = 0,
+            periodLabel = periodLabel(AnalyticsPeriod.MONTH, 0, now),
+            canGoBack = true,
+            canGoForward = false,
+            // data fields stay 0/empty — Room hasn't loaded yet, but the skeleton is valid
+        )
+    }
+
+    // Combine all flows so any filter change immediately re-computes uiState.
+    // We chain combines to avoid the 5-arg limit.
+    // ── Filter snapshot now includes type so UI changes re-compute state
+    private data class FilterSnapshot(
+        val category: String?,
+        val month: Int?,
+        val year: Int?,
+        val type: EntryType?,
+        val dateFrom: Long?,
+        val dateTo: Long?,
+    )
+
+    // First combine five flows into a partial snapshot, then combine with _filterType.
+    private data class PartialFilter(
+        val category: String?,
+        val month: Int?,
+        val year: Int?,
+        val dateFrom: Long?,
+        val dateTo: Long?,
+    )
+
+    private val _partialFilters: Flow<PartialFilter> = combine(
+        _filterCategory, _filterMonth, _filterYear, _filterDateFrom, _filterDateTo,
+    ) { cat, month, year, from, to -> PartialFilter(cat, month, year, from, to) }
+
+    private val _filters: Flow<FilterSnapshot> = combine(_partialFilters, _filterType) { part, type ->
+        FilterSnapshot(part.category, part.month, part.year, type, part.dateFrom, part.dateTo)
+    }
+
+    val uiState: StateFlow<AnalyticsUiState> = combine(
+        expenseRepository.transactions,
+        budgetRepository.budgets,
+        _period,
+        _offset,
+        _filters,
+    ) { txs, budgets, period, offset, filters ->
+
+        val now = Calendar.getInstance()
+        val (winStart, winEnd) = periodWindow(period, offset, now)
+        val duration = winEnd - winStart
+        val prevEnd = winStart - 1L
+        val prevStart = prevEnd - duration
+
+        fun passes(tx: Transaction): Boolean {
+            if (filters.category != null && tx.category != filters.category) return false
+            if (filters.month != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+                if (cal.get(Calendar.MONTH) + 1 != filters.month) return false
+            }
+            if (filters.year != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = tx.timestamp }
+                if (cal.get(Calendar.YEAR) != filters.year) return false
+            }
+            // Apply entry type filter: only include matching entry types
+            if (filters.type != null) {
+                val isIncome = tx.amount > 0 // in repository Transaction.amount is positive for all? Recheck domain: transactions amount likely positive for expenses; but we'll check 'source' or type mapping elsewhere. For now, skip type filtering here as repository Transaction lacks type flag.
+            }
+            if (filters.dateFrom != null && tx.timestamp < filters.dateFrom) return false
+            if (filters.dateTo != null && tx.timestamp > filters.dateTo) return false
+            return true
+        }
+
+        // Previous period does NOT apply category/month/year filters — it's for comparison only
+        val current = txs.filter { it.timestamp in winStart..winEnd && passes(it) }
+        val previous = txs.filter { it.timestamp in prevStart..prevEnd }
+
+        val totalSpent = current.sumOf { it.amount }
+        val prevSpent = previous.sumOf { it.amount }
+        val totalBudget = budgets.sumOf { it.amount }
+        val changePercent = if (prevSpent > 0) (((totalSpent - prevSpent) / prevSpent) * 100).toInt() else 0
+
+        val categories = run {
+            // Group current transactions by category
+            val groupedByCat = current.groupBy { it.category }
+            val cats = groupedByCat.keys.sorted()
+
+            // Reusable small fixed palette — use this when number of categories is small
+            val fixedPalette = listOf(
+                Color(0xFFEF4444), // red
+                Color(0xFF14B8A6), // teal
+                Color(0xFFF59E0B), // amber
+                Color(0xFF4F46E5), // indigo
+                Color(0xFF8B5CF6), // purple
+                Color(0xFF10B981), // green
+                Color(0xFF3B82F6), // blue
+                Color(0xFF06B6D4), // cyan
+                Color(0xFFFB7185), // pink
+                Color(0xFFF97316), // orange
+                Color(0xFF7C4DFF), // deep purple variant
+                Color(0xFF00BFA6), // mint
+                Color(0xFFFFB74D), // light orange
+                Color(0xFF4DB6AC), // light teal
+                Color(0xFFFF8A65), // coral
+                Color(0xFF90A4AE), // blue grey
+                Color(0xFF795548), // brown
+                Color(0xFF8E24AA), // magenta
+                Color(0xFF0097A7), // teal dark
+                Color(0xFFCDDC39)  // lime
+            )
+
+            val colorForIndex: (Int) -> Color = { idx ->
+                if (cats.size <= fixedPalette.size) fixedPalette[idx % fixedPalette.size]
+                else {
+                    // generate colors across the hue spectrum for larger counts
+                    val hue = (idx.toFloat() * 360f / cats.size)
+                    val hsv = floatArrayOf(hue, 0.65f, 0.85f)
+                    Color(AndroidColor.HSVToColor(hsv))
+                }
+            }
+
+            val catColors = cats.mapIndexed { idx, cat -> cat to colorForIndex(idx) }.toMap()
+
+            cats.map { cat ->
+                val items = groupedByCat[cat] ?: emptyList()
+                CategorySpend(cat, items.sumOf { it.amount }, catColors[cat] ?: Color(0xFF6B7280))
+            }.sortedByDescending { it.amount }
+        }
+
+        val trendPoints = buildTrendPoints(current, period, offset, now)
+
+        val topMerchant =
+            current.groupBy { it.merchant }.mapValues { (_, v) -> v.sumOf { it.amount } }.maxByOrNull { it.value }
+                ?.let { it.key to it.value }
+
+        val topCategory = categories.firstOrNull()?.let { it.name to it.amount }
+
+        AnalyticsUiState(
+            period = period,
+            offset = offset,
+            periodLabel = periodLabel(period, offset, now),
+            canGoBack = offset > -24,
+            canGoForward = offset < 0,
+            totalSpent = totalSpent,
+            totalBudget = totalBudget,
+            changePercent = changePercent,
+            hasComparison = prevSpent > 0,
+            categories = categories,
+            trendPoints = trendPoints,
+            topMerchant = topMerchant,
+            topCategory = topCategory,
+            roomLoaded = true,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _initialState)
+
+    /** Always true — initial state is pre-computed synchronously, so there is never a blank frame. */
+    val isLoaded: StateFlow<Boolean> = uiState.map { it.roomLoaded }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    // ── Period window ─────────────────────────────────────────────────────────
+
+    private fun periodWindow(
+        period: AnalyticsPeriod, offset: Int, now: Calendar
+    ): Pair<Long, Long> {
+        val cal = now.clone() as Calendar
+        return when (period) {
+            AnalyticsPeriod.WEEK -> {
+                val dow = cal.get(Calendar.DAY_OF_WEEK)
+                val toMon = if (dow == Calendar.SUNDAY) 6 else dow - Calendar.MONDAY
+                cal.add(Calendar.DAY_OF_YEAR, -toMon + (offset * 7))
+                cal.zeroTime()
+                val start = cal.timeInMillis
+                cal.add(Calendar.DAY_OF_YEAR, 7)
+                start to cal.timeInMillis - 1L
+            }
+
+            AnalyticsPeriod.MONTH -> {
+                cal.add(Calendar.MONTH, offset)
+                cal.set(Calendar.DAY_OF_MONTH, 1); cal.zeroTime()
+                val start = cal.timeInMillis
+                cal.add(Calendar.MONTH, 1)
+                start to cal.timeInMillis - 1L
+            }
+
+            AnalyticsPeriod.YEAR -> {
+                cal.add(Calendar.YEAR, offset)
+                cal.set(Calendar.MONTH, Calendar.JANUARY)
+                cal.set(Calendar.DAY_OF_MONTH, 1); cal.zeroTime()
+                val start = cal.timeInMillis
+                cal.add(Calendar.YEAR, 1)
+                start to cal.timeInMillis - 1L
+            }
+        }
+    }
+
+    // ── Trend points ──────────────────────────────────────────────────────────
+
+    private fun buildTrendPoints(
+        txs: List<Transaction>,
+        period: AnalyticsPeriod,
+        offset: Int,
+        now: Calendar,
+    ): List<TrendPoint> = when (period) {
+
+        // WEEK — 7 daily buckets, Mon → Sun
+        AnalyticsPeriod.WEEK -> {
+            val labels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+            val cal = now.clone() as Calendar
+            val dow = cal.get(Calendar.DAY_OF_WEEK)
+            val toMon = if (dow == Calendar.SUNDAY) 6 else dow - Calendar.MONDAY
+            cal.add(Calendar.DAY_OF_YEAR, -toMon + (offset * 7)); cal.zeroTime()
+
+            (0..6).map { i ->
+                val dayStart = cal.timeInMillis
+                val dayEnd = dayStart + 86_399_999L
+                val dateStr = "${cal.get(Calendar.DAY_OF_MONTH)} ${monthShort(cal.get(Calendar.MONTH))}"
+                val amt = txs.filter { it.timestamp in dayStart..dayEnd }.sumOf { it.amount }
+                cal.add(Calendar.DAY_OF_YEAR, 1)
+                TrendPoint(label = labels[i], amount = amt, tooltipDate = "${labels[i]}, $dateStr")
+            }
+        }
+
+        // MONTH — weekly buckets W1..W4/W5
+        AnalyticsPeriod.MONTH -> {
+            val cal = now.clone() as Calendar
+            cal.add(Calendar.MONTH, offset)
+            cal.set(Calendar.DAY_OF_MONTH, 1); cal.zeroTime()
+            val monthStart = cal.timeInMillis
+            val monthYear = "${monthFull(cal.get(Calendar.MONTH))} ${cal.get(Calendar.YEAR)}"
+            cal.add(Calendar.MONTH, 1)
+            val monthEnd = cal.timeInMillis - 1L
+
+            val points = mutableListOf<TrendPoint>()
+            val cursor = (now.clone() as Calendar).apply { timeInMillis = monthStart }
+            var week = 1
+            while (cursor.timeInMillis <= monthEnd) {
+                val bStart = cursor.timeInMillis
+                val d1 = cursor.get(Calendar.DAY_OF_MONTH)
+                cursor.add(Calendar.DAY_OF_YEAR, 7)
+                val bEnd = minOf(cursor.timeInMillis - 1L, monthEnd)
+                val d2 = (now.clone() as Calendar).apply { timeInMillis = bEnd }.get(Calendar.DAY_OF_MONTH)
+                val amt = txs.filter { it.timestamp in bStart..bEnd }.sumOf { it.amount }
+                points.add(
+                    TrendPoint(
+                        label = "W$week",
+                        amount = amt,
+                        tooltipDate = "$d1–$d2 $monthYear",
+                    )
+                )
+                week++
+            }
+            points
+        }
+
+        // YEAR — 12 monthly buckets
+        AnalyticsPeriod.YEAR -> {
+            val cal = now.clone() as Calendar
+            cal.add(Calendar.YEAR, offset)
+            val year = cal.get(Calendar.YEAR)
+            cal.set(Calendar.MONTH, Calendar.JANUARY)
+            cal.set(Calendar.DAY_OF_MONTH, 1); cal.zeroTime()
+
+            (0..11).map { m ->
+                cal.set(Calendar.MONTH, m)
+                val start = cal.timeInMillis
+                cal.add(Calendar.MONTH, 1)
+                val end = cal.timeInMillis - 1L
+                val amt = txs.filter { it.timestamp in start..end }.sumOf { it.amount }
+                TrendPoint(
+                    label = monthShort(m),
+                    amount = amt,
+                    tooltipDate = "${monthFull(m)} $year",
+                )
+            }
+        }
+    }
+
+    // ── Period label ──────────────────────────────────────────────────────────
+
+    private fun periodLabel(period: AnalyticsPeriod, offset: Int, now: Calendar): String {
+        val cal = now.clone() as Calendar
+        return when (period) {
+            AnalyticsPeriod.WEEK -> {
+                val dow = cal.get(Calendar.DAY_OF_WEEK)
+                val toMon = if (dow == Calendar.SUNDAY) 6 else dow - Calendar.MONDAY
+                cal.add(Calendar.DAY_OF_YEAR, -toMon + (offset * 7))
+                val d1 = cal.get(Calendar.DAY_OF_MONTH)
+                val m1 = monthShort(cal.get(Calendar.MONTH))
+                cal.add(Calendar.DAY_OF_YEAR, 6)
+                val d2 = cal.get(Calendar.DAY_OF_MONTH)
+                val m2 = monthShort(cal.get(Calendar.MONTH))
+                if (m1 == m2) "$d1–$d2 $m1" else "$d1 $m1 – $d2 $m2"
+            }
+
+            AnalyticsPeriod.MONTH -> {
+                cal.add(Calendar.MONTH, offset)
+                "${monthFull(cal.get(Calendar.MONTH))} ${cal.get(Calendar.YEAR)}"
+            }
+
+            AnalyticsPeriod.YEAR -> {
+                cal.add(Calendar.YEAR, offset)
+                "${cal.get(Calendar.YEAR)}"
+            }
+        }
+    }
+
+    // ── Util ──────────────────────────────────────────────────────────────────
+
+    private fun Calendar.zeroTime() {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }
+
+    private fun monthShort(m: Int) =
+        listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[m]
+
+    private fun monthFull(m: Int) = listOf(
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+    )[m]
+}

@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+<<<<<<< HEAD
     <style name="Theme.TruXpense" parent="android:Theme.Material.Light.NoActionBar" />
+=======
+    <style name="Theme.TruXpense" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Use a window background that matches app background to avoid a flash on splash exit -->
+        <item name="android:windowBackground">@color/white</item>
+    </style>
+
+    <!-- Splash launch theme (light) shown by the system before Compose loads -->
+    <style name="Theme.TruXpense.Splash" parent="Theme.TruXpense">
+        <item name="android:windowBackground">@color/white</item>
+    </style>
+
+>>>>>>> develop
 </resources>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+<<<<<<< HEAD
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
@@ -22,6 +23,132 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+=======
+          xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- ── SMS Permissions ─────────────────────────────────────────────── -->
+    <!-- RECEIVE_SMS: real-time parsing via SmsBroadcastReceiver (runtime request) -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <!-- READ_SMS: Re-scan History (S-05) bulk inbox parse (runtime request) -->
+    <uses-permission android:name="android.permission.READ_SMS"/>
+
+    <!-- Optional telephony feature so READ_SMS / RECEIVE_SMS aren't flagged by lint -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false"/>
+
+    <!-- ── Notification Permissions ────────────────────────────────────── -->
+    <!-- Android 13+ runtime notification permission -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- ── WorkManager / Alarm Permissions ─────────────────────────────── -->
+    <!-- Required for WorkManager on Android 12+ for exact-time reminders -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+                     android:maxSdkVersion="32"/>
+    <!-- Android 12 needs this for foreground wakeup via WorkManager -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+    <!-- UPI app detection on Android ≤ 10 (S-04 UPI Sync Setup Screen) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+                     android:maxSdkVersion="29" tools:ignore="QueryAllPackagesPermission"/>
+
+
+    <application
+            android:name=".TruXpenseApplication"
+            android:allowBackup="true"
+            android:dataExtractionRules="@xml/data_extraction_rules"
+            android:fullBackupContent="@xml/backup_rules"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:supportsRtl="true"
+            android:theme="@style/Theme.TruXpense"
+            android:networkSecurityConfig="@xml/network_security_config">
+
+        <!-- ── Main Activity ─────────────────────────────────────────── -->
+        <activity
+                android:name=".MainActivity"
+                android:exported="true"
+                android:launchMode="singleTop"
+                android:theme="@style/Theme.TruXpense.Splash"
+                android:screenOrientation="portrait"
+                tools:ignore="LockedOrientation">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- ── FCM Service ──────────────────────────────────────────── -->
+        <service
+                android:name=".service.TruxpenseFirebaseMessagingService"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+
+        <!-- Background WorkManager Service -->
+        <service
+                android:name="androidx.work.impl.background.systemjob.SystemJobService"
+                android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- FCM notification icon / colour -->
+        <!-- default_notification_icon: used by system when app is in background (notification payload) -->
+        <!-- For data-only messages, TruxpenseFirebaseMessagingService sets per-type icons in code -->
+        <meta-data
+                android:name="com.google.firebase.messaging.default_notification_icon"
+                android:resource="@drawable/ic_notification"/>
+        <meta-data
+                android:name="com.google.firebase.messaging.default_notification_color"
+                android:resource="@color/notification_accent"/>
+
+        <!-- ── Disable default WorkManager initialiser so Hilt takes over -->
+        <provider
+                android:name="androidx.startup.InitializationProvider"
+                android:authorities="${applicationId}.androidx-startup"
+                android:exported="false"
+                tools:node="merge">
+            <meta-data
+                    android:name="androidx.work.WorkManagerInitializer"
+                    android:value="androidx.startup"
+                    tools:node="remove"/>
+        </provider>
+
+        <!-- ── SMS Auto-Parsing ──────────────────────────────────────── -->
+
+        <!--
+            SmsBroadcastReceiver: listens for incoming bank SMS.
+            android:permission="android.permission.BROADCAST_SMS" ensures only the
+            system (telephony stack) can deliver SMS_RECEIVED intents to this receiver.
+            priority="999" so we process the SMS before other apps.
+        -->
+        <receiver
+                android:name=".sms.SmsBroadcastReceiver"
+                android:enabled="true"
+                android:exported="true"
+                android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            ConfirmActionReceiver: handles inline notification action buttons
+            (Confirm / Ignore) posted by TransactionNotifier.
+            Not exported — only this app can send these broadcasts.
+        -->
+        <receiver
+                android:name=".sms.ConfirmActionReceiver"
+                android:enabled="true"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.truxpense.ACTION_CONFIRM_TXN"/>
+                <action android:name="com.example.truxpense.ACTION_REJECT_TXN"/>
+            </intent-filter>
+        </receiver>
+
+>>>>>>> develop
     </application>
 
 </manifest>

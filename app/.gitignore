@@ -1,1 +1,9 @@
+<<<<<<< HEAD
 /build
+=======
+/build
+../gradle.properties
+../gradle.properties.local
+../strings.xml
+../network_security_config.xml
+>>>>>>> develop
